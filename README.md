@@ -6,17 +6,23 @@ First, run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open **http://localhost:3000** in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+You can start editing the page by modifying `app/page.tsx`.
+
+### Cleaning the dev cache (Windows)
+
+Use `npm run dev:safe` if you ever see lock/port issues or localhost refuses to connect.
+
+If the dev server hangs or shows lock errors, run:
+
+```bash
+npm run clean:dev
+```
+
+This removes the `.next/dev/lock` file and clears the `.next` cache. On Windows, this works from PowerShell or Command Prompt. Then run `npm run dev` again. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

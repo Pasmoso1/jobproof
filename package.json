@@ -4,14 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:safe": "taskkill /IM node.exe /F 2>NUL || echo no-node && node -e \"try{require('fs').rmSync('.next/dev/lock',{force:true})}catch(e){}\" && next dev",
+    "dev:reset": "taskkill /IM node.exe /F || echo no-node && node -e \"require('fs').rmSync('.next/dev/lock',{force:true})\" && next dev",
+    "clean:dev": "node -e \"const fs=require('fs');try{fs.unlinkSync('.next/dev/lock')}catch(e){};try{fs.rmSync('.next',{recursive:true,force:true})}catch(e){}\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.98.0",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "resend": "^6.9.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
