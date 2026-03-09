@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 export async function POST(request: Request) {
   try {
     const url = process.env.SUPABASE_URL;
@@ -18,7 +20,6 @@ export async function POST(request: Request) {
     }
 
     const supabase = createClient(url, serviceRoleKey);
-    const resend = new Resend(process.env.RESEND_API_KEY);
 
     const body = await request.json();
     const { email, trade, city, source, website } = body;
@@ -59,18 +60,31 @@ export async function POST(request: Request) {
     }
 
     const { error: emailError } = await resend.emails.send({
-      from: "Job Proof <onboarding@resend.dev>",
+      from: "Job Proof <hello@jobproof.ca>",
       to: normalizedEmail,
-      subject: "Job Proof Early Access Request Received",
-      text: `
-Thanks for requesting early access to Job Proof.
+      reply_to: "jeffrey@jobproof.ca",
+      subject: "You're on the Job Proof early access list",
+      html: `
+    <div style="font-family: Arial, sans-serif; line-height:1.5;">
+      <h2>You're on the list.</h2>
 
-We're building Job Proof to help contractors protect every job with clear contracts, organized documentation, and dispute support.
+      <p>Thanks for requesting early access to <strong>Job Proof</strong>.</p>
 
-We'll be in touch as we get closer to launch.
+      <p>
+      We're building Job Proof with real contractors across Ontario to help
+      create clear contracts, document jobs properly, and stay protected
+      when problems happen.
+      </p>
 
-— Job Proof
-`,
+      <p>
+      You'll be among the first contractors notified when early access opens.
+      </p>
+
+      <p>
+      — Job Proof
+      </p>
+    </div>
+  `,
     });
     if (emailError) {
       console.error("RESEND_EMAIL_ERROR", emailError);

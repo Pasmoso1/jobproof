@@ -3,6 +3,17 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --brand-blue: #2436BB;
+  --brand-teal: #4DBACC;
+  --brand-orange: #F26C36;
+}
+
+a:not([class*="rounded-lg"]) {
+  color: var(--brand-blue);
+  transition: color 0.2s;
+}
+a:not([class*="rounded-lg"]):hover {
+  color: var(--brand-teal);
 }
 
 @theme inline {
