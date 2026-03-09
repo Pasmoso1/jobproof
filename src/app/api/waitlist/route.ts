@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     const { error: emailError } = await resend.emails.send({
       from: "Job Proof <hello@jobproof.ca>",
       to: normalizedEmail,
-      reply_to: "jeffrey@jobproof.ca",
+      replyTo: "jeffrey@jobproof.ca",
       subject: "You're on the Job Proof early access list",
       html: `
     <div style="font-family: Arial, sans-serif; line-height:1.5;">
