@@ -81,6 +81,51 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Who it's for */}
+        <section
+          id="who-its-for"
+          className="scroll-mt-20 border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20"
+        >
+          <div className="mx-auto max-w-4xl">
+            <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+              Who Job Proof Is Built For
+            </h2>
+
+            <p className="mt-6 text-center text-zinc-600 leading-relaxed">
+              Job Proof is designed for contractors who want to protect their work,
+              document jobs properly, and reduce disputes with clear contracts and
+              professional records.
+            </p>
+
+            <div className="mt-12 grid gap-8 sm:grid-cols-2">
+              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
+                <h3 className="font-semibold text-zinc-900">Great for</h3>
+                <ul className="mt-3 space-y-2 text-sm text-zinc-600">
+                  <li>Independent contractors</li>
+                  <li>Small contractor teams</li>
+                  <li>Plumbers</li>
+                  <li>HVAC technicians</li>
+                  <li>Electricians</li>
+                  <li>Flooring installers</li>
+                  <li>Painters</li>
+                  <li>Roofers</li>
+                  <li>Landscapers</li>
+                  <li>Renovation contractors</li>
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
+                <h3 className="font-semibold text-zinc-900">Probably not necessary for</h3>
+                <ul className="mt-3 space-y-2 text-sm text-zinc-600">
+                  <li>Large commercial construction companies</li>
+                  <li>Firms with dedicated legal or compliance departments</li>
+                  <li>Companies already running complex enterprise project management systems</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Problem */}
         <section
           id="problem"
