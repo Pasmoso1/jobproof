@@ -320,7 +320,7 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <p className="mt-10 text-center text-sm text-zinc-500">
+            <p className="mt-10 text-center text-sm font-semibold text-zinc-700">
               Designed specifically for contractors working in the real world —
               not office software.
             </p>
@@ -366,7 +366,7 @@ export default function Home() {
                 General Contracting
               </div>
             </div>
-            <p className="mt-6 text-center text-sm text-zinc-500">
+            <p className="mt-6 text-center text-sm font-semibold text-zinc-700">
               And many other contractor trades.
             </p>
           </div>
