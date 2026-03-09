@@ -52,6 +52,17 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white font-sans">
+      <header className="border-b border-zinc-200 bg-white px-6 py-4 sm:px-8">
+        <div className="mx-auto flex max-w-6xl items-center">
+          <a href="/">
+            <img
+              src="/jobproof-logo.png"
+              alt="Job Proof"
+              className="h-10 w-auto"
+            />
+          </a>
+        </div>
+      </header>
       <main>
         {/* Hero */}
         <section className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-20 sm:px-8 sm:py-28">
