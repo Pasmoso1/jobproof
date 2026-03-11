@@ -16,9 +16,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Job Proof",
   description: "Protect every job. Get paid. Stay protected.",
-  icons: {
-    icon: "/jobproof-favicon.png",
-  },
 };
 
 export default function RootLayout({
