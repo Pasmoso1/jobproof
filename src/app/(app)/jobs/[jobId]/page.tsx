@@ -1,0 +1,437 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
+import { getJob, getJobUpdates, getContractForJob, getChangeOrders, getProfile } from "../../actions";
+
+export default async function JobDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ jobId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { jobId } = await params;
+  const sp = searchParams ? await searchParams : {};
+  const contractSentFlag = sp.contractSent;
+  const contractSent =
+    contractSentFlag === "1" ||
+    contractSentFlag === "true" ||
+    (Array.isArray(contractSentFlag) &&
+      (contractSentFlag[0] === "1" || contractSentFlag[0] === "true"));
+  const rawEmail = sp.contractEmail;
+  const contractEmailParam =
+    typeof rawEmail === "string"
+      ? rawEmail
+      : Array.isArray(rawEmail)
+        ? rawEmail[0]
+        : undefined;
+  let contractEmailDisplay = "";
+  if (contractEmailParam) {
+    try {
+      contractEmailDisplay = decodeURIComponent(contractEmailParam);
+    } catch {
+      contractEmailDisplay = contractEmailParam;
+    }
+  }
+  const [job, updates, contract, changeOrders, profile, supabase] = await Promise.all([
+    getJob(jobId),
+    getJobUpdates(jobId),
+    getContractForJob(jobId),
+    getChangeOrders(jobId),
+    getProfile(),
+    createClient(),
+  ]);
+
+  if (!job) notFound();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
+  const businessIncomplete =
+    !profile ||
+    !user ||
+    !isBusinessProfileCompleteForApp({
+      business_name: profile.business_name,
+      account_email: user.email ?? "",
+      phone: profile.phone,
+      address_line_1: profile.address_line_1,
+      city: profile.city,
+      province: profile.province,
+      postal_code: profile.postal_code,
+    });
+
+  return (
+    <div className="space-y-6">
+      {contractSent && (
+        <div
+          className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-950"
+          role="status"
+        >
+          <p className="font-semibold text-green-900">Contract sent for signature</p>
+          {contractEmailDisplay ? (
+            <p className="mt-1 text-green-900">
+              Contract sent to <span className="font-medium">{contractEmailDisplay}</span> for
+              signature.
+            </p>
+          ) : (
+            <p className="mt-1 text-green-800">
+              A remote signing link was created. If you don&apos;t see this message with an email
+              address, check the contract page and your email provider logs.
+            </p>
+          )}
+        </div>
+      )}
+      {businessIncomplete && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Complete your business profile to send contracts and invoices.{" "}
+          <Link href="/settings/business" className="font-medium underline hover:no-underline">
+            Add business details →
+          </Link>
+        </div>
+      )}
+      <div>
+        <Link
+          href="/dashboard"
+          className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
+        >
+          ← Back to dashboard
+        </Link>
+        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">
+              {job.title}
+            </h1>
+            <p className="mt-1 text-zinc-600">
+              {customer?.full_name ?? "Unknown customer"}
+              {customer?.email && (
+                <span className="ml-2 text-zinc-500">• {customer.email}</span>
+              )}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  job.status === "active"
+                    ? "bg-green-100 text-green-800"
+                    : job.status === "completed"
+                      ? "bg-zinc-100 text-zinc-700"
+                      : "bg-red-100 text-red-800"
+                }`}
+              >
+                {job.status}
+              </span>
+              {job.contract_status && job.contract_status !== "none" && (
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    job.contract_status === "signed"
+                      ? "bg-green-100 text-green-800"
+                      : job.contract_status === "pending"
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-zinc-100 text-zinc-700"
+                  }`}
+                >
+                  Contract: {job.contract_status}
+                </span>
+              )}
+              {(job.current_contract_total ?? job.original_contract_price) != null && (
+                <span className="text-sm font-medium text-zinc-700">
+                  ${Number(job.current_contract_total ?? job.original_contract_price).toLocaleString()}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/jobs/${jobId}/edit`}
+              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+            >
+              Edit job
+            </Link>
+            <Link
+              href={`/jobs/${jobId}/updates/new`}
+              className="rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2"
+            >
+              Add job update (photos/notes)
+            </Link>
+            <Link
+              href={`/jobs/${jobId}/contract`}
+              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+            >
+              {job.contract_status === "signed"
+                ? "View contract"
+                : job.contract_status === "pending"
+                  ? "Contract (pending)"
+                  : "Create contract"}
+            </Link>
+            <Link
+              href={`/jobs/${jobId}/change-orders`}
+              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+            >
+              Add change order
+            </Link>
+            <Link
+              href={`/jobs/${jobId}/invoices`}
+              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+            >
+              Invoices
+            </Link>
+            <Link
+              href={`/jobs/${jobId}/proof`}
+              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+            >
+              Proof report
+            </Link>
+          </div>
+        </div>
+
+        {!contract && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Create a contract before starting work
+          </div>
+        )}
+        {contract?.status === "signed" && (
+          <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+            <h2 className="font-semibold text-zinc-900">Contract</h2>
+            <div className="mt-2 flex flex-wrap gap-4 text-sm">
+              <span className="text-zinc-600">
+                Status: <span className="font-medium text-green-700">Signed</span>
+              </span>
+              {contract.signed_at && (
+                <span className="text-zinc-600">
+                  Signed: {new Date(contract.signed_at).toLocaleDateString()}
+                </span>
+              )}
+              {contract.price != null && (
+                <span className="text-zinc-600">
+                  Price: ${Number(contract.price).toLocaleString()}
+                </span>
+              )}
+              {contract.signing_method && (
+                <span className="text-zinc-600 capitalize">
+                  Method: {contract.signing_method}
+                </span>
+              )}
+            </div>
+            <Link
+              href={`/jobs/${jobId}/contract`}
+              className="mt-3 inline-block text-sm font-medium text-[#2436BB] hover:underline"
+            >
+              View signed contract
+            </Link>
+          </div>
+        )}
+
+        <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+          <h2 className="font-semibold text-zinc-900">Change orders</h2>
+          {changeOrders.length === 0 ? (
+            <p className="mt-1 text-sm text-zinc-600">No change orders yet.</p>
+          ) : (
+            <>
+              <p className="mt-1 text-sm text-zinc-600">
+                Signed total: ${changeOrders
+                  .filter((c: { status: string }) => c.status === "signed")
+                  .reduce((s: number, c: { change_amount?: number | null }) => s + (c.change_amount ?? 0), 0)
+                  .toLocaleString()}
+              </p>
+              <ul className="mt-2 space-y-2 text-sm">
+                {changeOrders.slice(0, 5).map((co: {
+                  id: string;
+                  change_title: string | null;
+                  change_amount: number | null;
+                  revised_total_price: number | null;
+                  original_contract_price: number | null;
+                  status: string;
+                  signed_at: string | null;
+                  signing_method: string | null;
+                  pdf_path: string | null;
+                }) => {
+                  const prev = co.original_contract_price ?? 0;
+                  const next = co.revised_total_price ?? prev + (co.change_amount ?? 0);
+                  const delta = co.change_amount ?? next - prev;
+                  return (
+                  <li key={co.id} className="flex items-center justify-between gap-2">
+                    <div>
+                      <span className="font-medium text-zinc-900">
+                        {co.change_title ?? "Change order"}
+                      </span>
+                      <span className={`ml-2 ${co.status === "signed" ? "text-green-700" : co.status === "declined" ? "text-red-700" : co.status === "sent" ? "text-amber-700" : "text-zinc-500"}`}>
+                        ({co.status === "sent" ? "awaiting approval" : co.status})
+                      </span>
+                      {co.revised_total_price != null && (
+                        <span className="ml-2 text-zinc-600">
+                          ${prev.toLocaleString()} → ${next.toLocaleString()}
+                          <span className={delta >= 0 ? " text-green-700" : " text-red-700"}>
+                            {" "}({delta >= 0 ? "+" : ""}{delta.toLocaleString()})
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {co.signed_at && (
+                        <span className="text-zinc-500">
+                          {new Date(co.signed_at).toLocaleDateString()}
+                          {co.signing_method && ` (${co.signing_method})`}
+                        </span>
+                      )}
+                      {co.status === "signed" && (
+                        <Link
+                          href={`/jobs/${jobId}/change-orders/${co.id}`}
+                          className="text-sm font-medium text-[#2436BB] hover:underline"
+                        >
+                          {co.pdf_path ? "View PDF" : "View"}
+                        </Link>
+                      )}
+                    </div>
+                  </li>
+                );
+                })}
+              </ul>
+            </>
+          )}
+          <Link
+            href={`/jobs/${jobId}/change-orders`}
+            className="mt-2 inline-block text-sm font-medium text-[#2436BB] hover:underline"
+          >
+            View change orders
+          </Link>
+        </div>
+
+        {(job.property_address_line_1 || job.description) && (
+          <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+            {job.property_address_line_1 && (
+              <p className="text-sm text-zinc-600">
+                <span className="font-medium text-zinc-700">Address:</span>{" "}
+                {[job.property_address_line_1, job.property_address_line_2, job.property_city, job.property_province, job.property_postal_code]
+                  .filter(Boolean)
+                  .join(", ")}
+              </p>
+            )}
+            {job.description && (
+              <p className="mt-2 text-sm text-zinc-600">
+                <span className="font-medium text-zinc-700">Description:</span>{" "}
+                {job.description}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Timeline */}
+      <div className="rounded-xl border border-zinc-200 bg-white">
+        <h2 className="border-b border-zinc-200 px-4 py-3 font-semibold text-zinc-900 sm:px-6">
+          Timeline
+        </h2>
+        <div className="divide-y divide-zinc-200">
+          {updates.length === 0 ? (
+            <div className="px-4 py-12 text-center text-zinc-500 sm:px-6">
+              <p>No updates yet.</p>
+              <Link
+                href={`/jobs/${jobId}/updates/new`}
+                className="mt-2 inline-block font-medium text-[#2436BB] hover:underline"
+              >
+                Add first update
+              </Link>
+            </div>
+          ) : (
+            updates.map(
+              (update: {
+                id: string;
+                category: string;
+                title: string;
+                note: string | null;
+                date: string;
+                created_at: string;
+                location_source?: string | null;
+                location_latitude?: number | null;
+                location_longitude?: number | null;
+                job_update_attachments: {
+                  id: string;
+                  file_name: string;
+                  file_type: string | null;
+                  captured_at: string | null;
+                }[];
+              }) => {
+                const atts = update.job_update_attachments ?? [];
+                const n = atts.length;
+                const photoCount = atts.filter((a) => a.file_type === "photo").length;
+                const docTime = new Date(update.created_at).toLocaleString();
+                const hasRecordedLocation =
+                  update.location_source === "device_current" &&
+                  update.location_latitude != null &&
+                  update.location_longitude != null;
+                return (
+                <div
+                  key={update.id}
+                  className="px-4 py-4 sm:px-6"
+                >
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <span className="inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">
+                        {update.category}
+                      </span>
+                      <h3 className="mt-1 font-medium text-zinc-900">
+                        {update.title}
+                      </h3>
+                      {update.note && (
+                        <p className="mt-1 text-sm text-zinc-600">{update.note}</p>
+                      )}
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Job date: {new Date(update.date).toLocaleDateString()}
+                      </p>
+                      <p className="mt-0.5 text-xs font-medium text-zinc-700">
+                        Documented {docTime}
+                        {n > 0 && (
+                          <>
+                            {" "}
+                            • {n} attachment{n === 1 ? "" : "s"}
+                            {photoCount > 0 && (
+                              <span className="text-zinc-600">
+                                {" "}
+                                ({photoCount} photo{photoCount === 1 ? "" : "s"} added)
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </p>
+                      {hasRecordedLocation && photoCount > 0 && (
+                        <p className="mt-1 text-xs font-medium text-zinc-700">
+                          Location recorded
+                        </p>
+                      )}
+                      {n > 0 && (
+                        <p className="mt-1 text-xs text-zinc-500">
+                          Files are timestamped when this update was saved and appear on this timeline
+                          entry.
+                        </p>
+                      )}
+                    </div>
+                    {n > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1 sm:mt-0">
+                        {atts.map((a) => (
+                          <span
+                            key={a.id}
+                            className="inline-flex items-center rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-600"
+                            title={
+                              a.captured_at
+                                ? `Uploaded ${new Date(a.captured_at).toLocaleString()}`
+                                : undefined
+                            }
+                          >
+                            📎 {a.file_name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                );
+              }
+            )
+          )}
+        </div>
+      </div>
+
+    </div>
+  );
+}

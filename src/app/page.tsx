@@ -53,13 +53,19 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white font-sans">
       <header className="border-b border-zinc-200 bg-white px-6 py-4 sm:px-8">
-        <div className="mx-auto flex max-w-6xl items-center">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
           <a href="/">
             <img
               src="/jobproof-logo.png"
               alt="Job Proof"
               className="h-10 w-auto"
             />
+          </a>
+          <a
+            href="/login"
+            className="text-sm font-medium text-[#2436BB] hover:text-[#1c2a96]"
+          >
+            Sign in
           </a>
         </div>
       </header>

@@ -1,0 +1,621 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createJob, createCustomer } from "../../actions";
+import {
+  parsePositiveContractPrice,
+  validateCustomerEmail,
+  validateJobEstimatedScheduleDates,
+  validateScopeOfWork,
+  validateTrade,
+} from "@/lib/validation/job-create";
+
+type Customer = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  address_line_1?: string | null;
+  address_line_2?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postal_code?: string | null;
+};
+
+export function CreateJobForm({ customers }: { customers: Customer[] }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [useNewCustomer, setUseNewCustomer] = useState(customers.length === 0);
+
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerNotes, setCustomerNotes] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? "");
+
+  const [title, setTitle] = useState("");
+  const [scopeOfWork, setScopeOfWork] = useState("");
+  const [serviceCategory, setServiceCategory] = useState("");
+  const [propertyAddressLine1, setPropertyAddressLine1] = useState("");
+  const [propertyAddressLine2, setPropertyAddressLine2] = useState("");
+  const [propertyCity, setPropertyCity] = useState("");
+  const [propertyProvince, setPropertyProvince] = useState("");
+  const [propertyPostalCode, setPropertyPostalCode] = useState("");
+  const [depositAmount, setDepositAmount] = useState("");
+  const [taxRate, setTaxRate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [estimatedCompletionDate, setEstimatedCompletionDate] = useState("");
+  const [originalContractPrice, setOriginalContractPrice] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  function validateJobDetails(): boolean {
+    const errs: Record<string, string> = {};
+    const scopeErr = validateScopeOfWork(scopeOfWork);
+    if (scopeErr) errs.scope_of_work = scopeErr;
+    const priceRes = parsePositiveContractPrice(originalContractPrice);
+    if (!priceRes.ok) errs.original_contract_price = priceRes.message;
+    const tradeErr = validateTrade(serviceCategory);
+    if (tradeErr) errs.service_category = tradeErr;
+
+    const scheduleErrs = validateJobEstimatedScheduleDates(startDate, estimatedCompletionDate);
+    if (scheduleErrs) Object.assign(errs, scheduleErrs);
+
+    if (useNewCustomer) {
+      const emErr = validateCustomerEmail(customerEmail);
+      if (emErr) errs.customer_email = emErr;
+    } else {
+      if (!selectedCustomerId) {
+        errs.customer_selection = "Please select a customer.";
+      } else {
+        const c = customers.find((x) => x.id === selectedCustomerId);
+        const emErr = validateCustomerEmail(c?.email ?? "");
+        if (emErr) errs.customer_email = emErr;
+      }
+    }
+
+    setFieldErrors(errs);
+    return Object.keys(errs).length === 0;
+  }
+
+  async function handleSubmit(action: "save" | "saveAndContract") {
+    setError(null);
+    if (!validateJobDetails()) {
+      return;
+    }
+
+    setLoading(true);
+
+    let customerId = selectedCustomerId;
+
+    if (useNewCustomer) {
+      const formData = new FormData();
+      formData.set("full_name", customerName.trim());
+      formData.set("email", customerEmail.trim() || "");
+      formData.set("phone", customerPhone.trim() || "");
+      formData.set("notes", customerNotes.trim() || "");
+
+      const result = await createCustomer(formData);
+      if (result?.error) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
+      if (result?.customerId) {
+        customerId = result.customerId;
+      } else {
+        setError("Failed to create customer");
+        setLoading(false);
+        return;
+      }
+    } else if (!customerId) {
+      setError("Please select a customer or create a new one");
+      setLoading(false);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("customer_id", customerId);
+    formData.set("title", title.trim());
+    formData.set("scope_of_work", scopeOfWork.trim());
+    formData.set("service_category", serviceCategory.trim() || "");
+    formData.set("property_address_line_1", propertyAddressLine1.trim() || "");
+    formData.set("property_address_line_2", propertyAddressLine2.trim() || "");
+    formData.set("property_city", propertyCity.trim() || "");
+    formData.set("property_province", propertyProvince.trim() || "");
+    formData.set("property_postal_code", propertyPostalCode.trim() || "");
+    formData.set("deposit_amount", depositAmount.trim() || "");
+    formData.set("tax_rate", taxRate.trim() || "");
+    formData.set("start_date", startDate.trim() || "");
+    formData.set("estimated_completion_date", estimatedCompletionDate.trim() || "");
+    formData.set("original_contract_price", originalContractPrice.trim() || "");
+
+    const result = await createJob(formData);
+
+    setLoading(false);
+
+    if (result && "fieldErrors" in result && result.fieldErrors) {
+      setFieldErrors(result.fieldErrors as unknown as Record<string, string>);
+      return;
+    }
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+
+    if (result?.jobId) {
+      if (action === "saveAndContract") {
+        router.push(`/jobs/${result.jobId}/contract`);
+      } else {
+        router.push(`/jobs/${result.jobId}`);
+      }
+      router.refresh();
+    }
+  }
+
+  return (
+    <form
+      className="space-y-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm"
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSubmit("save");
+      }}
+    >
+      {error && (
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Customer section */}
+      <div>
+        <h2 className="text-lg font-semibold text-zinc-900">Customer</h2>
+        <div className="mt-3 flex gap-4">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="radio"
+              name="customerMode"
+              checked={!useNewCustomer}
+              onChange={() => setUseNewCustomer(false)}
+              className="h-4 w-4 border-zinc-300 text-[#2436BB] focus:ring-[#2436BB]"
+            />
+            <span className="text-sm text-zinc-700">Select existing</span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="radio"
+              name="customerMode"
+              checked={useNewCustomer}
+              onChange={() => setUseNewCustomer(true)}
+              className="h-4 w-4 border-zinc-300 text-[#2436BB] focus:ring-[#2436BB]"
+            />
+            <span className="text-sm text-zinc-700">Create new</span>
+          </label>
+        </div>
+
+        {useNewCustomer ? (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label htmlFor="customerName" className="block text-sm font-medium text-zinc-700">
+                Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="customerName"
+                type="text"
+                required={useNewCustomer}
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="John Smith"
+                className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+              />
+            </div>
+            <div>
+              <label htmlFor="customerEmail" className="block text-sm font-medium text-zinc-700">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="customerEmail"
+                type="email"
+                required
+                value={customerEmail}
+                onChange={(e) => {
+                  setCustomerEmail(e.target.value);
+                  setFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.customer_email;
+                    return next;
+                  });
+                }}
+                placeholder="john@example.com"
+                className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
+                  fieldErrors.customer_email ? "border-red-500 focus:border-red-500" : "border-zinc-300 focus:border-[#2436BB]"
+                }`}
+                aria-invalid={!!fieldErrors.customer_email}
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                Required for contracts, remote signing links, and invoices.
+              </p>
+              {fieldErrors.customer_email && (
+                <p className="mt-1 text-sm text-red-600" role="alert">
+                  {fieldErrors.customer_email}
+                </p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="customerPhone" className="block text-sm font-medium text-zinc-700">
+                Phone
+              </label>
+              <input
+                id="customerPhone"
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="(555) 123-4567"
+                className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="customerNotes" className="block text-sm font-medium text-zinc-700">
+                Notes
+              </label>
+              <textarea
+                id="customerNotes"
+                rows={2}
+                value={customerNotes}
+                onChange={(e) => setCustomerNotes(e.target.value)}
+                placeholder="Additional notes..."
+                className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <label htmlFor="customer" className="block text-sm font-medium text-zinc-700">
+              Customer
+            </label>
+            <select
+              id="customer"
+              value={selectedCustomerId}
+              onChange={(e) => {
+                setSelectedCustomerId(e.target.value);
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.customer_email;
+                  delete next.customer_selection;
+                  return next;
+                });
+              }}
+              required={!useNewCustomer}
+              className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-zinc-900 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
+                fieldErrors.customer_selection || fieldErrors.customer_email
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-zinc-300 focus:border-[#2436BB]"
+              }`}
+              aria-invalid={!!(fieldErrors.customer_selection || fieldErrors.customer_email)}
+            >
+              <option value="">Select a customer</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.full_name}
+                  {c.email ? ` (${c.email})` : ""}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-zinc-500">
+              Customer must have an email on file for contracts, remote signing, and invoices.
+            </p>
+            {fieldErrors.customer_selection && (
+              <p className="mt-1 text-sm text-red-600" role="alert">
+                {fieldErrors.customer_selection}
+              </p>
+            )}
+            {fieldErrors.customer_email && (
+              <p className="mt-1 text-sm text-red-600" role="alert">
+                {fieldErrors.customer_email}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Job section */}
+      <div>
+        <h2 className="text-lg font-semibold text-zinc-900">Job details</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label htmlFor="title" className="block text-sm font-medium text-zinc-700">
+              Job title <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="title"
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Kitchen renovation"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="scopeOfWork" className="block text-sm font-medium text-zinc-700">
+              Scope of work <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              id="scopeOfWork"
+              rows={4}
+              value={scopeOfWork}
+              onChange={(e) => {
+                setScopeOfWork(e.target.value);
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.scope_of_work;
+                  return next;
+                });
+              }}
+              placeholder="Describe exactly what work will be completed (e.g., install drywall, paint walls, replace flooring)"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+              aria-invalid={!!fieldErrors.scope_of_work}
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              This will be included in your contract and helps protect you in disputes.
+            </p>
+            {fieldErrors.scope_of_work && (
+              <p className="mt-1 text-sm text-red-600" role="alert">
+                {fieldErrors.scope_of_work}
+              </p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="serviceCategory" className="block text-sm font-medium text-zinc-700">
+              Trade <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="serviceCategory"
+              type="text"
+              required
+              value={serviceCategory}
+              onChange={(e) => {
+                setServiceCategory(e.target.value);
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.service_category;
+                  return next;
+                });
+              }}
+              placeholder="e.g. Electrical, Plumbing, Renovation"
+              className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
+                fieldErrors.service_category ? "border-red-500 focus:border-red-500" : "border-zinc-300 focus:border-[#2436BB]"
+              }`}
+              aria-invalid={!!fieldErrors.service_category}
+            />
+            {fieldErrors.service_category && (
+              <p className="mt-1 text-sm text-red-600" role="alert">
+                {fieldErrors.service_category}
+              </p>
+            )}
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="propertyAddressLine1" className="block text-sm font-medium text-zinc-700">
+              Property address line 1 <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="propertyAddressLine1"
+              type="text"
+              required
+              value={propertyAddressLine1}
+              onChange={(e) => setPropertyAddressLine1(e.target.value)}
+              placeholder="123 Main St"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="propertyAddressLine2" className="block text-sm font-medium text-zinc-700">
+              Property address line 2
+            </label>
+            <input
+              id="propertyAddressLine2"
+              type="text"
+              value={propertyAddressLine2}
+              onChange={(e) => setPropertyAddressLine2(e.target.value)}
+              placeholder="Suite 100"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+            />
+          </div>
+          <div>
+            <label htmlFor="propertyCity" className="block text-sm font-medium text-zinc-700">
+              City <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="propertyCity"
+              type="text"
+              required
+              value={propertyCity}
+              onChange={(e) => setPropertyCity(e.target.value)}
+              placeholder="London"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+            />
+          </div>
+          <div>
+            <label htmlFor="propertyProvince" className="block text-sm font-medium text-zinc-700">
+              Province <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="propertyProvince"
+              type="text"
+              required
+              value={propertyProvince}
+              onChange={(e) => setPropertyProvince(e.target.value)}
+              placeholder="ON"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+            />
+          </div>
+          <div>
+            <label htmlFor="propertyPostalCode" className="block text-sm font-medium text-zinc-700">
+              Postal code
+            </label>
+            <input
+              id="propertyPostalCode"
+              type="text"
+              value={propertyPostalCode}
+              onChange={(e) => setPropertyPostalCode(e.target.value)}
+              placeholder="N6A 1B2"
+              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+            />
+          </div>
+          <div>
+            <label htmlFor="depositAmount" className="block text-sm font-medium text-zinc-700">
+              Deposit amount
+            </label>
+            <div className="relative mt-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-zinc-500">
+                $
+              </span>
+              <input
+                id="depositAmount"
+                type="number"
+                step="0.01"
+                min="0"
+                inputMode="decimal"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                placeholder="0.00"
+                className="no-spinner block w-full rounded-lg border border-zinc-300 py-2.5 pl-7 pr-4 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="taxRate" className="block text-sm font-medium text-zinc-700">
+              Tax rate (e.g. 0.13 for 13%)
+            </label>
+            <input
+              id="taxRate"
+              type="number"
+              step="0.0001"
+              min="0"
+              max="1"
+              value={taxRate}
+              onChange={(e) => setTaxRate(e.target.value)}
+              placeholder="0.13"
+              className="no-spinner mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+            />
+          </div>
+          <div>
+            <label htmlFor="startDate" className="block text-sm font-medium text-zinc-700">
+              Estimated start date <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="startDate"
+              type="date"
+              required
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.start_date;
+                  delete next.estimated_completion_date;
+                  return next;
+                });
+              }}
+              className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-zinc-900 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
+                fieldErrors.start_date ? "border-red-500 focus:border-red-500" : "border-zinc-300 focus:border-[#2436BB]"
+              }`}
+              aria-invalid={!!fieldErrors.start_date}
+            />
+            {fieldErrors.start_date && (
+              <p className="mt-1 text-sm text-red-600" role="alert">
+                {fieldErrors.start_date}
+              </p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="estimatedCompletionDate" className="block text-sm font-medium text-zinc-700">
+              Estimated completion date <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="estimatedCompletionDate"
+              type="date"
+              required
+              min={startDate || undefined}
+              value={estimatedCompletionDate}
+              onChange={(e) => {
+                setEstimatedCompletionDate(e.target.value);
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.estimated_completion_date;
+                  delete next.start_date;
+                  return next;
+                });
+              }}
+              className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-zinc-900 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
+                fieldErrors.estimated_completion_date
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-zinc-300 focus:border-[#2436BB]"
+              }`}
+              aria-invalid={!!fieldErrors.estimated_completion_date}
+            />
+            {fieldErrors.estimated_completion_date && (
+              <p className="mt-1 text-sm text-red-600" role="alert">
+                {fieldErrors.estimated_completion_date}
+              </p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="originalContractPrice" className="block text-sm font-medium text-zinc-700">
+              Contract price <span className="text-red-500">*</span>
+            </label>
+            <div className="relative mt-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-zinc-500">
+                $
+              </span>
+              <input
+                id="originalContractPrice"
+                type="number"
+                step="0.01"
+                min="0.01"
+                inputMode="decimal"
+                value={originalContractPrice}
+                onChange={(e) => {
+                  setOriginalContractPrice(e.target.value);
+                  setFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.original_contract_price;
+                    return next;
+                  });
+                }}
+                placeholder="0.00"
+                className="no-spinner block w-full rounded-lg border border-zinc-300 py-2.5 pl-7 pr-4 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                aria-invalid={!!fieldErrors.original_contract_price}
+              />
+            </div>
+            {fieldErrors.original_contract_price && (
+              <p className="mt-1 text-sm text-red-600" role="alert">
+                {fieldErrors.original_contract_price}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col gap-3 border-t border-zinc-200 pt-6 sm:flex-row">
+        <button
+          type="submit"
+          disabled={loading}
+          className="rounded-lg bg-[#2436BB] px-6 py-3 font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {loading ? "Saving..." : "Save job"}
+        </button>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => handleSubmit("saveAndContract")}
+          className="rounded-lg border-2 border-[#2436BB] bg-white px-6 py-3 font-medium text-[#2436BB] transition-colors hover:bg-[#2436BB]/5 focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          Save and create contract
+        </button>
+      </div>
+    </form>
+  );
+}

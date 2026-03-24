@@ -1,0 +1,115 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getJob, getContractForJob, getContractPdfSignedUrl, getProfile } from "@/app/(app)/actions";
+import { ContractBuilderForm } from "./contract-builder-form";
+
+export default async function ContractBuilderPage({
+  params,
+}: {
+  params: Promise<{ jobId: string }>;
+}) {
+  const { jobId } = await params;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const [job, contract, profile] = await Promise.all([
+    getJob(jobId),
+    getContractForJob(jobId),
+    getProfile(),
+  ]);
+
+  if (!job) notFound();
+
+  const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
+
+  if (contract?.status === "signed") {
+    const pdfUrl = contract.pdf_path
+      ? await getContractPdfSignedUrl(contract.pdf_path)
+      : null;
+
+    return (
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-6">
+          <Link
+            href={`/jobs/${jobId}`}
+            className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
+          >
+            ← Back to job
+          </Link>
+          <h1 className="mt-2 text-2xl font-bold text-zinc-900">Signed contract</h1>
+          <p className="mt-1 text-zinc-600">
+            {job.title} • {customer?.full_name ?? "Unknown customer"}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap gap-4 text-sm">
+            <span className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 font-medium text-green-800">
+              Signed
+            </span>
+            {contract.signed_at && (
+              <span className="text-zinc-600">
+                Signed {new Date(contract.signed_at).toLocaleDateString()}
+              </span>
+            )}
+            {contract.signing_method && (
+              <span className="text-zinc-600 capitalize">
+                {contract.signing_method} signing
+              </span>
+            )}
+            {contract.price != null && (
+              <span className="font-medium text-zinc-900">
+                ${Number(contract.price).toLocaleString()}
+              </span>
+            )}
+          </div>
+          {contract.signer_name && (
+            <p className="mt-4 text-sm text-zinc-600">
+              Signed by: {contract.signer_name}
+              {contract.signer_email && ` (${contract.signer_email})`}
+            </p>
+          )}
+          {pdfUrl ? (
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96]"
+            >
+              View / Download signed PDF
+            </a>
+          ) : (
+            <p className="mt-4 text-sm text-zinc-500">
+              PDF generation coming soon. Contract details are stored and locked.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-4xl">
+      <div className="mb-6">
+        <Link
+          href={`/jobs/${jobId}`}
+          className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
+        >
+          ← Back to job
+        </Link>
+        <h1 className="mt-2 text-2xl font-bold text-zinc-900">Contract builder</h1>
+        <p className="mt-1 text-zinc-600">
+          {job.title} • {customer?.full_name ?? "Unknown customer"}
+        </p>
+      </div>
+
+      <ContractBuilderForm
+        jobId={jobId}
+        job={job}
+        existingContract={contract}
+        profile={profile}
+        userEmail={user?.email ?? ""}
+      />
+    </div>
+  );
+}

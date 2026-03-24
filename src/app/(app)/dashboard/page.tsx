@@ -1,0 +1,200 @@
+import Link from "next/link";
+import { Suspense } from "react";
+import { createClient } from "@/lib/supabase/server";
+import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
+import {
+  getProfile,
+  getActiveJobsCount,
+  getStorageUsage,
+  getJobs,
+} from "../actions";
+import { DashboardAlerts } from "./dashboard-alerts";
+
+function formatStorage(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export default async function DashboardPage() {
+  const [profile, activeCount, storageBytes, jobs, supabase] = await Promise.all([
+    getProfile(),
+    getActiveJobsCount(),
+    getStorageUsage(),
+    getJobs(),
+    createClient(),
+  ]);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const businessProfileComplete =
+    profile &&
+    user &&
+    isBusinessProfileCompleteForApp({
+      business_name: profile.business_name,
+      account_email: user.email ?? "",
+      phone: profile.phone,
+      address_line_1: profile.address_line_1,
+      city: profile.city,
+      province: profile.province,
+      postal_code: profile.postal_code,
+    });
+
+  const storageLimitBytes = (profile?.storage_limit_mb ?? 10240) * 1024 * 1024;
+  const storagePercent = storageLimitBytes > 0
+    ? Math.round(((storageBytes ?? 0) / storageLimitBytes) * 100)
+    : 0;
+  const isStorageNearLimit = storagePercent >= 80;
+  const isJobLimitReached =
+    (activeCount ?? 0) >= (profile?.active_job_limit ?? 10);
+
+  return (
+    <div className="space-y-6">
+      <Suspense fallback={null}>
+        <DashboardAlerts />
+      </Suspense>
+      <div>
+        <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">
+          Dashboard
+        </h1>
+        <p className="mt-1 text-zinc-600">
+          Welcome back. Here&apos;s an overview of your jobs.
+        </p>
+      </div>
+
+      {/* Business profile banner */}
+      {!businessProfileComplete && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Complete your business profile to send contracts and invoices.{" "}
+          <Link href="/settings/business" className="font-medium underline hover:no-underline">
+            Add business details →
+          </Link>
+        </div>
+      )}
+
+      {/* Alerts */}
+      {(isStorageNearLimit || isJobLimitReached) && (
+        <div className="space-y-3">
+          {isStorageNearLimit && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Storage is {storagePercent}% full ({formatStorage(storageBytes ?? 0)} / {formatStorage(storageLimitBytes)}).
+              Consider removing old attachments or upgrading your plan.
+            </div>
+          )}
+          {isJobLimitReached && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              You&apos;ve reached your active job limit ({profile?.active_job_limit ?? 10}).
+              Complete or cancel jobs to create new ones, or upgrade your plan.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+          <p className="text-sm font-medium text-zinc-500">Plan</p>
+          <p className="mt-1 text-lg font-semibold capitalize text-zinc-900">
+            {profile?.plan_type ?? "Solo"}
+          </p>
+          <p className="mt-0.5 text-xs text-zinc-500 capitalize">
+            {profile?.subscription_status ?? "Trial"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+          <p className="text-sm font-medium text-zinc-500">Active jobs</p>
+          <p className="mt-1 text-lg font-semibold text-zinc-900">
+            {activeCount ?? 0}
+          </p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            of {profile?.active_job_limit ?? 10} limit
+          </p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+          <p className="text-sm font-medium text-zinc-500">Storage used</p>
+          <p className="mt-1 text-lg font-semibold text-zinc-900">
+            {formatStorage(storageBytes ?? 0)}
+          </p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            of {(profile?.storage_limit_mb ?? 10240)} MB
+          </p>
+        </div>
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
+          <Link
+            href="/jobs/create"
+            className="flex h-full flex-col justify-center"
+          >
+            <p className="text-sm font-medium text-zinc-500">Quick action</p>
+            <p className="mt-1 text-lg font-semibold text-[#2436BB] hover:underline">
+              Create job
+            </p>
+          </Link>
+        </div>
+      </div>
+
+      {/* Job list */}
+      <div className="rounded-xl border border-zinc-200 bg-white">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 sm:px-6">
+          <h2 className="font-semibold text-zinc-900">Recent jobs</h2>
+          <Link
+            href="/jobs/create"
+            className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            Create job
+          </Link>
+        </div>
+        <div className="divide-y divide-zinc-200">
+          {jobs.length === 0 ? (
+            <div className="px-4 py-12 text-center text-zinc-500 sm:px-6">
+              <p>No jobs yet.</p>
+              <Link
+                href="/jobs/create"
+                className="mt-2 inline-block font-medium text-[#2436BB] hover:underline"
+              >
+                Create your first job
+              </Link>
+            </div>
+          ) : (
+            jobs.map((job: { id: string; title: string; status: string; customers: { full_name?: string } | { full_name?: string }[] | null; current_contract_total?: number | null; original_contract_price?: number | null;  }) => {
+              const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
+              return (
+              <Link
+                key={job.id}
+                href={`/jobs/${job.id}`}
+                className="block px-4 py-4 transition-colors hover:bg-zinc-50 sm:px-6"
+              >
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium text-zinc-900">{job.title}</p>
+                    <p className="text-sm text-zinc-500">
+                      {customer?.full_name ?? "Unknown customer"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {(job.current_contract_total ?? job.original_contract_price) != null && (
+                      <span className="text-sm font-medium text-zinc-700">
+                        ${Number(job.current_contract_total ?? job.original_contract_price).toLocaleString()}
+                      </span>
+                    )}
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        job.status === "active"
+                          ? "bg-green-100 text-green-800"
+                          : job.status === "completed"
+                            ? "bg-zinc-100 text-zinc-700"
+                            : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {job.status}
+                    </span>
+                  </div>
+                </div>
+              </Link>
+            );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
