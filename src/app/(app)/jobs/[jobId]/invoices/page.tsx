@@ -1,21 +1,34 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getJob, getInvoices, getProfile } from "@/app/(app)/actions";
+import { getJob, getInvoices, getProfile, getContractForJob } from "@/app/(app)/actions";
 import { InvoiceBuilderForm } from "./invoice-builder-form";
 
 export default async function InvoicesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ jobId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { jobId } = await params;
-  const [job, invoices, profile] = await Promise.all([
+  const sp = searchParams ? await searchParams : {};
+  const jobCompletedFlag = sp.jobCompleted;
+  const showJobCompletedMessage =
+    jobCompletedFlag === "1" ||
+    jobCompletedFlag === "true" ||
+    (Array.isArray(jobCompletedFlag) &&
+      (jobCompletedFlag[0] === "1" || jobCompletedFlag[0] === "true"));
+
+  const [job, invoices, profile, contract] = await Promise.all([
     getJob(jobId),
     getInvoices(jobId),
     getProfile(),
+    getContractForJob(jobId),
   ]);
 
   if (!job) notFound();
+
+  const contractSigned = contract?.status === "signed";
 
   const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
   const businessName = (profile as { business_name?: string | null })?.business_name;
@@ -51,7 +64,21 @@ export default async function InvoicesPage({
         </div>
       )}
 
-      <InvoiceBuilderForm jobId={jobId} job={job} />
+      {showJobCompletedMessage && (
+        <div
+          className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-950"
+          role="status"
+        >
+          <p className="font-semibold text-green-900">Job marked complete.</p>
+          <p className="mt-1 text-green-900">Create your invoice now.</p>
+        </div>
+      )}
+
+      <InvoiceBuilderForm
+        jobId={jobId}
+        job={job}
+        contractSigned={contractSigned}
+      />
 
       <div className="mt-8 rounded-xl border border-zinc-200 bg-white">
         <h2 className="border-b border-zinc-200 px-4 py-3 font-semibold text-zinc-900 sm:px-6">
@@ -63,33 +90,57 @@ export default async function InvoicesPage({
               No invoices yet. Create one above.
             </div>
           ) : (
-            invoices.map((inv: { id: string; invoice_number: string | null; total: number; status: string; created_at: string }) => (
-              <div
-                key={inv.id}
-                className="flex items-center justify-between px-4 py-4 sm:px-6"
-              >
-                <div>
-                  <p className="font-medium text-zinc-900">
-                    {inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`}
-                  </p>
-                  <p className="text-sm text-zinc-500">
-                    {new Date(inv.created_at).toLocaleDateString()} •{" "}
-                    <span
-                      className={
-                        inv.status === "paid"
-                          ? "text-green-700"
-                          : inv.status === "sent"
-                            ? "text-amber-700"
-                            : "text-zinc-600"
-                      }
-                    >
-                      {inv.status}
-                    </span>
-                  </p>
-                </div>
-                <p className="font-medium text-zinc-900">${Number(inv.total).toLocaleString()}</p>
-              </div>
-            ))
+            invoices.map(
+              (inv: {
+                id: string;
+                invoice_number: string | null;
+                total: number;
+                balance_due?: number | null;
+                status: string;
+                created_at: string;
+              }) => {
+                const displayAmount =
+                  inv.balance_due != null && inv.balance_due !== undefined
+                    ? Number(inv.balance_due)
+                    : Number(inv.total);
+                return (
+                  <div
+                    key={inv.id}
+                    className="flex items-center justify-between px-4 py-4 sm:px-6"
+                  >
+                    <div>
+                      <p className="font-medium text-zinc-900">
+                        {inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`}
+                      </p>
+                      <p className="text-sm text-zinc-500">
+                        {new Date(inv.created_at).toLocaleDateString()} •{" "}
+                        <span
+                          className={
+                            inv.status === "paid"
+                              ? "text-green-700"
+                              : inv.status === "sent"
+                                ? "text-amber-700"
+                                : "text-zinc-600"
+                          }
+                        >
+                          {inv.status}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-zinc-900">
+                        ${displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      {inv.balance_due != null &&
+                        inv.balance_due !== undefined &&
+                        Number(inv.balance_due) !== Number(inv.total) && (
+                          <p className="text-xs text-zinc-500">Balance due</p>
+                        )}
+                    </div>
+                  </div>
+                );
+              }
+            )
           )}
         </div>
       </div>

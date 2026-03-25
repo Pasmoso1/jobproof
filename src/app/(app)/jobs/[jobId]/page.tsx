@@ -2,7 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
-import { getJob, getJobUpdates, getContractForJob, getChangeOrders, getProfile } from "../../actions";
+import {
+  getJob,
+  getJobUpdatesWithSignedAttachmentUrls,
+  getContractForJob,
+  getChangeOrders,
+  getProfile,
+} from "../../actions";
+import { MarkJobCompleteButton } from "./mark-job-complete-button";
+import { UpdateTimelinePhotos } from "./update-timeline-photos";
 
 export default async function JobDetailPage({
   params,
@@ -36,7 +44,7 @@ export default async function JobDetailPage({
   }
   const [job, updates, contract, changeOrders, profile, supabase] = await Promise.all([
     getJob(jobId),
-    getJobUpdates(jobId),
+    getJobUpdatesWithSignedAttachmentUrls(jobId),
     getContractForJob(jobId),
     getChangeOrders(jobId),
     getProfile(),
@@ -182,6 +190,7 @@ export default async function JobDetailPage({
             >
               Proof report
             </Link>
+            {job.status === "active" && <MarkJobCompleteButton jobId={jobId} />}
           </div>
         </div>
 
@@ -349,7 +358,9 @@ export default async function JobDetailPage({
                   id: string;
                   file_name: string;
                   file_type: string | null;
+                  mime_type?: string | null;
                   captured_at: string | null;
+                  signedUrl?: string | null;
                 }[];
               }) => {
                 const atts = update.job_update_attachments ?? [];
@@ -360,67 +371,88 @@ export default async function JobDetailPage({
                   update.location_source === "device_current" &&
                   update.location_latitude != null &&
                   update.location_longitude != null;
+
+                const isTimelineImage = (a: (typeof atts)[number]) => {
+                  if (!a.signedUrl) return false;
+                  if (a.file_type === "photo") return true;
+                  if (a.mime_type?.toLowerCase().startsWith("image/")) return true;
+                  return /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(a.file_name);
+                };
+
+                const photoTiles = atts
+                  .filter(isTimelineImage)
+                  .map((a) => ({
+                    id: a.id,
+                    file_name: a.file_name,
+                    signedUrl: a.signedUrl ?? null,
+                  }));
+                const photoTileIds = new Set(photoTiles.map((p) => p.id));
+                const otherAttachments = atts.filter((a) => !photoTileIds.has(a.id));
+
                 return (
                 <div
                   key={update.id}
                   className="px-4 py-4 sm:px-6"
                 >
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
                       <span className="inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">
                         {update.category}
                       </span>
-                      <h3 className="mt-1 font-medium text-zinc-900">
+                      <h3 className="mt-1 text-base font-semibold text-zinc-900">
                         {update.title}
                       </h3>
+                      <p className="mt-0.5 text-sm text-zinc-600">
+                        Job date {new Date(update.date).toLocaleDateString()}
+                        {n > 0 && (
+                          <>
+                            {" "}
+                            · {n} attachment{n === 1 ? "" : "s"}
+                            {photoCount > 0 && (
+                              <>
+                                {" "}
+                                ({photoCount} photo{photoCount === 1 ? "" : "s"})
+                              </>
+                            )}
+                          </>
+                        )}
+                      </p>
                       {update.note && (
                         <p className="mt-1 text-sm text-zinc-600">{update.note}</p>
                       )}
                       <p className="mt-1 text-xs text-zinc-500">
-                        Job date: {new Date(update.date).toLocaleDateString()}
-                      </p>
-                      <p className="mt-0.5 text-xs font-medium text-zinc-700">
                         Documented {docTime}
-                        {n > 0 && (
-                          <>
-                            {" "}
-                            • {n} attachment{n === 1 ? "" : "s"}
-                            {photoCount > 0 && (
-                              <span className="text-zinc-600">
-                                {" "}
-                                ({photoCount} photo{photoCount === 1 ? "" : "s"} added)
-                              </span>
-                            )}
-                          </>
-                        )}
                       </p>
                       {hasRecordedLocation && photoCount > 0 && (
                         <p className="mt-1 text-xs font-medium text-zinc-700">
                           Location recorded
                         </p>
                       )}
-                      {n > 0 && (
-                        <p className="mt-1 text-xs text-zinc-500">
-                          Files are timestamped when this update was saved and appear on this timeline
-                          entry.
+                      <UpdateTimelinePhotos attachments={photoTiles} />
+                      {photoTiles.length > 0 && (
+                        <p className="mt-2 text-xs text-zinc-500">
+                          Tap a thumbnail to view full size.
                         </p>
                       )}
                     </div>
-                    {n > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1 sm:mt-0">
-                        {atts.map((a) => (
-                          <span
-                            key={a.id}
-                            className="inline-flex items-center rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-600"
-                            title={
-                              a.captured_at
-                                ? `Uploaded ${new Date(a.captured_at).toLocaleString()}`
-                                : undefined
-                            }
-                          >
-                            📎 {a.file_name}
-                          </span>
-                        ))}
+                    {otherAttachments.length > 0 && (
+                      <div className="mt-2 flex min-w-0 flex-col gap-1 sm:mt-0 sm:max-w-[14rem]">
+                        <p className="text-xs font-medium text-zinc-600">Other files</p>
+                        <div className="flex flex-wrap gap-1">
+                          {otherAttachments.map((a) => (
+                            <span
+                              key={a.id}
+                              className="inline-flex max-w-full items-center truncate rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-600"
+                              title={
+                                a.captured_at
+                                  ? `Uploaded ${new Date(a.captured_at).toLocaleString()}`
+                                  : a.file_name
+                              }
+                            >
+                              📎 {a.file_name}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

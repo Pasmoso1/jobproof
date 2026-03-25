@@ -586,6 +586,56 @@ export async function updateJob(jobId: string, formData: FormData) {
   return { success: true };
 }
 
+export async function markJobComplete(jobId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("id, profile_id, status")
+    .eq("id", jobId)
+    .single();
+
+  if (!job) return { error: "Job not found" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile || job.profile_id !== profile.id) {
+    return { error: "Unauthorized" };
+  }
+
+  if (job.status === "completed") {
+    return { success: true as const };
+  }
+  if (job.status === "cancelled") {
+    return { error: "Cancelled jobs cannot be marked complete." };
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { error } = await supabase
+    .from("jobs")
+    .update({
+      status: "completed",
+      actual_completion_date: today,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/invoices`);
+  return { success: true as const };
+}
+
 export async function getJob(jobId: string) {
   const supabase = await createClient();
   const {
@@ -663,6 +713,55 @@ export async function getJobUpdates(jobId: string) {
     .order("created_at", { ascending: false });
 
   return data ?? [];
+}
+
+function attachmentIsLikelyImage(a: {
+  file_type: string | null;
+  mime_type: string | null;
+  file_name: string;
+}): boolean {
+  if (a.file_type === "photo") return true;
+  if (a.mime_type?.toLowerCase().startsWith("image/")) return true;
+  return /\.(jpe?g|png|gif|webp|heic|heif|bmp)$/i.test(a.file_name);
+}
+
+/** Same rows as getJobUpdates, with signedUrl on each attachment when it is an image (for thumbnails / lightbox). */
+export async function getJobUpdatesWithSignedAttachmentUrls(jobId: string) {
+  const updates = await getJobUpdates(jobId);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const pathsToSign = new Set<string>();
+  for (const u of updates) {
+    for (const a of u.job_update_attachments ?? []) {
+      if (attachmentIsLikelyImage(a) && a.storage_path) {
+        pathsToSign.add(a.storage_path);
+      }
+    }
+  }
+
+  const urlByPath = new Map<string, string>();
+  await Promise.all(
+    [...pathsToSign].map(async (path) => {
+      const { data } = await supabase.storage
+        .from("job-attachments")
+        .createSignedUrl(path, 3600);
+      if (data?.signedUrl) urlByPath.set(path, data.signedUrl);
+    })
+  );
+
+  return updates.map((u) => ({
+    ...u,
+    job_update_attachments: (u.job_update_attachments ?? []).map(
+      (a: Record<string, unknown>) => ({
+        ...a,
+        signedUrl: urlByPath.get(String(a.storage_path)) ?? null,
+      })
+    ),
+  }));
 }
 
 export type CreateJobUpdateResult = { success: true } | { error: string };
@@ -2559,11 +2658,15 @@ export async function getInvoices(jobId: string) {
   return data ?? [];
 }
 
+/**
+ * Create invoice from signed job totals only (contract + signed change orders on the job).
+ * Amounts are computed server-side; the client may only adjust tax rate, due date, and notes.
+ */
 export async function createInvoice(
   jobId: string,
-  lineItems: { description: string; amount: number; quantity?: number }[],
   taxRate: number,
-  dueDate?: string
+  dueDate?: string,
+  notes?: string
 ) {
   const supabase = await createClient();
   const {
@@ -2571,9 +2674,19 @@ export async function createInvoice(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const contract = await getContractForJob(jobId);
+  if (!contract || contract.status !== "signed") {
+    return {
+      error:
+        "Invoices from agreed amounts require a signed contract. Complete signing first.",
+    };
+  }
+
   const { data: job } = await supabase
     .from("jobs")
-    .select("id, profile_id")
+    .select(
+      "id, profile_id, deposit_amount, current_contract_total, original_contract_price"
+    )
     .eq("id", jobId)
     .single();
 
@@ -2607,9 +2720,35 @@ export async function createInvoice(
     };
   }
 
-  const subtotal = lineItems.reduce((s, i) => s + (i.amount * (i.quantity ?? 1)), 0);
-  const taxAmount = subtotal * taxRate;
-  const total = subtotal + taxAmount;
+  const agreedWorkSubtotal = Number(
+    job.current_contract_total ?? job.original_contract_price ?? 0
+  );
+  if (!Number.isFinite(agreedWorkSubtotal) || agreedWorkSubtotal <= 0) {
+    return {
+      error:
+        "This job has no positive agreed work total. Check the contract and signed change orders.",
+    };
+  }
+
+  const rate = Number.isFinite(taxRate) && taxRate >= 0 ? taxRate : 0;
+  const depositRaw = Number(job.deposit_amount ?? 0);
+  const depositOnFile = Number.isFinite(depositRaw) && depositRaw > 0 ? depositRaw : 0;
+
+  const subtotal = agreedWorkSubtotal;
+  const taxAmount = Math.round(subtotal * rate * 100) / 100;
+  const total = Math.round((subtotal + taxAmount) * 100) / 100;
+  const depositCredited = Math.min(depositOnFile, total);
+  const balanceDue = Math.round((total - depositCredited) * 100) / 100;
+
+  const lineItems = [
+    {
+      description: "Agreed work (signed contract & change orders)",
+      amount: agreedWorkSubtotal,
+      quantity: 1,
+    },
+  ];
+
+  const notesTrimmed = notes?.trim() || null;
 
   const { data: invoice, error } = await supabase
     .from("invoices")
@@ -2617,17 +2756,21 @@ export async function createInvoice(
       job_id: jobId,
       profile_id: profile.id,
       line_items: lineItems,
+      agreed_work_subtotal: agreedWorkSubtotal,
       subtotal,
       tax_amount: taxAmount,
       total,
+      deposit_credited: depositCredited,
+      balance_due: balanceDue,
       due_date: dueDate || null,
+      notes: notesTrimmed,
     })
     .select("id")
     .single();
 
   if (error) return { error: error.message };
 
-  if (invoice?.id && lineItems.length > 0) {
+  if (invoice?.id) {
     const lineItemRows = lineItems.map((item, i) => ({
       invoice_id: invoice.id,
       description: item.description,

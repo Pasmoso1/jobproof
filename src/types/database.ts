@@ -272,6 +272,10 @@ export interface Invoice {
   subtotal: number;
   tax_amount: number;
   total: number;
+  /** Pre-tax agreed work from signed contract + change orders at issue time */
+  agreed_work_subtotal?: number | null;
+  deposit_credited?: number;
+  balance_due?: number;
   due_date: string | null;
   sent_at: string | null;
   paid_at: string | null;
