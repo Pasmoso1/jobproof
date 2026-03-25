@@ -25,10 +25,9 @@ export const CHANGE_ORDER_TITLE_REQUIRED = "Title is required.";
 export const CHANGE_ORDER_DESCRIPTION_REQUIRED = "Description is required.";
 export const CHANGE_ORDER_NEW_TOTAL_REQUIRED = "New job total is required.";
 export const CHANGE_ORDER_NEW_TOTAL_INVALID = "Enter a valid new job total greater than zero.";
-export const CHANGE_ORDER_START_DATE_REQUIRED = "Estimated start date is required.";
-export const CHANGE_ORDER_COMPLETION_DATE_REQUIRED = "Estimated completion date is required.";
-export const CHANGE_ORDER_DATES_ORDER =
-  "Estimated completion date must be on or after the estimated start date.";
+export const CHANGE_ORDER_NEW_COMPLETION_DATE_REQUIRED = "New completion date is required.";
+/** @deprecated Use CHANGE_ORDER_NEW_COMPLETION_DATE_REQUIRED */
+export const CHANGE_ORDER_COMPLETION_DATE_REQUIRED = CHANGE_ORDER_NEW_COMPLETION_DATE_REQUIRED;
 
 export function validateChangeOrderTitle(raw: string | null | undefined): string | null {
   if (!String(raw ?? "").trim()) return CHANGE_ORDER_TITLE_REQUIRED;
@@ -62,15 +61,12 @@ export function validateChangeOrderDateField(
   return null;
 }
 
-/** Returns null if OK, else error message. */
-export function validateChangeOrderSchedule(
-  startIso: string,
-  endIso: string
+/** Validates the change order “new completion date” field only. */
+export function validateChangeOrderNewCompletionDate(
+  raw: string | null | undefined
 ): string | null {
-  const s = validateChangeOrderDateField(startIso, CHANGE_ORDER_START_DATE_REQUIRED);
-  if (s) return s;
-  const e = validateChangeOrderDateField(endIso, CHANGE_ORDER_COMPLETION_DATE_REQUIRED);
-  if (e) return e;
-  if (new Date(endIso) < new Date(startIso)) return CHANGE_ORDER_DATES_ORDER;
-  return null;
+  return validateChangeOrderDateField(
+    raw,
+    CHANGE_ORDER_NEW_COMPLETION_DATE_REQUIRED
+  );
 }

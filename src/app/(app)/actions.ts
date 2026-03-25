@@ -25,10 +25,7 @@ import {
   validateChangeOrderTitle,
   validateCustomerEmailForChangeOrderRemote,
   parseNewJobTotal,
-  validateChangeOrderDateField,
-  CHANGE_ORDER_START_DATE_REQUIRED,
-  CHANGE_ORDER_COMPLETION_DATE_REQUIRED,
-  CHANGE_ORDER_DATES_ORDER,
+  validateChangeOrderNewCompletionDate,
 } from "@/lib/validation/change-order";
 import { sendSigningLinkEmail } from "@/lib/delivery-service";
 import { generateUUID } from "@/lib/utils/uuid";
@@ -1954,7 +1951,6 @@ export async function createChangeOrder(
     reasonForChange?: string;
     /** New total contract price for the job after this change (stored as revised_total_price). */
     newJobTotal: number;
-    newEstimatedStartDate: string;
     newEstimatedCompletionDate: string;
   }
 ) {
@@ -1970,24 +1966,11 @@ export async function createChangeOrder(
   const descErr = validateChangeOrderDescription(params.changeDescription);
   if (descErr) return { fieldErrors: { change_description: descErr } };
 
-  const startDateErr = validateChangeOrderDateField(
-    params.newEstimatedStartDate,
-    CHANGE_ORDER_START_DATE_REQUIRED
-  );
-  if (startDateErr) return { fieldErrors: { new_estimated_start_date: startDateErr } };
-
-  const completionDateErr = validateChangeOrderDateField(
-    params.newEstimatedCompletionDate,
-    CHANGE_ORDER_COMPLETION_DATE_REQUIRED
+  const completionDateErr = validateChangeOrderNewCompletionDate(
+    params.newEstimatedCompletionDate
   );
   if (completionDateErr) {
     return { fieldErrors: { new_estimated_completion_date: completionDateErr } };
-  }
-
-  const startD = params.newEstimatedStartDate.trim();
-  const endD = params.newEstimatedCompletionDate.trim();
-  if (new Date(endD) < new Date(startD)) {
-    return { fieldErrors: { new_estimated_completion_date: CHANGE_ORDER_DATES_ORDER } };
   }
 
   const totalRes = parseNewJobTotal(params.newJobTotal);
@@ -2026,7 +2009,7 @@ export async function createChangeOrder(
       original_contract_price: previousTotal,
       change_amount: changeAmount,
       revised_total_price: newTotal,
-      new_estimated_start_date: params.newEstimatedStartDate.trim(),
+      new_estimated_start_date: null,
       new_estimated_completion_date: params.newEstimatedCompletionDate.trim(),
       status: "draft",
     })
@@ -2036,6 +2019,7 @@ export async function createChangeOrder(
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/change-orders`);
+  revalidatePath(`/jobs/${jobId}/change-orders/${data.id}`);
   return { changeOrderId: data.id };
 }
 
@@ -2163,7 +2147,6 @@ export type ChangeOrderUpdatePayload = {
   changeDescription: string;
   reasonForChange?: string;
   newJobTotal: number;
-  newEstimatedStartDate: string;
   newEstimatedCompletionDate: string;
 };
 
@@ -2180,24 +2163,11 @@ export async function updateChangeOrder(changeOrderId: string, params: ChangeOrd
   const descErr = validateChangeOrderDescription(params.changeDescription);
   if (descErr) return { fieldErrors: { change_description: descErr } };
 
-  const startDateErr = validateChangeOrderDateField(
-    params.newEstimatedStartDate,
-    CHANGE_ORDER_START_DATE_REQUIRED
-  );
-  if (startDateErr) return { fieldErrors: { new_estimated_start_date: startDateErr } };
-
-  const completionDateErr = validateChangeOrderDateField(
-    params.newEstimatedCompletionDate,
-    CHANGE_ORDER_COMPLETION_DATE_REQUIRED
+  const completionDateErr = validateChangeOrderNewCompletionDate(
+    params.newEstimatedCompletionDate
   );
   if (completionDateErr) {
     return { fieldErrors: { new_estimated_completion_date: completionDateErr } };
-  }
-
-  const startD = params.newEstimatedStartDate.trim();
-  const endD = params.newEstimatedCompletionDate.trim();
-  if (new Date(endD) < new Date(startD)) {
-    return { fieldErrors: { new_estimated_completion_date: CHANGE_ORDER_DATES_ORDER } };
   }
 
   const totalRes = parseNewJobTotal(params.newJobTotal);
@@ -2239,7 +2209,7 @@ export async function updateChangeOrder(changeOrderId: string, params: ChangeOrd
       reason_for_change: params.reasonForChange?.trim() || null,
       change_amount: changeAmount,
       revised_total_price: newTotal,
-      new_estimated_start_date: params.newEstimatedStartDate.trim(),
+      new_estimated_start_date: null,
       new_estimated_completion_date: params.newEstimatedCompletionDate.trim(),
       updated_at: new Date().toISOString(),
     })

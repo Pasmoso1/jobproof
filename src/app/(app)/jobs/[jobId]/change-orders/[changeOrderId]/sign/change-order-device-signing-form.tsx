@@ -55,8 +55,7 @@ export function ChangeOrderDeviceSigningForm({
       return;
     }
 
-    router.push(`/jobs/${jobId}/change-orders`);
-    router.refresh();
+    router.push(`/jobs/${jobId}/change-orders/${changeOrderId}`);
   }
 
   return (
@@ -184,7 +183,7 @@ export function ChangeOrderDeviceSigningForm({
           {loading ? "Signing..." : "Customer signs change order"}
         </button>
         <Link
-          href={`/jobs/${jobId}/change-orders`}
+          href={`/jobs/${jobId}/change-orders/${changeOrderId}`}
           className="rounded-lg border border-zinc-300 px-6 py-3 font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
         >
           Cancel

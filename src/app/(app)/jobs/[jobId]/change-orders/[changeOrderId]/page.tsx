@@ -72,6 +72,14 @@ export default async function ChangeOrderDetailPage({
             </span>
           )}
         </p>
+        <p className="mt-3">
+          <Link
+            href={`/jobs/${jobId}/change-orders`}
+            className="text-sm font-medium text-[#2436BB] hover:underline"
+          >
+            Create another change order
+          </Link>
+        </p>
         {changeOrder.status === "sent" && changeOrder.sent_at && (
           <p className="mt-2 text-sm text-zinc-600">
             <span className="font-medium text-zinc-800">Sent for approval:</span>{" "}
@@ -142,19 +150,24 @@ export default async function ChangeOrderDetailPage({
         )}
 
         {changeOrder.status !== "draft" &&
-          (changeOrder.new_estimated_start_date || changeOrder.new_estimated_completion_date) && (
+          (changeOrder.new_estimated_completion_date || changeOrder.new_estimated_start_date) && (
           <div>
             <h2 className="text-sm font-medium text-zinc-500">Schedule (this change)</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              {changeOrder.new_estimated_completion_date
+                ? "Updated target completion date included with this change order."
+                : "Schedule captured on an earlier version of this form."}
+            </p>
             <dl className="mt-2 space-y-1 text-sm text-zinc-900">
               {changeOrder.new_estimated_start_date && (
                 <div>
-                  <dt className="text-zinc-500">Estimated start</dt>
+                  <dt className="text-zinc-500">Estimated start (legacy)</dt>
                   <dd>{new Date(changeOrder.new_estimated_start_date).toLocaleDateString()}</dd>
                 </div>
               )}
               {changeOrder.new_estimated_completion_date && (
                 <div>
-                  <dt className="text-zinc-500">Estimated completion</dt>
+                  <dt className="text-zinc-500">New completion date</dt>
                   <dd>{new Date(changeOrder.new_estimated_completion_date).toLocaleDateString()}</dd>
                 </div>
               )}

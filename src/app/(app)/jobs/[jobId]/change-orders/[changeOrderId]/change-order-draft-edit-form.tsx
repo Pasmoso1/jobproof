@@ -4,13 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateChangeOrder } from "@/app/(app)/actions";
 import {
-  CHANGE_ORDER_COMPLETION_DATE_REQUIRED,
-  CHANGE_ORDER_DATES_ORDER,
   CHANGE_ORDER_DESCRIPTION_REQUIRED,
-  CHANGE_ORDER_START_DATE_REQUIRED,
   CHANGE_ORDER_TITLE_REQUIRED,
   parseNewJobTotal,
-  validateChangeOrderDateField,
+  validateChangeOrderNewCompletionDate,
 } from "@/lib/validation/change-order";
 
 type ChangeOrderRow = {
@@ -20,7 +17,6 @@ type ChangeOrderRow = {
   reason_for_change: string | null;
   revised_total_price: number | null;
   original_contract_price: number | null;
-  new_estimated_start_date: string | null;
   new_estimated_completion_date: string | null;
 };
 
@@ -31,9 +27,6 @@ export function ChangeOrderDraftEditForm({ changeOrder }: { changeOrder: ChangeO
   const [reasonForChange, setReasonForChange] = useState(changeOrder.reason_for_change ?? "");
   const [newJobTotal, setNewJobTotal] = useState(
     changeOrder.revised_total_price != null ? String(changeOrder.revised_total_price) : ""
-  );
-  const [newEstimatedStartDate, setNewEstimatedStartDate] = useState(
-    changeOrder.new_estimated_start_date?.slice(0, 10) ?? ""
   );
   const [newEstimatedCompletionDate, setNewEstimatedCompletionDate] = useState(
     changeOrder.new_estimated_completion_date?.slice(0, 10) ?? ""
@@ -58,15 +51,8 @@ export function ChangeOrderDraftEditForm({ changeOrder }: { changeOrder: ChangeO
     const errs: Record<string, string> = {};
     if (!changeTitle.trim()) errs.change_title = CHANGE_ORDER_TITLE_REQUIRED;
     if (!changeDescription.trim()) errs.change_description = CHANGE_ORDER_DESCRIPTION_REQUIRED;
-    const s = validateChangeOrderDateField(newEstimatedStartDate, CHANGE_ORDER_START_DATE_REQUIRED);
-    if (s) errs.new_estimated_start_date = s;
-    const e = validateChangeOrderDateField(newEstimatedCompletionDate, CHANGE_ORDER_COMPLETION_DATE_REQUIRED);
+    const e = validateChangeOrderNewCompletionDate(newEstimatedCompletionDate);
     if (e) errs.new_estimated_completion_date = e;
-    if (!s && !e && newEstimatedStartDate && newEstimatedCompletionDate) {
-      if (new Date(newEstimatedCompletionDate) < new Date(newEstimatedStartDate)) {
-        errs.new_estimated_completion_date = CHANGE_ORDER_DATES_ORDER;
-      }
-    }
     const t = parseNewJobTotal(newJobTotal);
     if (!t.ok) errs.new_job_total = t.message;
     return errs;
@@ -89,7 +75,6 @@ export function ChangeOrderDraftEditForm({ changeOrder }: { changeOrder: ChangeO
       changeDescription: changeDescription.trim(),
       reasonForChange: reasonForChange.trim() || undefined,
       newJobTotal: totalRes.value,
-      newEstimatedStartDate: newEstimatedStartDate.trim(),
       newEstimatedCompletionDate: newEstimatedCompletionDate.trim(),
     });
     setLoading(false);
@@ -195,31 +180,20 @@ export function ChangeOrderDraftEditForm({ changeOrder }: { changeOrder: ChangeO
             </div>
           )}
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="block text-xs font-medium text-zinc-700">Est. start *</label>
-            <input
-              type="date"
-              value={newEstimatedStartDate}
-              onChange={(e) => setNewEstimatedStartDate(e.target.value)}
-              className="mt-1 block w-full rounded border border-zinc-300 px-3 py-2 text-sm"
-            />
-            {fieldErrors.new_estimated_start_date && (
-              <p className="mt-1 text-xs text-red-600">{fieldErrors.new_estimated_start_date}</p>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-700">Est. completion *</label>
-            <input
-              type="date"
-              value={newEstimatedCompletionDate}
-              onChange={(e) => setNewEstimatedCompletionDate(e.target.value)}
-              className="mt-1 block w-full rounded border border-zinc-300 px-3 py-2 text-sm"
-            />
-            {fieldErrors.new_estimated_completion_date && (
-              <p className="mt-1 text-xs text-red-600">{fieldErrors.new_estimated_completion_date}</p>
-            )}
-          </div>
+        <div>
+          <label className="block text-xs font-medium text-zinc-700">New completion date *</label>
+          <p className="mt-0.5 text-[11px] text-zinc-500">
+            Expected finish date for the job after this change.
+          </p>
+          <input
+            type="date"
+            value={newEstimatedCompletionDate}
+            onChange={(e) => setNewEstimatedCompletionDate(e.target.value)}
+            className="mt-1 block w-full max-w-xs rounded border border-zinc-300 px-3 py-2 text-sm"
+          />
+          {fieldErrors.new_estimated_completion_date && (
+            <p className="mt-1 text-xs text-red-600">{fieldErrors.new_estimated_completion_date}</p>
+          )}
         </div>
       </div>
 

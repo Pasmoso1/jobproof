@@ -96,7 +96,7 @@ export function ChangeOrderActions({
         }
         return;
       }
-      router.refresh();
+      router.push(`/jobs/${jobId}/change-orders/${changeOrder.id}`);
     } finally {
       setLoading(null);
     }

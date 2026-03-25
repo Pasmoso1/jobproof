@@ -26,10 +26,10 @@ export default async function ChangeOrderDeviceSigningPage({
             : "This change order is not ready for signing."}
         </p>
         <Link
-          href={`/jobs/${jobId}/change-orders`}
+          href={`/jobs/${jobId}/change-orders/${changeOrderId}`}
           className="mt-4 inline-block font-medium text-[#2436BB] hover:underline"
         >
-          Back to change orders
+          Back to change order
         </Link>
       </div>
     );
@@ -41,10 +41,10 @@ export default async function ChangeOrderDeviceSigningPage({
     <div className="mx-auto max-w-2xl">
       <div className="mb-6">
         <Link
-          href={`/jobs/${jobId}/change-orders`}
+          href={`/jobs/${jobId}/change-orders/${changeOrderId}`}
           className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
         >
-          ← Back to change orders
+          ← Back to change order
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-zinc-900">Customer signs change order</h1>
         <p className="mt-1 text-zinc-600">

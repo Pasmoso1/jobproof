@@ -9,15 +9,12 @@ import {
   sendChangeOrderRemoteSigningLink,
 } from "@/app/(app)/actions";
 import {
-  CHANGE_ORDER_COMPLETION_DATE_REQUIRED,
-  CHANGE_ORDER_DATES_ORDER,
   CHANGE_ORDER_DESCRIPTION_REQUIRED,
   CHANGE_ORDER_REMOTE_EMAIL_REQUIRED,
-  CHANGE_ORDER_START_DATE_REQUIRED,
   CHANGE_ORDER_TITLE_REQUIRED,
   isValidCustomerEmailForChangeOrderRemote,
   parseNewJobTotal,
-  validateChangeOrderDateField,
+  validateChangeOrderNewCompletionDate,
   validateCustomerEmailForChangeOrderRemote,
 } from "@/lib/validation/change-order";
 
@@ -40,7 +37,6 @@ export function AddChangeOrderForm({
   const [changeDescription, setChangeDescription] = useState("");
   const [reasonForChange, setReasonForChange] = useState("");
   const [newJobTotal, setNewJobTotal] = useState("");
-  const [newEstimatedStartDate, setNewEstimatedStartDate] = useState("");
   const [newEstimatedCompletionDate, setNewEstimatedCompletionDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -70,20 +66,11 @@ export function AddChangeOrderForm({
       total,
       change,
       title: changeTitle.trim() || "—",
-      startLabel: newEstimatedStartDate
-        ? new Date(`${newEstimatedStartDate}T12:00:00`).toLocaleDateString()
-        : "—",
-      endLabel: newEstimatedCompletionDate
+      completionLabel: newEstimatedCompletionDate
         ? new Date(`${newEstimatedCompletionDate}T12:00:00`).toLocaleDateString()
         : "—",
     };
-  }, [
-    newJobTotal,
-    newEstimatedStartDate,
-    newEstimatedCompletionDate,
-    changeTitle,
-    previousTotal,
-  ]);
+  }, [newJobTotal, newEstimatedCompletionDate, changeTitle, previousTotal]);
 
   function validateFields(): Record<string, string> {
     const errs: Record<string, string> = {};
@@ -94,23 +81,8 @@ export function AddChangeOrderForm({
       errs.change_description = CHANGE_ORDER_DESCRIPTION_REQUIRED;
     }
 
-    const startErr = validateChangeOrderDateField(
-      newEstimatedStartDate,
-      CHANGE_ORDER_START_DATE_REQUIRED
-    );
-    if (startErr) errs.new_estimated_start_date = startErr;
-
-    const endErr = validateChangeOrderDateField(
-      newEstimatedCompletionDate,
-      CHANGE_ORDER_COMPLETION_DATE_REQUIRED
-    );
-    if (endErr) errs.new_estimated_completion_date = endErr;
-
-    if (!startErr && !endErr && newEstimatedStartDate && newEstimatedCompletionDate) {
-      if (new Date(newEstimatedCompletionDate) < new Date(newEstimatedStartDate)) {
-        errs.new_estimated_completion_date = CHANGE_ORDER_DATES_ORDER;
-      }
-    }
+    const completionErr = validateChangeOrderNewCompletionDate(newEstimatedCompletionDate);
+    if (completionErr) errs.new_estimated_completion_date = completionErr;
 
     const t = parseNewJobTotal(newJobTotal);
     if (!t.ok) errs.new_job_total = t.message;
@@ -126,18 +98,8 @@ export function AddChangeOrderForm({
       changeDescription: changeDescription.trim(),
       reasonForChange: reasonForChange.trim() || undefined,
       newJobTotal: totalRes.value,
-      newEstimatedStartDate: newEstimatedStartDate.trim(),
       newEstimatedCompletionDate: newEstimatedCompletionDate.trim(),
     };
-  }
-
-  function resetForm() {
-    setChangeTitle("");
-    setChangeDescription("");
-    setReasonForChange("");
-    setNewJobTotal("");
-    setNewEstimatedStartDate("");
-    setNewEstimatedCompletionDate("");
   }
 
   async function runCreate(): Promise<
@@ -182,8 +144,7 @@ export function AddChangeOrderForm({
       return;
     }
     if (!created || !("changeOrderId" in created)) return;
-    resetForm();
-    router.refresh();
+    router.push(`/jobs/${jobId}/change-orders/${created.changeOrderId}`);
   }
 
   function openConfirmDevice() {
@@ -259,9 +220,7 @@ export function AddChangeOrderForm({
         setError(sendResult.error);
         return;
       }
-      resetForm();
       router.push(`/jobs/${jobId}/change-orders/${changeOrderId}/sign`);
-      router.refresh();
       return;
     }
 
@@ -281,8 +240,7 @@ export function AddChangeOrderForm({
       }
       return;
     }
-    resetForm();
-    router.refresh();
+    router.push(`/jobs/${jobId}/change-orders/${changeOrderId}`);
   }
 
   const emailReady = isValidCustomerEmailForChangeOrderRemote(customerEmail);
@@ -451,62 +409,38 @@ export function AddChangeOrderForm({
           )}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="newEstimatedStartDate" className="block text-sm font-medium text-zinc-700">
-              Estimated start date <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="newEstimatedStartDate"
-              type="date"
-              value={newEstimatedStartDate}
-              onChange={(e) => {
-                setNewEstimatedStartDate(e.target.value);
-                setFieldErrors((p) => {
-                  const n = { ...p };
-                  delete n.new_estimated_start_date;
-                  return n;
-                });
-              }}
-              className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-zinc-900 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
-                fieldErrors.new_estimated_start_date
-                  ? "border-red-500"
-                  : "border-zinc-300 focus:border-[#2436BB]"
-              }`}
-            />
-            {fieldErrors.new_estimated_start_date && (
-              <p className="mt-1 text-sm text-red-600">{fieldErrors.new_estimated_start_date}</p>
-            )}
-          </div>
-          <div>
-            <label
-              htmlFor="newEstimatedCompletionDate"
-              className="block text-sm font-medium text-zinc-700"
-            >
-              Estimated completion date <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="newEstimatedCompletionDate"
-              type="date"
-              value={newEstimatedCompletionDate}
-              onChange={(e) => {
-                setNewEstimatedCompletionDate(e.target.value);
-                setFieldErrors((p) => {
-                  const n = { ...p };
-                  delete n.new_estimated_completion_date;
-                  return n;
-                });
-              }}
-              className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-zinc-900 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
-                fieldErrors.new_estimated_completion_date
-                  ? "border-red-500"
-                  : "border-zinc-300 focus:border-[#2436BB]"
-              }`}
-            />
-            {fieldErrors.new_estimated_completion_date && (
-              <p className="mt-1 text-sm text-red-600">{fieldErrors.new_estimated_completion_date}</p>
-            )}
-          </div>
+        <div>
+          <label
+            htmlFor="newEstimatedCompletionDate"
+            className="block text-sm font-medium text-zinc-700"
+          >
+            New completion date <span className="text-red-500">*</span>
+          </label>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            The date the job is expected to finish after this change (updates the schedule for this
+            change order only).
+          </p>
+          <input
+            id="newEstimatedCompletionDate"
+            type="date"
+            value={newEstimatedCompletionDate}
+            onChange={(e) => {
+              setNewEstimatedCompletionDate(e.target.value);
+              setFieldErrors((p) => {
+                const n = { ...p };
+                delete n.new_estimated_completion_date;
+                return n;
+              });
+            }}
+            className={`mt-1 block w-full max-w-xs rounded-lg border px-4 py-2.5 text-zinc-900 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
+              fieldErrors.new_estimated_completion_date
+                ? "border-red-500"
+                : "border-zinc-300 focus:border-[#2436BB]"
+            }`}
+          />
+          {fieldErrors.new_estimated_completion_date && (
+            <p className="mt-1 text-sm text-red-600">{fieldErrors.new_estimated_completion_date}</p>
+          )}
         </div>
 
         <div className="rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2 text-sm text-zinc-700">
@@ -603,7 +537,7 @@ export function AddChangeOrderForm({
               </div>
             )}
             <dl
-              key={`${newJobTotal}|${newEstimatedStartDate}|${newEstimatedCompletionDate}|${changeTitle}`}
+              key={`${newJobTotal}|${newEstimatedCompletionDate}|${changeTitle}`}
               className="mt-4 space-y-2 rounded-lg bg-zinc-50 p-4 text-sm"
             >
               <div className="flex justify-between gap-4">
@@ -642,12 +576,8 @@ export function AddChangeOrderForm({
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-zinc-600">Est. start</dt>
-                <dd className="font-medium text-zinc-900">{confirmationPreview.startLabel}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-zinc-600">Est. completion</dt>
-                <dd className="font-medium text-zinc-900">{confirmationPreview.endLabel}</dd>
+                <dt className="text-zinc-600">New completion date</dt>
+                <dd className="font-medium text-zinc-900">{confirmationPreview.completionLabel}</dd>
               </div>
             </dl>
             <div className="mt-6 flex flex-wrap justify-end gap-3">
