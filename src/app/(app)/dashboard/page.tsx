@@ -91,7 +91,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
           <p className="text-sm font-medium text-zinc-500">Plan</p>
           <p className="mt-1 text-lg font-semibold capitalize text-zinc-900">
@@ -119,17 +119,6 @@ export default async function DashboardPage() {
             of {(profile?.storage_limit_mb ?? 10240)} MB
           </p>
         </div>
-        <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
-          <Link
-            href="/jobs/create"
-            className="flex h-full flex-col justify-center"
-          >
-            <p className="text-sm font-medium text-zinc-500">Quick action</p>
-            <p className="mt-1 text-lg font-semibold text-[#2436BB] hover:underline">
-              Create job
-            </p>
-          </Link>
-        </div>
       </div>
 
       {/* Job list */}
@@ -147,12 +136,9 @@ export default async function DashboardPage() {
           {jobs.length === 0 ? (
             <div className="px-4 py-12 text-center text-zinc-500 sm:px-6">
               <p>No jobs yet.</p>
-              <Link
-                href="/jobs/create"
-                className="mt-2 inline-block font-medium text-[#2436BB] hover:underline"
-              >
-                Create your first job
-              </Link>
+              <p className="mt-2 text-sm text-zinc-600">
+                Use <span className="font-medium text-zinc-800">Create job</span> above to get started.
+              </p>
             </div>
           ) : (
             jobs.map((job: { id: string; title: string; status: string; customers: { full_name?: string } | { full_name?: string }[] | null; current_contract_total?: number | null; original_contract_price?: number | null;  }) => {

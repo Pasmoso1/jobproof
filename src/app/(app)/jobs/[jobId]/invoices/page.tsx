@@ -98,6 +98,7 @@ export default async function InvoicesPage({
                 balance_due?: number | null;
                 status: string;
                 created_at: string;
+                sent_at?: string | null;
               }) => {
                 const displayAmount =
                   inv.balance_due != null && inv.balance_due !== undefined
@@ -113,7 +114,11 @@ export default async function InvoicesPage({
                         {inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`}
                       </p>
                       <p className="text-sm text-zinc-500">
-                        {new Date(inv.created_at).toLocaleDateString()} •{" "}
+                        {inv.sent_at
+                          ? `Issued ${new Date(inv.sent_at).toLocaleString()}`
+                          : `Created ${new Date(inv.created_at).toLocaleDateString()}`}
+                        {" "}
+                        •{" "}
                         <span
                           className={
                             inv.status === "paid"

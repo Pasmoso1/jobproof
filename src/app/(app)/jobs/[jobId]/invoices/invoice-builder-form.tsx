@@ -4,6 +4,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createInvoice } from "@/app/(app)/actions";
+import {
+  DEFAULT_INVOICE_TAX_RATE,
+  resolveInvoiceTaxRate,
+} from "@/lib/invoice-tax";
 
 type Job = {
   id: string;
@@ -24,7 +28,13 @@ export function InvoiceBuilderForm({
   contractSigned: boolean;
 }) {
   const router = useRouter();
-  const [taxRate, setTaxRate] = useState(String(job.tax_rate ?? 0.13));
+  const [taxRate, setTaxRate] = useState(() => {
+    const t = job.tax_rate;
+    if (t != null && Number.isFinite(Number(t)) && Number(t) >= 0) {
+      return String(Number(t));
+    }
+    return String(DEFAULT_INVOICE_TAX_RATE);
+  });
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -41,8 +51,7 @@ export function InvoiceBuilderForm({
   );
 
   const preview = useMemo(() => {
-    const rate = parseFloat(taxRate);
-    const r = Number.isFinite(rate) && rate >= 0 ? rate : 0;
+    const r = resolveInvoiceTaxRate(parseFloat(taxRate), job.tax_rate);
     const sub = agreedSubtotal;
     const tax = Math.round(sub * r * 100) / 100;
     const total = Math.round((sub + tax) * 100) / 100;
@@ -55,7 +64,7 @@ export function InvoiceBuilderForm({
       depositCredited,
       balanceDue,
     };
-  }, [agreedSubtotal, taxRate, depositOnFile]);
+  }, [agreedSubtotal, taxRate, depositOnFile, job.tax_rate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,7 +81,7 @@ export function InvoiceBuilderForm({
     setLoading(true);
     const result = await createInvoice(
       jobId,
-      parseFloat(taxRate) || 0,
+      parseFloat(taxRate),
       dueDate || undefined,
       notes.trim() || undefined
     );
@@ -142,7 +151,9 @@ export function InvoiceBuilderForm({
         </p>
 
         <div className="flex justify-between gap-4 border-t border-zinc-200 pt-3">
-          <span className="text-zinc-600">Tax ({(parseFloat(taxRate) || 0) * 100}%)</span>
+          <span className="text-zinc-600">
+            Tax ({(resolveInvoiceTaxRate(parseFloat(taxRate), job.tax_rate) * 100).toFixed(2)}%)
+          </span>
           <span className="font-medium tabular-nums text-zinc-900">
             ${money(preview.taxAmount)}
           </span>
@@ -190,7 +201,8 @@ export function InvoiceBuilderForm({
             className="no-spinner mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
           />
           <p className="mt-1 text-xs text-zinc-500">
-            Decimal rate (e.g. 0.13 for 13%). Defaults from the job record.
+            Decimal rate (e.g. 0.13 for 13%). Uses the job&apos;s rate when set; otherwise defaults
+            to 13%.
           </p>
         </div>
         <div>

@@ -19,6 +19,7 @@ import {
   validateTrade,
 } from "@/lib/validation/job-create";
 import { resolvePublicAppOrigin } from "@/lib/app-origin";
+import { resolveInvoiceTaxRate } from "@/lib/invoice-tax";
 import {
   validateChangeOrderDescription,
   validateChangeOrderTitle,
@@ -1328,6 +1329,17 @@ export async function sendContractForSigning(contractId: string) {
   return { success: true };
 }
 
+/** Best-effort client IP for signing audit (first hop in X-Forwarded-For chain). */
+function clientIpFromRequestHeaders(h: Headers): string | null {
+  const xff = h.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  const real = h.get("x-real-ip")?.trim();
+  return real || null;
+}
+
 export async function signContractDevice(
   contractId: string,
   params: {
@@ -1358,8 +1370,8 @@ export async function signContractDevice(
   }
 
   const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for") ?? headersList.get("x-real-ip") ?? null;
-  const userAgent = headersList.get("user-agent") ?? null;
+  const ip = clientIpFromRequestHeaders(headersList);
+  const userAgent = headersList.get("user-agent")?.trim() || null;
 
   const { data, error } = await supabase.rpc("sign_contract_device", {
     p_contract_id: contractId,
@@ -1647,8 +1659,8 @@ export async function signContractRemote(
 
   const supabase = await createClient();
   const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for") ?? headersList.get("x-real-ip") ?? null;
-  const userAgent = headersList.get("user-agent") ?? null;
+  const ip = clientIpFromRequestHeaders(headersList);
+  const userAgent = headersList.get("user-agent")?.trim() || null;
 
   const { data, error } = await supabase.rpc("sign_contract_remote", {
     p_token: token,
@@ -2256,8 +2268,8 @@ export async function signChangeOrderDevice(
   if (!user) redirect("/login");
 
   const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for") ?? headersList.get("x-real-ip") ?? null;
-  const userAgent = headersList.get("user-agent") ?? null;
+  const ip = clientIpFromRequestHeaders(headersList);
+  const userAgent = headersList.get("user-agent")?.trim() || null;
 
   const { data, error } = await supabase.rpc("sign_change_order_device", {
     p_change_order_id: changeOrderId,
@@ -2377,8 +2389,8 @@ export async function signChangeOrderRemote(
 ) {
   const supabase = await createClient();
   const headersList = await headers();
-  const ip = headersList.get("x-forwarded-for") ?? headersList.get("x-real-ip") ?? null;
-  const userAgent = headersList.get("user-agent") ?? null;
+  const ip = clientIpFromRequestHeaders(headersList);
+  const userAgent = headersList.get("user-agent")?.trim() || null;
 
   const { data, error } = await supabase.rpc("sign_change_order_remote", {
     p_token: token,
@@ -2685,7 +2697,7 @@ export async function createInvoice(
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id, profile_id, deposit_amount, current_contract_total, original_contract_price"
+      "id, profile_id, deposit_amount, current_contract_total, original_contract_price, tax_rate"
     )
     .eq("id", jobId)
     .single();
@@ -2730,7 +2742,7 @@ export async function createInvoice(
     };
   }
 
-  const rate = Number.isFinite(taxRate) && taxRate >= 0 ? taxRate : 0;
+  const rate = resolveInvoiceTaxRate(taxRate, job.tax_rate as number | null | undefined);
   const depositRaw = Number(job.deposit_amount ?? 0);
   const depositOnFile = Number.isFinite(depositRaw) && depositRaw > 0 ? depositRaw : 0;
 
@@ -2749,6 +2761,7 @@ export async function createInvoice(
   ];
 
   const notesTrimmed = notes?.trim() || null;
+  const issuedAt = new Date().toISOString();
 
   const { data: invoice, error } = await supabase
     .from("invoices")
@@ -2764,6 +2777,8 @@ export async function createInvoice(
       balance_due: balanceDue,
       due_date: dueDate || null,
       notes: notesTrimmed,
+      status: "sent",
+      sent_at: issuedAt,
     })
     .select("id")
     .single();

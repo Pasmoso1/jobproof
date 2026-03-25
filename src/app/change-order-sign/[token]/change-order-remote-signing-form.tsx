@@ -109,6 +109,10 @@ export function ChangeOrderRemoteSigningForm({ token }: { token: string }) {
         />
       </div>
 
+      <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-900">
+        By signing below, you agree this change order is a legally binding amendment to your contract.
+      </p>
+
       <div>
         <label className="flex items-start gap-3">
           <input
@@ -119,7 +123,8 @@ export function ChangeOrderRemoteSigningForm({ token }: { token: string }) {
             className="mt-1 h-4 w-4 rounded border-zinc-300 text-[#2436BB] focus:ring-[#2436BB]"
           />
           <span className="text-sm text-zinc-700">
-            I have read and agree to this change order. I understand that by signing I am approving the amendment to the contract.
+            I have read this change order and approve the amendment. I confirm I am authorized to sign
+            on behalf of the customer where applicable.
           </span>
         </label>
       </div>
