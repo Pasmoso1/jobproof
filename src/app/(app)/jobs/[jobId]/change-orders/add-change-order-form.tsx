@@ -27,10 +27,13 @@ export function AddChangeOrderForm({
   jobId,
   job,
   customerEmail,
+  jobEditLocked = false,
 }: {
   jobId: string;
   job: Job;
   customerEmail: string | null | undefined;
+  /** When true, customer email cannot be edited via Edit job (signed contract). */
+  jobEditLocked?: boolean;
 }) {
   const router = useRouter();
   const [changeTitle, setChangeTitle] = useState("");
@@ -452,14 +455,20 @@ export function AddChangeOrderForm({
               <span className="text-amber-800">No email on file for this customer.</span>
             )}
           </p>
-          {!emailReady && (
-            <Link
-              href={`/jobs/${jobId}/edit`}
-              className="mt-2 inline-block text-sm font-medium text-[#2436BB] hover:underline"
-            >
-              Add customer email on Edit job →
-            </Link>
-          )}
+          {!emailReady &&
+            (jobEditLocked ? (
+              <p className="mt-2 text-sm text-amber-800">
+                No customer email on file. It can&apos;t be added here while the contract is signed and
+                the job is locked for editing.
+              </p>
+            ) : (
+              <Link
+                href={`/jobs/${jobId}/edit`}
+                className="mt-2 inline-block text-sm font-medium text-[#2436BB] hover:underline"
+              >
+                Add customer email on Edit job →
+              </Link>
+            ))}
           {emailSendError && (
             <p className="mt-2 text-sm text-red-600" role="alert">
               {emailSendError}

@@ -44,7 +44,12 @@ export default async function ChangeOrdersPage({
         </p>
       </div>
 
-      <AddChangeOrderForm jobId={jobId} job={job} customerEmail={customer?.email} />
+      <AddChangeOrderForm
+        jobId={jobId}
+        job={job}
+        customerEmail={customer?.email}
+        jobEditLocked={job.contract_status === "signed"}
+      />
 
       <div className="mt-8 rounded-xl border border-zinc-200 bg-white">
         <h2 className="border-b border-zinc-200 px-4 py-3 font-semibold text-zinc-900 sm:px-6">

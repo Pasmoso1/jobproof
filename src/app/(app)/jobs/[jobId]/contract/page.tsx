@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getJob, getContractForJob, getContractPdfSignedUrl, getProfile } from "@/app/(app)/actions";
+import {
+  ensureSignedContractPdf,
+  getJob,
+  getContractForJob,
+  getContractPdfSignedUrl,
+  getProfile,
+} from "@/app/(app)/actions";
 import { ContractBuilderForm } from "./contract-builder-form";
 
 export default async function ContractBuilderPage({
@@ -23,8 +29,16 @@ export default async function ContractBuilderPage({
   const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
 
   if (contract?.status === "signed") {
-    const pdfUrl = contract.pdf_path
-      ? await getContractPdfSignedUrl(contract.pdf_path)
+    let displayContract = contract;
+    if (!displayContract.pdf_path) {
+      await ensureSignedContractPdf(displayContract.id);
+      const refreshed = await getContractForJob(jobId);
+      if (refreshed?.status === "signed") {
+        displayContract = refreshed;
+      }
+    }
+    const pdfUrl = displayContract.pdf_path
+      ? await getContractPdfSignedUrl(displayContract.pdf_path)
       : null;
 
     return (
@@ -47,26 +61,26 @@ export default async function ContractBuilderPage({
             <span className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 font-medium text-green-800">
               Signed
             </span>
-            {contract.signed_at && (
+            {displayContract.signed_at && (
               <span className="text-zinc-600">
-                Signed {new Date(contract.signed_at).toLocaleDateString()}
+                Signed {new Date(displayContract.signed_at).toLocaleDateString()}
               </span>
             )}
-            {contract.signing_method && (
+            {displayContract.signing_method && (
               <span className="text-zinc-600 capitalize">
-                {contract.signing_method} signing
+                {displayContract.signing_method} signing
               </span>
             )}
-            {contract.price != null && (
+            {displayContract.price != null && (
               <span className="font-medium text-zinc-900">
-                ${Number(contract.price).toLocaleString()}
+                ${Number(displayContract.price).toLocaleString()}
               </span>
             )}
           </div>
-          {contract.signer_name && (
+          {displayContract.signer_name && (
             <p className="mt-4 text-sm text-zinc-600">
-              Signed by: {contract.signer_name}
-              {contract.signer_email && ` (${contract.signer_email})`}
+              Signed by: {displayContract.signer_name}
+              {displayContract.signer_email && ` (${displayContract.signer_email})`}
             </p>
           )}
           {pdfUrl ? (
@@ -79,8 +93,10 @@ export default async function ContractBuilderPage({
               View / Download signed PDF
             </a>
           ) : (
-            <p className="mt-4 text-sm text-zinc-500">
-              PDF generation coming soon. Contract details are stored and locked.
+            <p className="mt-4 text-sm text-amber-900">
+              Signed PDF isn&apos;t available yet. This can happen if server storage isn&apos;t
+              configured (for example <code className="rounded bg-zinc-100 px-1">SUPABASE_SERVICE_ROLE_KEY</code>{" "}
+              for uploads). Contract details are still stored and locked in JobProof.
             </p>
           )}
         </div>

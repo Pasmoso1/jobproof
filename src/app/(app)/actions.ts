@@ -20,6 +20,7 @@ import {
 } from "@/lib/validation/job-create";
 import { resolvePublicAppOrigin } from "@/lib/app-origin";
 import { resolveInvoiceTaxRate } from "@/lib/invoice-tax";
+import { JOB_LOCKED_SIGNED_CONTRACT_MESSAGE } from "@/lib/job-contract-lock";
 import {
   validateChangeOrderDescription,
   validateChangeOrderTitle,
@@ -470,6 +471,18 @@ export async function updateJob(jobId: string, formData: FormData) {
 
   if (!profile || job.profile_id !== profile.id) {
     return { error: "Unauthorized" };
+  }
+
+  const { data: signedContract } = await supabase
+    .from("contracts")
+    .select("id")
+    .eq("job_id", jobId)
+    .eq("status", "signed")
+    .limit(1)
+    .maybeSingle();
+
+  if (signedContract) {
+    return { error: JOB_LOCKED_SIGNED_CONTRACT_MESSAGE };
   }
 
   const { data: jobWithTotal } = await supabase
@@ -977,13 +990,6 @@ export async function createJobUpdate(
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/updates/new`);
-  if (process.env.NODE_ENV === "development") {
-    console.log("[createJobUpdate] DONE success", {
-      jobId,
-      updateId: update?.id,
-      attachmentRows: filePaths.length,
-    });
-  }
   return { success: true };
 }
 
@@ -1473,22 +1479,13 @@ async function deliverSignedContract(contractId: string) {
 
   if (!contract) return;
 
-  const { generateSignedContractPdf } = await import("@/lib/contract-pdf");
+  const { generateSignedContractPdf, contractDbRowToPdfInput } = await import(
+    "@/lib/contract-pdf"
+  );
   const { sendSignedContractEmail } = await import("@/lib/delivery-service");
   const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
 
-  const pdfPath = await generateSignedContractPdf({
-    contractId,
-    contractData: (contract.contract_data as Record<string, unknown>) ?? {},
-    jobTitle: contract.job_title ?? "",
-    customerName: contract.customer_name ?? "",
-    customerEmail: contract.customer_email ?? undefined,
-    propertyAddress: contract.job_address ?? undefined,
-    price: contract.price ?? undefined,
-    depositAmount: contract.deposit_amount ?? undefined,
-    scopeOfWork: contract.scope_of_work ?? undefined,
-    paymentTerms: contract.payment_terms ?? undefined,
-  });
+  const pdfPath = await generateSignedContractPdf(contractDbRowToPdfInput(contract));
 
   let effectivePdfPath = contract.pdf_path ?? null;
   if (pdfPath) {
@@ -1880,6 +1877,52 @@ export async function getContractPdfSignedUrl(storagePath: string) {
     .createSignedUrl(storagePath, 3600);
 
   return data?.signedUrl ?? null;
+}
+
+/** Backfill PDF for signed contracts created before PDF generation existed. */
+export async function ensureSignedContractPdf(
+  contractId: string
+): Promise<{ pdfPath: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: contract } = await supabase
+    .from("contracts")
+    .select("*")
+    .eq("id", contractId)
+    .single();
+
+  if (!contract || contract.status !== "signed") {
+    return { pdfPath: null };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile || contract.profile_id !== profile.id) {
+    return { pdfPath: null };
+  }
+
+  if (contract.pdf_path) {
+    return { pdfPath: contract.pdf_path };
+  }
+
+  const { generateSignedContractPdf, contractDbRowToPdfInput } = await import(
+    "@/lib/contract-pdf"
+  );
+  const pdfPath = await generateSignedContractPdf(contractDbRowToPdfInput(contract));
+  if (pdfPath) {
+    await supabase.from("contracts").update({ pdf_path: pdfPath }).eq("id", contractId);
+    revalidatePath(`/jobs/${contract.job_id}`);
+    revalidatePath(`/jobs/${contract.job_id}/contract`);
+  }
+  return { pdfPath: pdfPath ?? null };
 }
 
 // =============================================================================

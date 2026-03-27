@@ -9,6 +9,7 @@ import {
   getChangeOrders,
   getProfile,
 } from "../../actions";
+import { isJobLockedForContractEdits } from "@/lib/job-contract-lock";
 import { MarkJobCompleteButton } from "./mark-job-complete-button";
 import { UpdateTimelinePhotos } from "./update-timeline-photos";
 
@@ -150,12 +151,14 @@ export default async function JobDetailPage({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/jobs/${jobId}/edit`}
-              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
-            >
-              Edit job
-            </Link>
+            {!isJobLockedForContractEdits(job.contract_status) && (
+              <Link
+                href={`/jobs/${jobId}/edit`}
+                className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+              >
+                Edit job
+              </Link>
+            )}
             <Link
               href={`/jobs/${jobId}/updates/new`}
               className="rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2"
@@ -192,6 +195,13 @@ export default async function JobDetailPage({
             </Link>
             {job.status === "active" && <MarkJobCompleteButton jobId={jobId} />}
           </div>
+          {isJobLockedForContractEdits(job.contract_status) && (
+            <p className="mt-3 max-w-2xl text-sm text-zinc-600">
+              This job is locked because the contract has been signed. Customer, property, title,
+              scope, price, and schedule cannot be changed here — use change orders to amend the
+              agreement.
+            </p>
+          )}
         </div>
 
         {!contract && (
