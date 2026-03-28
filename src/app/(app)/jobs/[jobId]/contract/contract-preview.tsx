@@ -1,3 +1,5 @@
+import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
+
 type ContractPreviewProps = {
   jobTitle: string;
   customerName: string | null;
@@ -42,6 +44,8 @@ export function ContractPreview({
   warrantyNote,
   cancellationNote,
 }: ContractPreviewProps) {
+  const balanceDue = balanceDueOnCompletion(contractPrice, depositAmount);
+
   return (
     <div className="rounded-xl border border-zinc-200 bg-white shadow-sm">
       {/* Document-style header */}
@@ -136,6 +140,16 @@ export function ContractPreview({
                 Deposit: ${Number(depositAmount).toLocaleString()}
               </p>
             )}
+            {balanceDue != null && (
+              <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2">
+                <p className="text-sm font-semibold text-blue-950">
+                  Balance due on completion: ${balanceDue.toLocaleString()}
+                </p>
+                <p className="mt-0.5 text-xs text-blue-900/80">
+                  Contract total minus deposit (amount remaining when work is complete).
+                </p>
+              </div>
+            )}
             {(!contractPrice || contractPrice <= 0) && (
               <p className="text-sm text-zinc-500">—</p>
             )}
@@ -193,7 +207,8 @@ export function ContractPreview({
             Signature
           </h3>
           <p className="mt-3 text-sm text-zinc-600">
-            By signing below, the customer agrees to the terms of this contract and authorizes the contractor to perform the work described above.
+            By signing below, you confirm that you have read this contract, understand it, and agree
+            to be legally bound by its terms.
           </p>
           <div className="mt-4 flex items-end gap-8">
             <div className="flex-1 border-b-2 border-zinc-300 pb-1">

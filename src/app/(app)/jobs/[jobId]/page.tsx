@@ -10,6 +10,7 @@ import {
   getProfile,
 } from "../../actions";
 import { isJobLockedForContractEdits } from "@/lib/job-contract-lock";
+import { getJobListStatusDisplay } from "@/lib/job-dashboard-status";
 import { MarkJobCompleteButton } from "./mark-job-complete-button";
 import { UpdateTimelinePhotos } from "./update-timeline-photos";
 
@@ -71,6 +72,8 @@ export default async function JobDetailPage({
       postal_code: profile.postal_code,
     });
 
+  const listStatus = getJobListStatusDisplay(job);
+
   return (
     <div className="space-y-6">
       {contractSent && (
@@ -120,15 +123,9 @@ export default async function JobDetailPage({
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <span
-                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  job.status === "active"
-                    ? "bg-green-100 text-green-800"
-                    : job.status === "completed"
-                      ? "bg-zinc-100 text-zinc-700"
-                      : "bg-red-100 text-red-800"
-                }`}
+                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${listStatus.badgeClass}`}
               >
-                {job.status}
+                {listStatus.label}
               </span>
               {job.contract_status && job.contract_status !== "none" && (
                 <span

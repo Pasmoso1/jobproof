@@ -164,7 +164,8 @@ export function DeviceSigningForm({
       </div>
 
       <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-900">
-        By signing below, you agree this is a legally binding agreement.
+        By signing below, you confirm that you have read this contract, understand it, and agree to
+        be legally bound by its terms.
       </p>
 
       <div>
@@ -177,7 +178,8 @@ export function DeviceSigningForm({
             className="mt-1 h-4 w-4 rounded border-zinc-300 text-[#2436BB] focus:ring-[#2436BB]"
           />
           <span className="text-sm text-zinc-700">
-            I have read this contract and agree to its terms. I confirm I am authorized to sign on behalf of the customer where applicable.
+            I have read this contract, understand it, and agree to its terms. I confirm that I am
+            authorized to sign and enter into this legally binding agreement.
           </span>
         </label>
       </div>

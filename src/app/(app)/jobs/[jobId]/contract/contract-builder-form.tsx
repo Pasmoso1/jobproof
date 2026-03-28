@@ -16,6 +16,7 @@ import {
   validateContractBuilderScheduleDates,
   validateCustomerEmailForRemote,
 } from "@/lib/validation/job-create";
+import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
 import { ContractPreview } from "./contract-preview";
 import type { Contract, Profile } from "@/types/database";
 
@@ -227,6 +228,12 @@ export function ContractBuilderForm({
   const hasValidPrice = !Number.isNaN(priceNum) && priceNum > 0;
   const depositNum = parseFloat(form.depositAmount);
   const taxNum = parseFloat(form.taxRate);
+  const depositForBalance =
+    !Number.isNaN(depositNum) && depositNum >= 0 ? depositNum : 0;
+  const balanceDueSummary = balanceDueOnCompletion(
+    hasValidPrice ? priceNum : null,
+    depositForBalance > 0 ? depositForBalance : null
+  );
   const propertyAddressDisplay = form.jobAddress.trim() || "—";
   const remoteSigningEmailReady = isValidCustomerEmail(form.customerEmail);
 
@@ -512,6 +519,18 @@ export function ContractBuilderForm({
             <dt className="text-zinc-500">Contract price</dt>
             <dd className="font-medium text-zinc-900">
               {hasValidPrice ? `$${priceNum.toLocaleString()}` : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-zinc-500">Deposit</dt>
+            <dd className="font-medium text-zinc-900">
+              {depositForBalance > 0 ? `$${depositForBalance.toLocaleString()}` : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-zinc-500">Balance due on completion</dt>
+            <dd className="font-semibold text-[#2436BB]">
+              {balanceDueSummary != null ? `$${balanceDueSummary.toLocaleString()}` : "—"}
             </dd>
           </div>
           <div>

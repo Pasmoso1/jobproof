@@ -199,7 +199,8 @@ export async function getActiveJobsCount() {
     .from("jobs")
     .select("*", { count: "exact", head: true })
     .eq("profile_id", profile.id)
-    .eq("status", "active");
+    .eq("status", "active")
+    .eq("contract_status", "signed");
 
   return count ?? 0;
 }

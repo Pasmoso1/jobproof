@@ -7,8 +7,8 @@ export default function ContractSignSuccessPage() {
             Contract signed successfully. Thank you.
           </p>
           <p className="mt-3 text-sm text-zinc-600">
-            Your acceptance has been recorded with a timestamp. The contractor will receive a copy for
-            their records.
+            Your acceptance has been recorded with a timestamp. The customer and contractor will each
+            receive a copy for their records.
           </p>
         </div>
       </div>

@@ -9,6 +9,7 @@ import {
   getJobs,
 } from "../actions";
 import { DashboardAlerts } from "./dashboard-alerts";
+import { getJobListStatusDisplay } from "@/lib/job-dashboard-status";
 
 function formatStorage(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -107,7 +108,7 @@ export default async function DashboardPage() {
             {activeCount ?? 0}
           </p>
           <p className="mt-0.5 text-xs text-zinc-500">
-            of {profile?.active_job_limit ?? 10} limit
+            Signed contracts only • of {profile?.active_job_limit ?? 10} limit
           </p>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
@@ -141,8 +142,17 @@ export default async function DashboardPage() {
               </p>
             </div>
           ) : (
-            jobs.map((job: { id: string; title: string; status: string; customers: { full_name?: string } | { full_name?: string }[] | null; current_contract_total?: number | null; original_contract_price?: number | null;  }) => {
+            jobs.map((job: {
+              id: string;
+              title: string;
+              status: string;
+              contract_status?: string | null;
+              customers: { full_name?: string } | { full_name?: string }[] | null;
+              current_contract_total?: number | null;
+              original_contract_price?: number | null;
+            }) => {
               const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
+              const { label, badgeClass } = getJobListStatusDisplay(job);
               return (
               <Link
                 key={job.id}
@@ -163,15 +173,9 @@ export default async function DashboardPage() {
                       </span>
                     )}
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        job.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : job.status === "completed"
-                            ? "bg-zinc-100 text-zinc-700"
-                            : "bg-red-100 text-red-800"
-                      }`}
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeClass}`}
                     >
-                      {job.status}
+                      {label}
                     </span>
                   </div>
                 </div>

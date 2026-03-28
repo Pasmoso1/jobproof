@@ -2,6 +2,7 @@
  * Signed contract PDF generation (server-only). Uploads to Supabase `contract-pdfs` bucket.
  */
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 const PAGE_W = 612;
@@ -196,6 +197,12 @@ export async function buildSignedContractPdfBytes(
   heading(layout, "Pricing");
   labeledParagraph(layout, "Contract total", money(input.price));
   labeledParagraph(layout, "Deposit", money(input.depositAmount));
+  const pdfBalance = balanceDueOnCompletion(input.price ?? null, input.depositAmount ?? null);
+  labeledParagraph(
+    layout,
+    "Balance due on completion",
+    pdfBalance != null ? money(pdfBalance) : "—"
+  );
   labeledParagraph(
     layout,
     "Tax",

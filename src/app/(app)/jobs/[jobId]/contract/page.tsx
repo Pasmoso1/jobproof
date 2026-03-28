@@ -8,6 +8,7 @@ import {
   getContractPdfSignedUrl,
   getProfile,
 } from "@/app/(app)/actions";
+import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
 import { ContractBuilderForm } from "./contract-builder-form";
 
 export default async function ContractBuilderPage({
@@ -40,6 +41,16 @@ export default async function ContractBuilderPage({
     const pdfUrl = displayContract.pdf_path
       ? await getContractPdfSignedUrl(displayContract.pdf_path)
       : null;
+
+    const signedPrice =
+      displayContract.price != null && Number(displayContract.price) > 0
+        ? Number(displayContract.price)
+        : null;
+    const signedDeposit =
+      displayContract.deposit_amount != null && Number(displayContract.deposit_amount) > 0
+        ? Number(displayContract.deposit_amount)
+        : null;
+    const signedBalanceDue = balanceDueOnCompletion(signedPrice, signedDeposit);
 
     return (
       <div className="mx-auto max-w-3xl">
@@ -77,6 +88,26 @@ export default async function ContractBuilderPage({
               </span>
             )}
           </div>
+          {signedPrice != null && (
+            <dl className="mt-4 grid gap-2 border-t border-zinc-100 pt-4 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-zinc-500">Contract total</dt>
+                <dd className="font-medium text-zinc-900">${signedPrice.toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Deposit</dt>
+                <dd className="font-medium text-zinc-900">
+                  {signedDeposit != null ? `$${signedDeposit.toLocaleString()}` : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Balance due on completion</dt>
+                <dd className="font-semibold text-[#2436BB]">
+                  {signedBalanceDue != null ? `$${signedBalanceDue.toLocaleString()}` : "—"}
+                </dd>
+              </div>
+            </dl>
+          )}
           {displayContract.signer_name && (
             <p className="mt-4 text-sm text-zinc-600">
               Signed by: {displayContract.signer_name}
