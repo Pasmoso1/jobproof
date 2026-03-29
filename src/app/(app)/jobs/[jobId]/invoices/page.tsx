@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getJob, getInvoices, getProfile, getContractForJob } from "@/app/(app)/actions";
-import { InvoiceBuilderForm } from "./invoice-builder-form";
+import { formatDateEastern, formatDateTimeEastern } from "@/lib/datetime-eastern";
+import { InvoiceBuilderForm, type LatestInvoiceSummary } from "./invoice-builder-form";
 
 export default async function InvoicesPage({
   params,
@@ -29,6 +30,24 @@ export default async function InvoicesPage({
   if (!job) notFound();
 
   const contractSigned = contract?.status === "signed";
+
+  const latestInvoice: LatestInvoiceSummary | null =
+    invoices.length > 0
+      ? (() => {
+          const inv = invoices[0] as LatestInvoiceSummary;
+          return {
+            id: inv.id,
+            invoice_number: inv.invoice_number,
+            subtotal: Number(inv.subtotal),
+            tax_amount: Number(inv.tax_amount),
+            total: Number(inv.total),
+            deposit_credited: inv.deposit_credited != null ? Number(inv.deposit_credited) : null,
+            balance_due: inv.balance_due != null ? Number(inv.balance_due) : null,
+            due_date: inv.due_date,
+            status: inv.status,
+          };
+        })()
+      : null;
 
   const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
   const businessName = (profile as { business_name?: string | null })?.business_name;
@@ -78,6 +97,7 @@ export default async function InvoicesPage({
         jobId={jobId}
         job={job}
         contractSigned={contractSigned}
+        latestInvoice={latestInvoice}
       />
 
       <div className="mt-8 rounded-xl border border-zinc-200 bg-white">
@@ -115,8 +135,8 @@ export default async function InvoicesPage({
                       </p>
                       <p className="text-sm text-zinc-500">
                         {inv.sent_at
-                          ? `Issued ${new Date(inv.sent_at).toLocaleString()}`
-                          : `Created ${new Date(inv.created_at).toLocaleDateString()}`}
+                          ? `Issued ${formatDateTimeEastern(inv.sent_at)}`
+                          : `Created ${formatDateEastern(inv.created_at)}`}
                         {" "}
                         •{" "}
                         <span

@@ -9,6 +9,7 @@ import {
   getProfile,
 } from "@/app/(app)/actions";
 import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
+import { formatDateEastern } from "@/lib/datetime-eastern";
 import { ContractBuilderForm } from "./contract-builder-form";
 
 export default async function ContractBuilderPage({
@@ -74,7 +75,7 @@ export default async function ContractBuilderPage({
             </span>
             {displayContract.signed_at && (
               <span className="text-zinc-600">
-                Signed {new Date(displayContract.signed_at).toLocaleDateString()}
+                Signed {formatDateEastern(displayContract.signed_at)}
               </span>
             )}
             {displayContract.signing_method && (

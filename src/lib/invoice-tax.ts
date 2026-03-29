@@ -57,3 +57,15 @@ export function invoiceTaxRateDisplayLabel(province: string | null | undefined):
   const code = provinceCode(province) || "ON (default)";
   return `${pct}% (${code})`;
 }
+
+/** Compact label for invoice lines, e.g. "13% (ON)" or "14.975% (QC)". */
+export function invoiceTaxShortLabel(province: string | null | undefined): string {
+  const rate = taxRateFromPropertyProvince(province);
+  const pct = rate * 100;
+  const pctStr =
+    Math.abs(pct - Math.round(pct)) < 1e-9
+      ? String(Math.round(pct))
+      : pct.toFixed(3).replace(/\.?0+$/, "");
+  const code = provinceCode(province) || "ON";
+  return `${pctStr}% (${code})`;
+}

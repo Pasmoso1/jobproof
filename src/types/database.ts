@@ -22,6 +22,8 @@ export interface Profile {
   storage_limit_mb: number;
   business_name: string | null;
   contractor_name: string | null;
+  /** Interac e-Transfer receiving address for invoices */
+  e_transfer_email?: string | null;
   phone: string | null;
   address_line_1: string | null;
   address_line_2: string | null;

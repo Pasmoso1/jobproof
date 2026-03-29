@@ -1,4 +1,5 @@
 import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
+import { formatDateEastern, formatLocalDateStringEastern } from "@/lib/datetime-eastern";
 
 type ContractPreviewProps = {
   jobTitle: string;
@@ -53,7 +54,7 @@ export function ContractPreview({
         <h2 className="text-lg font-semibold text-zinc-900">Contract Agreement</h2>
         <p className="mt-0.5 text-sm text-zinc-600">{jobTitle}</p>
         <p className="mt-1 text-xs text-zinc-500">
-          Prepared {new Date().toLocaleDateString("en-CA", { year: "numeric", month: "long", day: "numeric" })}
+          Prepared {formatDateEastern(new Date())}
         </p>
       </div>
 
@@ -107,9 +108,10 @@ export function ContractPreview({
           </p>
           {(startDate || completionDate) && (
             <p className="mt-1 text-sm text-zinc-600">
-              {startDate && `Start: ${new Date(startDate).toLocaleDateString()}`}
+              {startDate && `Start: ${formatLocalDateStringEastern(startDate)}`}
               {startDate && completionDate && " • "}
-              {completionDate && `Completion: ${new Date(completionDate).toLocaleDateString()}`}
+              {completionDate &&
+                `Completion: ${formatLocalDateStringEastern(completionDate)}`}
             </p>
           )}
         </section>

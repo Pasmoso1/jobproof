@@ -19,6 +19,7 @@ type Profile = {
   default_contract_terms_and_conditions?: string | null;
   default_contract_warranty_note?: string | null;
   default_contract_cancellation_note?: string | null;
+  e_transfer_email?: string | null;
 } | null;
 
 export function BusinessSettingsForm({
@@ -53,6 +54,7 @@ export function BusinessSettingsForm({
   const [defaultCancellation, setDefaultCancellation] = useState(
     profile?.default_contract_cancellation_note ?? ""
   );
+  const [eTransferEmail, setETransferEmail] = useState(profile?.e_transfer_email ?? "");
 
   function clearFieldError(key: string) {
     setFieldErrors((prev) => {
@@ -96,6 +98,7 @@ export function BusinessSettingsForm({
     formData.set("default_contract_terms_and_conditions", defaultTermsAndConditions);
     formData.set("default_contract_warranty_note", defaultWarranty);
     formData.set("default_contract_cancellation_note", defaultCancellation);
+    formData.set("e_transfer_email", eTransferEmail.trim());
 
     const result = await updateProfileBusinessInfo(formData);
 
@@ -213,6 +216,32 @@ export function BusinessSettingsForm({
             {fieldErrors.phone}
           </p>
         )}
+      </div>
+
+      <div>
+        <label htmlFor="eTransferEmail" className="block text-sm font-medium text-zinc-700">
+          E-transfer email (optional)
+        </label>
+        <input
+          id="eTransferEmail"
+          type="email"
+          value={eTransferEmail}
+          onChange={(e) => {
+            setETransferEmail(e.target.value);
+            clearFieldError("e_transfer_email");
+          }}
+          placeholder="payments@yourbusiness.ca"
+          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+          aria-invalid={!!fieldErrors.e_transfer_email}
+        />
+        {fieldErrors.e_transfer_email && (
+          <p className="mt-1 text-sm text-red-600" role="alert">
+            {fieldErrors.e_transfer_email}
+          </p>
+        )}
+        <p className="mt-1 text-xs text-zinc-500">
+          Shown on invoices so customers know where to send Interac e-Transfers.
+        </p>
       </div>
 
       <div>

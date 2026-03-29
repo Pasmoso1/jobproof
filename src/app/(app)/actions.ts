@@ -20,9 +20,13 @@ import {
 } from "@/lib/validation/job-create";
 import { resolvePublicAppOrigin } from "@/lib/app-origin";
 import {
-  invoiceTaxRateDisplayLabel,
+  invoiceTaxShortLabel,
   taxRateFromPropertyProvince,
 } from "@/lib/invoice-tax";
+import {
+  formatDateEastern,
+  formatLocalDateStringEastern,
+} from "@/lib/datetime-eastern";
 import { JOB_LOCKED_SIGNED_CONTRACT_MESSAGE } from "@/lib/job-contract-lock";
 import {
   validateChangeOrderDescription,
@@ -132,11 +136,22 @@ export async function updateProfileBusinessInfo(formData: FormData) {
     return { fieldErrors };
   }
 
+  const eTransferEmail = String(formData.get("e_transfer_email") ?? "").trim() || null;
+  if (
+    eTransferEmail &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(eTransferEmail)
+  ) {
+    return {
+      fieldErrors: { e_transfer_email: "Enter a valid email address." },
+    };
+  }
+
   const { error } = await supabase
     .from("profiles")
     .update({
       business_name: businessName,
       contractor_name: contractorName,
+      e_transfer_email: eTransferEmail,
       phone,
       address_line_1: addressLine1,
       address_line_2: addressLine2,
@@ -1414,13 +1429,7 @@ function formatContractDateForEmail(v: unknown): string {
   const s = String(v ?? "").trim();
   if (!s) return "—";
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    try {
-      return new Date(`${s}T12:00:00`).toLocaleDateString(undefined, {
-        dateStyle: "medium",
-      });
-    } catch {
-      return s;
-    }
+    return formatLocalDateStringEastern(s, { dateStyle: "medium" }) || s;
   }
   return s;
 }
@@ -2716,6 +2725,39 @@ function formatJobServiceAddressLines(job: {
   return [street, cityLine].filter((s) => s.trim().length > 0);
 }
 
+function buildInvoicePaymentBlocks(
+  profile: {
+    contractor_name?: string | null;
+    phone?: string | null;
+    default_contract_payment_terms?: string | null;
+    e_transfer_email?: string | null;
+  },
+  bizName: string,
+  userEmail: string | null | undefined
+): { paymentInstructions: string; paymentContactLines: string[] } {
+  const et = profile.e_transfer_email?.trim() || null;
+  const paymentContactLines = [
+    profile.contractor_name?.trim()
+      ? `Contact: ${profile.contractor_name.trim()}`
+      : null,
+    profile.phone?.trim() ? `Phone: ${profile.phone.trim()}` : null,
+    userEmail?.trim() ? `Email: ${userEmail.trim()}` : null,
+    et ? `E-transfer: ${et}` : null,
+  ].filter(Boolean) as string[];
+
+  const etSentence = et
+    ? ` For Interac e-Transfer, send payment to ${et}.`
+    : "";
+
+  const defaultPaymentCopy = `Please pay the balance due using the method you agreed with ${bizName}.${etSentence} If you have not arranged payment yet, use the payment contact information below.`;
+
+  const paymentInstructions = profile.default_contract_payment_terms?.trim()
+    ? `${profile.default_contract_payment_terms.trim()}\n\n${defaultPaymentCopy}`
+    : defaultPaymentCopy;
+
+  return { paymentInstructions, paymentContactLines };
+}
+
 /**
  * Create invoice from signed job totals only (contract + signed change orders on the job).
  * Tax rate is derived from the job’s property province (server-side). Status is `draft` until
@@ -2774,7 +2816,7 @@ export async function createInvoice(
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, default_contract_payment_terms"
+      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, default_contract_payment_terms, e_transfer_email"
     )
     .eq("user_id", user.id)
     .single();
@@ -2831,6 +2873,9 @@ export async function createInvoice(
 
   const notesTrimmed = notes?.trim() || null;
   const dueDateTrimmed = dueDate?.trim() || null;
+  if (!dueDateTrimmed) {
+    return { error: "Due date is required." };
+  }
 
   const { data: invoice, error } = await supabase
     .from("invoices")
@@ -2889,19 +2934,10 @@ export async function createInvoice(
     invoice.invoice_number?.trim() ||
     `Invoice ${String(invoice.id).slice(0, 8)}`;
 
-  const dueDateFormatted =
-    dueDateTrimmed && !Number.isNaN(Date.parse(dueDateTrimmed + "T12:00:00"))
-      ? new Date(dueDateTrimmed + "T12:00:00").toLocaleDateString(undefined, {
-          dateStyle: "long",
-        })
-      : null;
+  const dueDateFormatted = formatLocalDateStringEastern(dueDateTrimmed);
+  const issueDateFormatted = formatDateEastern(invoice.created_at);
 
-  const issueDateFormatted = new Date(invoice.created_at).toLocaleDateString(
-    undefined,
-    { dateStyle: "long" }
-  );
-
-  const taxRateLabel = invoiceTaxRateDisplayLabel(province);
+  const taxRateLabel = invoiceTaxShortLabel(province);
 
   const contractorAddressLines = formatProfileAddressLines(profile);
   const serviceAddressLines = formatJobServiceAddressLines(
@@ -2909,18 +2945,11 @@ export async function createInvoice(
   );
 
   const bizName = profile.business_name?.trim() || "Your contractor";
-  const paymentContactLines = [
-    profile.contractor_name?.trim()
-      ? `Contact: ${profile.contractor_name.trim()}`
-      : null,
-    profile.phone?.trim() ? `Phone: ${profile.phone.trim()}` : null,
-    user.email?.trim() ? `Email: ${user.email.trim()}` : null,
-  ].filter(Boolean) as string[];
-
-  const defaultPaymentCopy = `Please pay the balance due using the method you agreed with ${bizName}. If you have not arranged payment yet, use the payment contact information in this email.`;
-  const paymentInstructions = profile.default_contract_payment_terms?.trim()
-    ? `${profile.default_contract_payment_terms.trim()}\n\n${defaultPaymentCopy}`
-    : defaultPaymentCopy;
+  const { paymentInstructions, paymentContactLines } = buildInvoicePaymentBlocks(
+    profile,
+    bizName,
+    user.email
+  );
 
   const pdfFilenameBase =
     invoiceNumberDisplay.replace(/[^a-zA-Z0-9-_]+/g, "-").replace(/^-+|-+$/g, "")
@@ -3067,4 +3096,283 @@ export async function createInvoice(
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/invoices`);
   return { invoiceId: invoice.id, emailSent: true };
+}
+
+/**
+ * Resend the invoice email (and PDF) using stored invoice amounts and due date — no edits.
+ */
+export async function resendInvoice(
+  invoiceId: string
+): Promise<{ emailSent: boolean; emailError?: string } | { error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: invRow, error: invErr } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("id", invoiceId)
+    .single();
+
+  if (invErr || !invRow) return { error: "Invoice not found" };
+
+  const jobId = String(invRow.job_id);
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, default_contract_payment_terms, e_transfer_email"
+    )
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile || invRow.profile_id !== profile.id) {
+    return { error: "Unauthorized" };
+  }
+
+  if (
+    !isBusinessProfileCompleteForApp({
+      business_name: profile.business_name,
+      account_email: user.email ?? "",
+      phone: profile.phone,
+      address_line_1: profile.address_line_1,
+      city: profile.city,
+      province: profile.province,
+      postal_code: profile.postal_code,
+    })
+  ) {
+    return {
+      error:
+        "Please complete your business profile before proceeding. Go to Settings → Business.",
+    };
+  }
+
+  const { data: job } = await supabase
+    .from("jobs")
+    .select(
+      `
+      id,
+      profile_id,
+      title,
+      property_province,
+      property_address_line_1,
+      property_address_line_2,
+      property_city,
+      property_postal_code,
+      customers (
+        id,
+        email,
+        full_name,
+        phone
+      )
+    `
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (!job || job.profile_id !== profile.id) return { error: "Job not found" };
+
+  const customerRow = Array.isArray((job as { customers?: unknown }).customers)
+    ? (
+        job as {
+          customers: {
+            email?: string | null;
+            full_name?: string | null;
+            phone?: string | null;
+          }[];
+        }
+      ).customers[0]
+    : (
+        job as {
+          customers?: {
+            email?: string | null;
+            full_name?: string | null;
+            phone?: string | null;
+          };
+        }
+      ).customers;
+
+  const customerEmail = customerRow?.email?.trim() ?? "";
+  const customerName = customerRow?.full_name?.trim() ?? "there";
+
+  if (!customerEmail) {
+    return {
+      error:
+        "Customer has no email on file. Add their email on the job before resending.",
+    };
+  }
+
+  const province =
+    (job as { property_province?: string | null }).property_province ?? null;
+  const taxRateLabel = invoiceTaxShortLabel(province);
+
+  const subtotal = Number(invRow.subtotal);
+  const taxAmount = Number(invRow.tax_amount);
+  const total = Number(invRow.total);
+  const depositCredited = Number(invRow.deposit_credited ?? 0);
+  const balanceDue = Number(invRow.balance_due ?? Math.max(0, total - depositCredited));
+
+  const rawLineItems = invRow.line_items;
+  const lineItemsParsed: { description: string; amount: number; quantity: number }[] =
+    Array.isArray(rawLineItems)
+      ? (rawLineItems as Record<string, unknown>[]).map((row) => ({
+          description: String(row.description ?? ""),
+          amount: Number(row.amount ?? 0),
+          quantity: Math.max(1, Number(row.quantity ?? 1) || 1),
+        }))
+      : [];
+
+  const invoiceNumberDisplay =
+    (invRow.invoice_number as string | null)?.trim() ||
+    `Invoice ${String(invRow.id).slice(0, 8)}`;
+
+  const dueRaw = (invRow.due_date as string | null)?.trim() || null;
+  const dueDateFormatted = dueRaw
+    ? formatLocalDateStringEastern(dueRaw)
+    : "Not specified";
+
+  const issueDateFormatted = formatDateEastern(String(invRow.created_at));
+
+  const notesTrimmed =
+    typeof invRow.notes === "string" ? invRow.notes.trim() || null : null;
+
+  const contractorAddressLines = formatProfileAddressLines(profile);
+  const serviceAddressLines = formatJobServiceAddressLines(
+    job as Parameters<typeof formatJobServiceAddressLines>[0]
+  );
+  const bizName = profile.business_name?.trim() || "Your contractor";
+  const { paymentInstructions, paymentContactLines } = buildInvoicePaymentBlocks(
+    profile,
+    bizName,
+    user.email
+  );
+
+  const pdfFilenameBase =
+    invoiceNumberDisplay.replace(/[^a-zA-Z0-9-_]+/g, "-").replace(/^-+|-+$/g, "")
+      .slice(0, 72) || "invoice";
+  const pdfFilename = `${pdfFilenameBase}.pdf`;
+
+  let pdfAttachment: { filename: string; contentBase64: string } | undefined;
+  try {
+    const pdfBytes = await buildInvoicePdf({
+      invoiceNumberLabel: invoiceNumberDisplay,
+      issueDateLabel: issueDateFormatted,
+      dueDateLabel: dueDateFormatted,
+      jobTitle: String((job as { title?: string }).title ?? "Job"),
+      contractor: {
+        businessName: bizName,
+        contactName: profile.contractor_name?.trim() || null,
+        phone: profile.phone?.trim() || null,
+        email: user.email?.trim() || null,
+        addressLines: contractorAddressLines,
+      },
+      customer: {
+        name: customerName,
+        email: customerRow?.email?.trim() || null,
+        phone: customerRow?.phone?.trim() || null,
+        serviceAddressLines,
+      },
+      lineItems: lineItemsParsed.map((item) => ({
+        description: item.description,
+        quantity: item.quantity,
+        amount: item.amount,
+      })),
+      subtotal,
+      taxLabel: taxRateLabel,
+      taxAmount,
+      total,
+      depositReceived: depositCredited,
+      balanceDue,
+      paymentInstructions,
+      paymentContactLines,
+      notes: notesTrimmed,
+    });
+
+    pdfAttachment = {
+      filename: pdfFilename,
+      contentBase64: Buffer.from(pdfBytes).toString("base64"),
+    };
+
+    const storagePath = `${profile.id}/${String(invRow.id)}.pdf`;
+    const { error: uploadErr } = await supabase.storage
+      .from("invoice-pdfs")
+      .upload(storagePath, pdfBytes, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    if (uploadErr) {
+      console.error("[resendInvoice] invoice PDF upload failed:", uploadErr);
+    } else {
+      await supabase
+        .from("invoices")
+        .update({ invoice_pdf_path: storagePath })
+        .eq("id", invRow.id);
+    }
+  } catch (e) {
+    console.error("[resendInvoice] invoice PDF generation failed:", e);
+    pdfAttachment = undefined;
+  }
+
+  const sendResult = await sendInvoiceEmail({
+    toEmail: customerEmail,
+    toName: customerName,
+    jobTitle: String((job as { title?: string }).title ?? "Job"),
+    businessDisplayName: profile.business_name,
+    replyToEmail: user.email ?? null,
+    contractor: {
+      businessName: bizName,
+      contactName: profile.contractor_name?.trim() || null,
+      phone: profile.phone?.trim() || null,
+      email: user.email?.trim() || null,
+      addressLines: contractorAddressLines,
+    },
+    customer: {
+      name: customerName,
+      email: customerRow?.email?.trim() || null,
+      phone: customerRow?.phone?.trim() || null,
+      serviceAddressLines,
+    },
+    invoiceNumber: invoiceNumberDisplay,
+    issueDate: issueDateFormatted,
+    dueDate: dueDateFormatted,
+    subtotal,
+    taxAmount,
+    taxRateLabel,
+    total,
+    depositReceived: depositCredited,
+    balanceDue,
+    paymentInstructions,
+    paymentContactLines,
+    notes: notesTrimmed,
+    pdfAttachment,
+    deliveryLog: {
+      profileId: profile.id,
+      type: "invoice",
+      relatedEntityId: String(invRow.id),
+    },
+  });
+
+  if (!sendResult.success) {
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/jobs/${jobId}/invoices`);
+    return {
+      emailSent: false,
+      emailError:
+        sendResult.error ??
+        "The email could not be sent. Check Resend configuration and try again.",
+    };
+  }
+
+  const sentAt = new Date().toISOString();
+  await supabase
+    .from("invoices")
+    .update({ status: "sent", sent_at: sentAt })
+    .eq("id", invRow.id);
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/invoices`);
+  return { emailSent: true };
 }

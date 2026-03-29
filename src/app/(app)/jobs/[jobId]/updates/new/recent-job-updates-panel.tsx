@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 
 type UpdateRow = {
   id: string;
@@ -44,7 +45,7 @@ export function RecentJobUpdatesPanel({
               <p className="mt-0.5 text-xs text-zinc-500">
                 <span className="capitalize">{u.category}</span>
                 {" • "}
-                {new Date(u.created_at).toLocaleString()}
+                {formatDateTimeEastern(u.created_at)}
                 {n > 0 && (
                   <>
                     {" • "}

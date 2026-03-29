@@ -9,6 +9,11 @@ import {
   getProfile,
 } from "@/app/(app)/actions";
 import { ProofPhotoEvidence } from "./proof-photo-evidence";
+import {
+  formatDateEastern,
+  formatDateTimeEastern,
+  formatLocalDateStringEastern,
+} from "@/lib/datetime-eastern";
 
 export default async function ProofReportPage({
   params,
@@ -73,7 +78,7 @@ export default async function ProofReportPage({
       if (isEvidenceImage(a)) {
         evidencePhotos.push({
           id: a.id,
-          file_name: `${u.title} · ${new Date(u.date).toLocaleDateString()} · ${a.file_name}`,
+          file_name: `${u.title} · ${formatLocalDateStringEastern(u.date)} · ${a.file_name}`,
           signedUrl: a.signedUrl ?? null,
         });
       }
@@ -171,7 +176,7 @@ export default async function ProofReportPage({
             <p className="mt-2 text-sm text-zinc-600">
               Signed{" "}
               {contract.signed_at
-                ? new Date(contract.signed_at).toLocaleString()
+                ? formatDateTimeEastern(contract.signed_at)
                 : "—"}{" "}
               ({contract.signing_method ?? "—"})
             </p>
@@ -218,7 +223,7 @@ export default async function ProofReportPage({
                     </span>
                     {co.signed_at && co.signing_method && (
                       <span className="ml-2 text-zinc-400">
-                        • {new Date(co.signed_at).toLocaleDateString()} ({co.signing_method})
+                        • {formatDateEastern(co.signed_at)} ({co.signing_method})
                       </span>
                     )}
                   </div>
@@ -278,7 +283,9 @@ export default async function ProofReportPage({
                         {u.category}
                       </span>
                       <span className="font-medium text-zinc-900">{u.title}</span>
-                      <span className="text-zinc-500">{new Date(u.date).toLocaleDateString()}</span>
+                      <span className="text-zinc-500">
+                        {formatLocalDateStringEastern(u.date)}
+                      </span>
                     </div>
                     {u.note && <p className="mt-2 text-zinc-600">{u.note}</p>}
                     {n > 0 && (
@@ -315,7 +322,7 @@ export default async function ProofReportPage({
                             <div className="sm:col-span-2">
                               <dt className="text-zinc-500">Recorded at</dt>
                               <dd className="text-zinc-900">
-                                {new Date(u.location_captured_at).toLocaleString()}
+                                {formatDateTimeEastern(u.location_captured_at)}
                               </dd>
                             </div>
                           )}
@@ -380,7 +387,7 @@ export default async function ProofReportPage({
                           {inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`}
                           {inv.sent_at && (
                             <span className="ml-2 text-zinc-500">
-                              · Issued {new Date(inv.sent_at).toLocaleString()}
+                              · Issued {formatDateTimeEastern(inv.sent_at)}
                             </span>
                           )}
                         </span>

@@ -1,12 +1,13 @@
 import type { EmailLog } from "@/types/database";
+import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 
 export function RecentEmailActivity({ logs }: { logs: EmailLog[] }) {
   return (
     <section className="mt-10 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-zinc-900">Recent email delivery</h2>
       <p className="mt-1 text-sm text-zinc-600">
-        Logged sends for contract and change order emails (success and failure). Use this to debug
-        delivery issues.
+        Logged sends for contract, change order, and invoice emails (success and failure). Use this
+        to debug delivery issues.
       </p>
 
       {logs.length === 0 ? (
@@ -31,7 +32,7 @@ export function RecentEmailActivity({ logs }: { logs: EmailLog[] }) {
                   {row.type.replace("_", " ")}
                 </span>
                 <span className="text-zinc-500">
-                  {new Date(row.created_at).toLocaleString()}
+                  {formatDateTimeEastern(row.created_at)}
                 </span>
               </div>
               <p className="mt-1 font-medium text-zinc-900">{row.recipient_email}</p>

@@ -5,6 +5,7 @@
 
 import { Resend } from "resend";
 import { insertEmailLog, type EmailLogEntityType } from "@/lib/email-log";
+import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 
 /** When set, every send attempt is recorded in `email_logs` (success or failure). */
 export interface EmailDeliveryAuditLog {
@@ -33,10 +34,7 @@ export interface DeliveryResult {
 }
 
 function signingLinkEmailHtml(opts: SendSigningLinkOptions): string {
-  const exp = opts.expiresAt.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const exp = formatDateTimeEastern(opts.expiresAt);
   const href = opts.signingUrl.replace(/"/g, "%22");
   return `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; max-width: 560px;">

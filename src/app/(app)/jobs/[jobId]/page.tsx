@@ -11,6 +11,11 @@ import {
 } from "../../actions";
 import { isJobLockedForContractEdits } from "@/lib/job-contract-lock";
 import { getJobListStatusDisplay } from "@/lib/job-dashboard-status";
+import {
+  formatDateEastern,
+  formatDateTimeEastern,
+  formatLocalDateStringEastern,
+} from "@/lib/datetime-eastern";
 import { MarkJobCompleteButton } from "./mark-job-complete-button";
 import { UpdateTimelinePhotos } from "./update-timeline-photos";
 
@@ -215,7 +220,7 @@ export default async function JobDetailPage({
               </span>
               {contract.signed_at && (
                 <span className="text-zinc-600">
-                  Signed: {new Date(contract.signed_at).toLocaleDateString()}
+                  Signed: {formatDateEastern(contract.signed_at)}
                 </span>
               )}
               {contract.price != null && (
@@ -286,7 +291,7 @@ export default async function JobDetailPage({
                     <div className="flex items-center gap-2">
                       {co.signed_at && (
                         <span className="text-zinc-500">
-                          {new Date(co.signed_at).toLocaleDateString()}
+                          {formatDateEastern(co.signed_at)}
                           {co.signing_method && ` (${co.signing_method})`}
                         </span>
                       )}
@@ -373,7 +378,7 @@ export default async function JobDetailPage({
                 const atts = update.job_update_attachments ?? [];
                 const n = atts.length;
                 const photoCount = atts.filter((a) => a.file_type === "photo").length;
-                const docTime = new Date(update.created_at).toLocaleString();
+                const docTime = formatDateTimeEastern(update.created_at);
                 const hasRecordedLocation =
                   update.location_source === "device_current" &&
                   update.location_latitude != null &&
@@ -410,7 +415,7 @@ export default async function JobDetailPage({
                         {update.title}
                       </h3>
                       <p className="mt-0.5 text-sm text-zinc-600">
-                        Job date {new Date(update.date).toLocaleDateString()}
+                        Job date {formatLocalDateStringEastern(update.date)}
                         {n > 0 && (
                           <>
                             {" "}
@@ -452,7 +457,7 @@ export default async function JobDetailPage({
                               className="inline-flex max-w-full items-center truncate rounded bg-zinc-100 px-2 py-1 text-xs text-zinc-600"
                               title={
                                 a.captured_at
-                                  ? `Uploaded ${new Date(a.captured_at).toLocaleString()}`
+                                  ? `Uploaded ${formatDateTimeEastern(a.captured_at)}`
                                   : a.file_name
                               }
                             >

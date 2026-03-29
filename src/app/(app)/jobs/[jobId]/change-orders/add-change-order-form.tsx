@@ -17,6 +17,7 @@ import {
   validateChangeOrderNewCompletionDate,
   validateCustomerEmailForChangeOrderRemote,
 } from "@/lib/validation/change-order";
+import { formatLocalDateStringEastern } from "@/lib/datetime-eastern";
 
 type Job = {
   original_contract_price?: number | null;
@@ -70,7 +71,7 @@ export function AddChangeOrderForm({
       change,
       title: changeTitle.trim() || "—",
       completionLabel: newEstimatedCompletionDate
-        ? new Date(`${newEstimatedCompletionDate}T12:00:00`).toLocaleDateString()
+        ? formatLocalDateStringEastern(newEstimatedCompletionDate)
         : "—",
     };
   }, [newJobTotal, newEstimatedCompletionDate, changeTitle, previousTotal]);

@@ -4,6 +4,7 @@ import { getJob, getChangeOrders } from "@/app/(app)/actions";
 import { AddChangeOrderForm } from "./add-change-order-form";
 import { ChangeOrderActions } from "./change-order-actions";
 import { formatChangeOrderSentDelivery } from "@/lib/change-order-display";
+import { formatDateEastern, formatDateTimeEastern } from "@/lib/datetime-eastern";
 
 export default async function ChangeOrdersPage({
   params,
@@ -92,7 +93,7 @@ export default async function ChangeOrdersPage({
                 <div>
                   <p className="font-medium text-zinc-900">{co.change_title ?? "Change order"}</p>
                   <p className="text-sm text-zinc-500">
-                    {new Date(co.created_at).toLocaleDateString()} •{" "}
+                    {formatDateEastern(co.created_at)} •{" "}
                     <span
                       className={
                         co.status === "signed"
@@ -108,13 +109,13 @@ export default async function ChangeOrdersPage({
                     </span>
                     {co.signed_at && co.signing_method && (
                       <span className="ml-1 text-zinc-500">
-                        • {new Date(co.signed_at).toLocaleDateString()} ({co.signing_method})
+                        • {formatDateEastern(co.signed_at)} ({co.signing_method})
                       </span>
                     )}
                   </p>
                   {co.status === "sent" && co.sent_at && (
                     <p className="mt-1 text-xs text-zinc-600">
-                      Sent {new Date(co.sent_at).toLocaleString()} •{" "}
+                      Sent {formatDateTimeEastern(co.sent_at)} •{" "}
                       {formatChangeOrderSentDelivery(co.sent_delivery_method)}
                     </p>
                   )}

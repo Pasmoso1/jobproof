@@ -3,6 +3,7 @@
  */
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
+import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 const PAGE_W = 612;
@@ -261,12 +262,7 @@ export async function buildSignedContractPdfBytes(
   labeledParagraph(
     layout,
     "Signed at",
-    input.signedAt
-      ? new Date(input.signedAt).toLocaleString(undefined, {
-          dateStyle: "medium",
-          timeStyle: "short",
-        })
-      : "—"
+    input.signedAt ? formatDateTimeEastern(input.signedAt) : "—"
   );
   labeledParagraph(
     layout,

@@ -6,6 +6,11 @@ import { ChangeOrderActions } from "../change-order-actions";
 import { ChangeOrderWithdrawButton } from "../change-order-withdraw-button";
 import { ChangeOrderDraftEditForm } from "./change-order-draft-edit-form";
 import { formatChangeOrderSentDelivery } from "@/lib/change-order-display";
+import {
+  formatDateEastern,
+  formatDateTimeEastern,
+  formatLocalDateStringEastern,
+} from "@/lib/datetime-eastern";
 
 export default async function ChangeOrderDetailPage({
   params,
@@ -67,7 +72,7 @@ export default async function ChangeOrderDetailPage({
           </span>
           {changeOrder.signed_at && (
             <span className="ml-2 text-zinc-500">
-              Signed {new Date(changeOrder.signed_at).toLocaleDateString()}
+              Signed {formatDateEastern(changeOrder.signed_at)}
               {changeOrder.signing_method && ` via ${changeOrder.signing_method}`}
             </span>
           )}
@@ -83,7 +88,7 @@ export default async function ChangeOrderDetailPage({
         {changeOrder.status === "sent" && changeOrder.sent_at && (
           <p className="mt-2 text-sm text-zinc-600">
             <span className="font-medium text-zinc-800">Sent for approval:</span>{" "}
-            {new Date(changeOrder.sent_at).toLocaleString()} •{" "}
+            {formatDateTimeEastern(changeOrder.sent_at)} •{" "}
             <span className="font-medium text-zinc-800">Delivery:</span>{" "}
             {formatChangeOrderSentDelivery(changeOrder.sent_delivery_method)}
           </p>
@@ -162,13 +167,17 @@ export default async function ChangeOrderDetailPage({
               {changeOrder.new_estimated_start_date && (
                 <div>
                   <dt className="text-zinc-500">Estimated start (legacy)</dt>
-                  <dd>{new Date(changeOrder.new_estimated_start_date).toLocaleDateString()}</dd>
+                  <dd>
+                    {formatLocalDateStringEastern(changeOrder.new_estimated_start_date)}
+                  </dd>
                 </div>
               )}
               {changeOrder.new_estimated_completion_date && (
                 <div>
                   <dt className="text-zinc-500">New completion date</dt>
-                  <dd>{new Date(changeOrder.new_estimated_completion_date).toLocaleDateString()}</dd>
+                  <dd>
+                    {formatLocalDateStringEastern(changeOrder.new_estimated_completion_date)}
+                  </dd>
                 </div>
               )}
             </dl>
