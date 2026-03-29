@@ -32,6 +32,7 @@ import {
   validateChangeOrderNewCompletionDate,
 } from "@/lib/validation/change-order";
 import { sendInvoiceEmail, sendSigningLinkEmail } from "@/lib/delivery-service";
+import { buildInvoicePdf } from "@/lib/invoice-pdf";
 import { generateUUID } from "@/lib/utils/uuid";
 
 export async function getProfile() {
@@ -2687,6 +2688,34 @@ export async function getInvoices(jobId: string) {
   return data ?? [];
 }
 
+function formatProfileAddressLines(p: {
+  address_line_1: string | null;
+  address_line_2: string | null;
+  city: string | null;
+  province: string | null;
+  postal_code: string | null;
+}): string[] {
+  const street = [p.address_line_1, p.address_line_2].filter(Boolean).join(", ");
+  const cityLine = [p.city, p.province, p.postal_code].filter(Boolean).join(", ");
+  return [street, cityLine].filter((s) => s.trim().length > 0);
+}
+
+function formatJobServiceAddressLines(job: {
+  property_address_line_1?: string | null;
+  property_address_line_2?: string | null;
+  property_city?: string | null;
+  property_province?: string | null;
+  property_postal_code?: string | null;
+}): string[] {
+  const street = [job.property_address_line_1, job.property_address_line_2]
+    .filter(Boolean)
+    .join(", ");
+  const cityLine = [job.property_city, job.property_province, job.property_postal_code]
+    .filter(Boolean)
+    .join(", ");
+  return [street, cityLine].filter((s) => s.trim().length > 0);
+}
+
 /**
  * Create invoice from signed job totals only (contract + signed change orders on the job).
  * Tax rate is derived from the job’s property province (server-side). Status is `draft` until
@@ -2725,10 +2754,15 @@ export async function createInvoice(
       current_contract_total,
       original_contract_price,
       property_province,
+      property_address_line_1,
+      property_address_line_2,
+      property_city,
+      property_postal_code,
       customers (
         id,
         email,
-        full_name
+        full_name,
+        phone
       )
     `
     )
@@ -2740,7 +2774,7 @@ export async function createInvoice(
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, business_name, phone, address_line_1, city, province, postal_code"
+      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, default_contract_payment_terms"
     )
     .eq("user_id", user.id)
     .single();
@@ -2815,7 +2849,7 @@ export async function createInvoice(
       status: "draft",
       sent_at: null,
     })
-    .select("id, invoice_number")
+    .select("id, invoice_number, created_at")
     .single();
 
   if (error) return { error: error.message };
@@ -2833,15 +2867,25 @@ export async function createInvoice(
   const customerRow = Array.isArray(
     (job as { customers?: unknown }).customers
   )
-    ? (job as { customers: { email?: string | null; full_name?: string | null }[] })
-        .customers[0]
-    : (job as { customers?: { email?: string | null; full_name?: string | null } })
-        .customers;
+    ? (job as {
+        customers: {
+          email?: string | null;
+          full_name?: string | null;
+          phone?: string | null;
+        }[];
+      }).customers[0]
+    : (job as {
+        customers?: {
+          email?: string | null;
+          full_name?: string | null;
+          phone?: string | null;
+        };
+      }).customers;
 
   const customerEmail = customerRow?.email?.trim() ?? "";
   const customerName = customerRow?.full_name?.trim() ?? "there";
 
-  const invoiceLabel =
+  const invoiceNumberDisplay =
     invoice.invoice_number?.trim() ||
     `Invoice ${String(invoice.id).slice(0, 8)}`;
 
@@ -2852,7 +2896,101 @@ export async function createInvoice(
         })
       : null;
 
+  const issueDateFormatted = new Date(invoice.created_at).toLocaleDateString(
+    undefined,
+    { dateStyle: "long" }
+  );
+
   const taxRateLabel = invoiceTaxRateDisplayLabel(province);
+
+  const contractorAddressLines = formatProfileAddressLines(profile);
+  const serviceAddressLines = formatJobServiceAddressLines(
+    job as Parameters<typeof formatJobServiceAddressLines>[0]
+  );
+
+  const bizName = profile.business_name?.trim() || "Your contractor";
+  const paymentContactLines = [
+    profile.contractor_name?.trim()
+      ? `Contact: ${profile.contractor_name.trim()}`
+      : null,
+    profile.phone?.trim() ? `Phone: ${profile.phone.trim()}` : null,
+    user.email?.trim() ? `Email: ${user.email.trim()}` : null,
+  ].filter(Boolean) as string[];
+
+  const defaultPaymentCopy = `Please pay the balance due using the method you agreed with ${bizName}. If you have not arranged payment yet, use the payment contact information in this email.`;
+  const paymentInstructions = profile.default_contract_payment_terms?.trim()
+    ? `${profile.default_contract_payment_terms.trim()}\n\n${defaultPaymentCopy}`
+    : defaultPaymentCopy;
+
+  const pdfFilenameBase =
+    invoiceNumberDisplay.replace(/[^a-zA-Z0-9-_]+/g, "-").replace(/^-+|-+$/g, "")
+      .slice(0, 72) || "invoice";
+  const pdfFilename = `${pdfFilenameBase}.pdf`;
+
+  let pdfAttachment:
+    | { filename: string; contentBase64: string }
+    | undefined;
+
+  try {
+    const pdfBytes = await buildInvoicePdf({
+      invoiceNumberLabel: invoiceNumberDisplay,
+      issueDateLabel: issueDateFormatted,
+      dueDateLabel: dueDateFormatted,
+      jobTitle: String((job as { title?: string }).title ?? "Job"),
+      contractor: {
+        businessName: bizName,
+        contactName: profile.contractor_name?.trim() || null,
+        phone: profile.phone?.trim() || null,
+        email: user.email?.trim() || null,
+        addressLines: contractorAddressLines,
+      },
+      customer: {
+        name: customerName,
+        email: customerRow?.email?.trim() || null,
+        phone: customerRow?.phone?.trim() || null,
+        serviceAddressLines,
+      },
+      lineItems: lineItems.map((item) => ({
+        description: item.description,
+        quantity: item.quantity ?? 1,
+        amount: item.amount,
+      })),
+      subtotal,
+      taxLabel: taxRateLabel,
+      taxAmount,
+      total,
+      depositReceived: depositCredited,
+      balanceDue,
+      paymentInstructions,
+      paymentContactLines,
+      notes: notesTrimmed,
+    });
+
+    pdfAttachment = {
+      filename: pdfFilename,
+      contentBase64: Buffer.from(pdfBytes).toString("base64"),
+    };
+
+    const storagePath = `${profile.id}/${invoice.id}.pdf`;
+    const { error: uploadErr } = await supabase.storage
+      .from("invoice-pdfs")
+      .upload(storagePath, pdfBytes, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    if (uploadErr) {
+      console.error("[createInvoice] invoice PDF upload failed:", uploadErr);
+    } else {
+      await supabase
+        .from("invoices")
+        .update({ invoice_pdf_path: storagePath })
+        .eq("id", invoice.id);
+    }
+  } catch (e) {
+    console.error("[createInvoice] invoice PDF generation failed:", e);
+    pdfAttachment = undefined;
+  }
 
   if (!customerEmail) {
     revalidatePath(`/jobs/${jobId}`);
@@ -2870,17 +3008,33 @@ export async function createInvoice(
     toName: customerName,
     jobTitle: String((job as { title?: string }).title ?? "Job"),
     businessDisplayName: profile.business_name,
-    businessPhone: profile.phone,
     replyToEmail: user.email ?? null,
-    invoiceLabel,
+    contractor: {
+      businessName: bizName,
+      contactName: profile.contractor_name?.trim() || null,
+      phone: profile.phone?.trim() || null,
+      email: user.email?.trim() || null,
+      addressLines: contractorAddressLines,
+    },
+    customer: {
+      name: customerName,
+      email: customerRow?.email?.trim() || null,
+      phone: customerRow?.phone?.trim() || null,
+      serviceAddressLines,
+    },
+    invoiceNumber: invoiceNumberDisplay,
+    issueDate: issueDateFormatted,
+    dueDate: dueDateFormatted,
     subtotal,
     taxAmount,
     taxRateLabel,
     total,
     depositReceived: depositCredited,
     balanceDue,
-    dueDate: dueDateFormatted,
+    paymentInstructions,
+    paymentContactLines,
     notes: notesTrimmed,
+    pdfAttachment,
     deliveryLog: {
       profileId: profile.id,
       type: "invoice",

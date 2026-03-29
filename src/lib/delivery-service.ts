@@ -375,24 +375,43 @@ export async function sendSignedContractEmail(
   return result;
 }
 
+export interface InvoiceEmailPartyBlock {
+  businessName: string;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  addressLines: string[];
+}
+
+export interface InvoiceEmailCustomerBlock {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  serviceAddressLines: string[];
+}
+
 export interface SendInvoiceEmailOptions {
   toEmail: string;
   toName: string;
   jobTitle: string;
+  /** Used for Resend From: "{name} via JobProof <…>". */
   businessDisplayName?: string | null;
-  businessPhone?: string | null;
   replyToEmail?: string | null;
-  invoiceLabel: string;
+  contractor: InvoiceEmailPartyBlock;
+  customer: InvoiceEmailCustomerBlock;
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string | null;
   subtotal: number;
   taxAmount: number;
   taxRateLabel: string;
   total: number;
   depositReceived: number;
   balanceDue: number;
-  dueDate: string | null;
+  paymentInstructions: string;
+  paymentContactLines: string[];
   notes: string | null;
-  /** Optional link for contractor-facing tools (customer may not have login). */
-  contractorInvoicesUrl?: string | null;
+  pdfAttachment?: { filename: string; contentBase64: string };
   deliveryLog?: EmailDeliveryAuditLog;
 }
 
@@ -402,45 +421,99 @@ function moneyHtml(n: number): string {
   );
 }
 
+function linesToHtml(lines: string[]): string {
+  return lines
+    .filter((l) => l.trim())
+    .map((l) => `<div>${escapeHtml(l)}</div>`)
+    .join("");
+}
+
 function invoiceEmailHtml(opts: SendInvoiceEmailOptions): string {
-  const due =
-    opts.dueDate && opts.dueDate.trim()
-      ? `<p><strong>Due date:</strong> ${escapeHtml(opts.dueDate)}</p>`
+  const c = opts.contractor;
+  const cu = opts.customer;
+  const contractorBody = [
+    c.businessName,
+    c.contactName ? `Contact: ${c.contactName}` : null,
+    c.phone ? `Phone: ${c.phone}` : null,
+    c.email ? `Email: ${c.email}` : null,
+    ...c.addressLines,
+  ]
+    .filter(Boolean)
+    .map((s) => String(s));
+
+  const customerBody = [
+    cu.name,
+    cu.email ? `Email: ${cu.email}` : null,
+    cu.phone ? `Phone: ${cu.phone}` : null,
+    ...(cu.serviceAddressLines.some((l) => l.trim())
+      ? ["Service address:", ...cu.serviceAddressLines.filter((l) => l.trim())]
+      : []),
+  ]
+    .filter(Boolean)
+    .map((s) => String(s));
+
+  const paymentContactBlock =
+    opts.paymentContactLines.filter((l) => l.trim()).length > 0
+      ? `<p style="margin:12px 0 4px;font-weight:600;">Payment contact</p>${linesToHtml(opts.paymentContactLines)}`
       : "";
+
   const notesBlock =
     opts.notes && opts.notes.trim()
-      ? `<p style="margin-top:12px;"><strong>Notes:</strong><br/>${escapeHtml(opts.notes).replace(/\n/g, "<br/>")}</p>`
+      ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 6px;font-weight:600;">Notes</p>
+          <div style="font-size:14px;color:#374151;">${escapeHtml(opts.notes).replace(/\n/g, "<br/>")}</div>
+        </div>`
       : "";
-  const contact = [opts.businessPhone, opts.replyToEmail]
-    .filter(Boolean)
-    .map((s) => escapeHtml(String(s)))
-    .join(" • ");
-  const contractorHref = opts.contractorInvoicesUrl
-    ? escapeHtml(opts.contractorInvoicesUrl)
+
+  const pdfNote = opts.pdfAttachment
+    ? `<p style="margin-top:14px;font-size:14px;color:#374151;">A detailed PDF copy is attached to this email.</p>`
     : "";
-  const contractorLink = contractorHref
-    ? `<p style="font-size:13px;color:#666;">Contractor: <a href="${contractorHref}" style="color:#2436BB;font-weight:600;">Open invoices for this job in JobProof</a></p>`
-    : "";
+
   return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; max-width: 560px;">
-      <p>Hi ${escapeHtml(opts.toName || "there")},</p>
-      <p>
-        Please find your invoice for <strong>${escapeHtml(opts.jobTitle)}</strong> below.
+    <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.55; max-width: 600px; color: #111827;">
+      <p style="font-size:16px;">Hi ${escapeHtml(opts.toName || "there")},</p>
+      <p style="font-size:15px;">
+        Please find your invoice from <strong>${escapeHtml(c.businessName)}</strong> for
+        <strong>${escapeHtml(opts.jobTitle)}</strong>.
       </p>
-      <table style="border-collapse:collapse;margin:16px 0;width:100%;max-width:420px;">
-        <tr><td style="padding:6px 12px 6px 0;color:#555;">Subtotal</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.subtotal)}</td></tr>
-        <tr><td style="padding:6px 12px 6px 0;color:#555;">Tax (${escapeHtml(opts.taxRateLabel)})</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.taxAmount)}</td></tr>
-        <tr><td style="padding:6px 12px 6px 0;font-weight:600;">Total</td><td style="padding:6px 0;text-align:right;font-weight:600;">$${moneyHtml(opts.total)}</td></tr>
-        <tr><td style="padding:6px 12px 6px 0;color:#555;">Deposit received (applied)</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.depositReceived)}</td></tr>
-        <tr><td style="padding:6px 12px 6px 0;font-weight:600;color:#2436BB;">Balance due</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#2436BB;">$${moneyHtml(opts.balanceDue)}</td></tr>
-      </table>
-      ${due}
+      ${pdfNote}
+
+      <div style="margin-top:22px;padding:14px 16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
+        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2436BB;text-transform:uppercase;letter-spacing:0.04em;">Contractor</p>
+        ${linesToHtml(contractorBody)}
+      </div>
+
+      <div style="margin-top:16px;padding:14px 16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
+        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2436BB;text-transform:uppercase;letter-spacing:0.04em;">Customer &amp; job address</p>
+        ${linesToHtml(customerBody)}
+      </div>
+
+      <div style="margin-top:20px;">
+        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2436BB;text-transform:uppercase;letter-spacing:0.04em;">Invoice</p>
+        <table style="border-collapse:collapse;width:100%;max-width:440px;font-size:14px;">
+          <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Invoice number</td><td style="padding:4px 0;text-align:right;font-weight:600;">${escapeHtml(opts.invoiceNumber)}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Issue date</td><td style="padding:4px 0;text-align:right;">${escapeHtml(opts.issueDate)}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Due date</td><td style="padding:4px 0;text-align:right;">${opts.dueDate ? escapeHtml(opts.dueDate) : "—"}</td></tr>
+        </table>
+        <table style="border-collapse:collapse;margin-top:14px;width:100%;max-width:440px;font-size:14px;">
+          <tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Subtotal</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.subtotal)}</td></tr>
+          <tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Tax (${escapeHtml(opts.taxRateLabel)})</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.taxAmount)}</td></tr>
+          <tr><td style="padding:6px 12px 6px 0;font-weight:600;">Total</td><td style="padding:6px 0;text-align:right;font-weight:600;">$${moneyHtml(opts.total)}</td></tr>
+          <tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Deposit received</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.depositReceived)}</td></tr>
+          <tr><td style="padding:8px 12px 6px 0;font-weight:700;color:#2436BB;">Balance due</td><td style="padding:8px 0;text-align:right;font-weight:700;color:#2436BB;">$${moneyHtml(opts.balanceDue)}</td></tr>
+        </table>
+      </div>
+
+      <div style="margin-top:22px;padding:14px 16px;background:#fffbeb;border-radius:10px;border:1px solid #fcd34d;">
+        <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.04em;">How to pay</p>
+        <div style="font-size:14px;color:#78350f;">${escapeHtml(opts.paymentInstructions).replace(/\n/g, "<br/>")}</div>
+        ${paymentContactBlock}
+      </div>
+
       ${notesBlock}
-      <p style="font-size:14px;color:#555;">
-        Questions or payment: ${contact || "reply to your contractor."}
-      </p>
-      ${contractorLink}
-      <p style="font-size:13px;color:#888;">— JobProof</p>
+
+      <p style="margin-top:22px;font-size:13px;color:#6b7280;">Thank you for your business.</p>
+      <p style="font-size:12px;color:#9ca3af;">— JobProof</p>
     </div>
   `;
 }
@@ -452,9 +525,11 @@ export async function sendInvoiceEmail(
   options: SendInvoiceEmailOptions
 ): Promise<DeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = buildResendFromHeader(options.businessDisplayName ?? null);
+  const from = buildResendFromHeader(
+    options.businessDisplayName ?? options.contractor.businessName ?? null
+  );
   const title = options.jobTitle.trim() || "Job";
-  const subject = `Invoice: ${options.invoiceLabel} — ${title}`;
+  const subject = `Invoice: ${options.invoiceNumber} — ${title}`;
   const isProd = process.env.NODE_ENV === "production";
   const html = invoiceEmailHtml(options);
 
@@ -470,11 +545,21 @@ export async function sendInvoiceEmail(
   } else {
     try {
       const resend = new Resend(apiKey);
+      const attachments = options.pdfAttachment
+        ? [
+            {
+              filename: options.pdfAttachment.filename,
+              content: options.pdfAttachment.contentBase64,
+            },
+          ]
+        : undefined;
+
       const { data, error } = await resend.emails.send({
         from,
         to: options.toEmail.trim(),
         subject,
         html,
+        ...(attachments ? { attachments } : {}),
         ...(options.replyToEmail?.trim()
           ? { replyTo: options.replyToEmail.trim() }
           : {}),

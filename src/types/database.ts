@@ -276,6 +276,8 @@ export interface Invoice {
   agreed_work_subtotal?: number | null;
   deposit_credited?: number;
   balance_due?: number;
+  /** Path in `invoice-pdfs` bucket: `{profile_id}/{invoice_id}.pdf` */
+  invoice_pdf_path?: string | null;
   due_date: string | null;
   sent_at: string | null;
   paid_at: string | null;
