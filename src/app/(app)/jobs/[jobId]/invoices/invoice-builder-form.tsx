@@ -72,8 +72,6 @@ function ResendInvoicePanel({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [emailWarning, setEmailWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const dueDisplay = invoice.due_date?.trim()
@@ -88,8 +86,6 @@ function ResendInvoicePanel({
 
   async function handleResend() {
     setError(null);
-    setInfo(null);
-    setEmailWarning(null);
     if (!contractSigned) {
       setError("Contract must be signed to work with invoices for this job.");
       return;
@@ -104,16 +100,17 @@ function ResendInvoicePanel({
     }
 
     if (result && "emailSent" in result) {
+      const p = new URLSearchParams();
       if (result.emailSent) {
-        setInfo("Invoice resent to the customer.");
-        setEmailWarning(null);
+        p.set("invNotice", "resent");
       } else {
-        setInfo("Could not complete send.");
-        setEmailWarning(result.emailError ?? null);
+        p.set("invNotice", "failed");
+        const detail = (result.emailError ?? "").trim().slice(0, 500);
+        if (detail) p.set("invMsg", detail);
       }
+      router.replace(`/jobs/${jobId}/invoices?${p.toString()}`);
+      router.refresh();
     }
-
-    router.refresh();
   }
 
   return (
@@ -128,20 +125,6 @@ function ResendInvoicePanel({
             >
               Business settings →
             </Link>
-          )}
-        </div>
-      )}
-
-      {info && (
-        <div
-          className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-950"
-          role="status"
-        >
-          <p>{info}</p>
-          {emailWarning && (
-            <p className="mt-2 border-t border-green-200 pt-2 text-amber-900">
-              {emailWarning}
-            </p>
           )}
         </div>
       )}
@@ -225,8 +208,6 @@ function CreateInvoicePanel({
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [emailWarning, setEmailWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const agreedSubtotal = Number(
@@ -261,8 +242,6 @@ function CreateInvoicePanel({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setInfo(null);
-    setEmailWarning(null);
     if (!contractSigned) {
       setError("Sign the contract before creating an invoice from agreed amounts.");
       return;
@@ -286,16 +265,18 @@ function CreateInvoicePanel({
     }
 
     if (result && "invoiceId" in result) {
+      const p = new URLSearchParams();
       if (result.emailSent) {
-        setInfo("Invoice created and emailed to the customer.");
-        setEmailWarning(null);
+        p.set("invNotice", "sent");
       } else {
-        setInfo("Invoice saved.");
-        setEmailWarning(result.emailError ?? null);
+        p.set("invNotice", "draft");
+        if (result.emailError) {
+          p.set("invMsg", result.emailError.slice(0, 500));
+        }
       }
+      router.replace(`/jobs/${jobId}/invoices?${p.toString()}`);
+      router.refresh();
     }
-
-    router.refresh();
   }
 
   return (
@@ -313,20 +294,6 @@ function CreateInvoicePanel({
             >
               Add business details →
             </Link>
-          )}
-        </div>
-      )}
-
-      {info && (
-        <div
-          className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-950"
-          role="status"
-        >
-          <p>{info}</p>
-          {emailWarning && (
-            <p className="mt-2 border-t border-green-200 pt-2 text-amber-900">
-              {emailWarning}
-            </p>
           )}
         </div>
       )}

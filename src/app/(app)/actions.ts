@@ -2697,6 +2697,55 @@ export async function getInvoices(jobId: string) {
   return data ?? [];
 }
 
+/** Per-job flags for dashboard / job CTAs (completed jobs + invoicing). */
+export async function getInvoiceDeliverySummaryForJobIds(
+  jobIds: string[]
+): Promise<Record<string, { hasAnyInvoice: boolean; hasSentOrPaidInvoice: boolean }>> {
+  const empty: Record<string, { hasAnyInvoice: boolean; hasSentOrPaidInvoice: boolean }> = {};
+  if (jobIds.length === 0) return empty;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return empty;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile) return empty;
+
+  const { data: jobs } = await supabase
+    .from("jobs")
+    .select("id")
+    .in("id", jobIds)
+    .eq("profile_id", profile.id);
+
+  const allowed = new Set((jobs ?? []).map((j) => j.id));
+  if (allowed.size === 0) return empty;
+
+  const { data: rows } = await supabase
+    .from("invoices")
+    .select("job_id, status")
+    .in("job_id", [...allowed]);
+
+  for (const id of allowed) {
+    empty[id] = { hasAnyInvoice: false, hasSentOrPaidInvoice: false };
+  }
+  for (const r of rows ?? []) {
+    const jid = r.job_id as string;
+    if (!empty[jid]) continue;
+    empty[jid].hasAnyInvoice = true;
+    if (r.status === "sent" || r.status === "paid") {
+      empty[jid].hasSentOrPaidInvoice = true;
+    }
+  }
+  return empty;
+}
+
 function formatProfileAddressLines(p: {
   address_line_1: string | null;
   address_line_2: string | null;
@@ -3071,6 +3120,15 @@ export async function createInvoice(
     },
   });
 
+  if (process.env.NODE_ENV === "development") {
+    console.log("[createInvoice] sendInvoiceEmail finished", {
+      invoiceId: invoice.id,
+      jobId,
+      ok: sendResult.success,
+      error: sendResult.error ?? null,
+    });
+  }
+
   if (!sendResult.success) {
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath(`/jobs/${jobId}/invoices`);
@@ -3354,6 +3412,15 @@ export async function resendInvoice(
       relatedEntityId: String(invRow.id),
     },
   });
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[resendInvoice] sendInvoiceEmail finished", {
+      invoiceId: invRow.id,
+      jobId,
+      ok: sendResult.success,
+      error: sendResult.error ?? null,
+    });
+  }
 
   if (!sendResult.success) {
     revalidatePath(`/jobs/${jobId}`);

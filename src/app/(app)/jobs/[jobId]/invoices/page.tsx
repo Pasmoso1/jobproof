@@ -3,6 +3,25 @@ import { notFound } from "next/navigation";
 import { getJob, getInvoices, getProfile, getContractForJob } from "@/app/(app)/actions";
 import { formatDateEastern, formatDateTimeEastern } from "@/lib/datetime-eastern";
 import { InvoiceBuilderForm, type LatestInvoiceSummary } from "./invoice-builder-form";
+import {
+  InvoicePageNotices,
+  type InvoicePageNoticeKind,
+} from "./invoice-page-notices";
+
+function firstSearchParam(
+  v: string | string[] | undefined
+): string | undefined {
+  if (Array.isArray(v)) return v[0];
+  return v;
+}
+
+function safeDecodeURIComponent(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
 
 export default async function InvoicesPage({
   params,
@@ -19,6 +38,17 @@ export default async function InvoicesPage({
     jobCompletedFlag === "true" ||
     (Array.isArray(jobCompletedFlag) &&
       (jobCompletedFlag[0] === "1" || jobCompletedFlag[0] === "true"));
+
+  const rawNotice = firstSearchParam(sp.invNotice);
+  const invoiceNotice: InvoicePageNoticeKind =
+    rawNotice === "sent" ||
+    rawNotice === "resent" ||
+    rawNotice === "draft" ||
+    rawNotice === "failed"
+      ? rawNotice
+      : null;
+  const rawMsg = firstSearchParam(sp.invMsg)?.trim();
+  const invoiceNoticeMsg = rawMsg ? safeDecodeURIComponent(rawMsg) : null;
 
   const [job, invoices, profile, contract] = await Promise.all([
     getJob(jobId),
@@ -71,6 +101,12 @@ export default async function InvoicesPage({
           {job.title} • {customer?.full_name ?? "Unknown customer"}
         </p>
       </div>
+
+      <InvoicePageNotices
+        jobId={jobId}
+        notice={invoiceNotice}
+        message={invoiceNoticeMsg}
+      />
 
       {businessName && (
         <div className="mb-6 rounded-xl border border-zinc-200 bg-zinc-50/50 p-4">

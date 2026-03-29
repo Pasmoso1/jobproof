@@ -7,6 +7,7 @@ import {
   getActiveJobsCount,
   getStorageUsage,
   getJobs,
+  getInvoiceDeliverySummaryForJobIds,
 } from "../actions";
 import { DashboardAlerts } from "./dashboard-alerts";
 import { getJobListStatusDisplay } from "@/lib/job-dashboard-status";
@@ -48,6 +49,9 @@ export default async function DashboardPage() {
   const isStorageNearLimit = storagePercent >= 80;
   const isJobLimitReached =
     (activeCount ?? 0) >= (profile?.active_job_limit ?? 10);
+
+  const jobIds = jobs.map((j: { id: string }) => j.id);
+  const invByJob = await getInvoiceDeliverySummaryForJobIds(jobIds);
 
   return (
     <div className="space-y-6">
@@ -153,33 +157,53 @@ export default async function DashboardPage() {
             }) => {
               const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
               const { label, badgeClass } = getJobListStatusDisplay(job);
+              const inv = invByJob[job.id];
+              const showInvoiceCta =
+                job.status === "completed" && job.contract_status === "signed";
+              const invoiceCtaLabel = !inv?.hasAnyInvoice
+                ? "Create invoice"
+                : !inv?.hasSentOrPaidInvoice
+                  ? "Send invoice"
+                  : "Resend invoice";
               return (
-              <Link
+              <div
                 key={job.id}
-                href={`/jobs/${job.id}`}
-                className="block px-4 py-4 transition-colors hover:bg-zinc-50 sm:px-6"
+                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
               >
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-medium text-zinc-900">{job.title}</p>
-                    <p className="text-sm text-zinc-500">
-                      {customer?.full_name ?? "Unknown customer"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {(job.current_contract_total ?? job.original_contract_price) != null && (
-                      <span className="text-sm font-medium text-zinc-700">
-                        ${Number(job.current_contract_total ?? job.original_contract_price).toLocaleString()}
+                <Link
+                  href={`/jobs/${job.id}`}
+                  className="min-w-0 flex-1 rounded-lg px-1 py-0.5 transition-colors hover:bg-zinc-50"
+                >
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium text-zinc-900">{job.title}</p>
+                      <p className="text-sm text-zinc-500">
+                        {customer?.full_name ?? "Unknown customer"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {(job.current_contract_total ?? job.original_contract_price) != null && (
+                        <span className="text-sm font-medium text-zinc-700">
+                          ${Number(job.current_contract_total ?? job.original_contract_price).toLocaleString()}
+                        </span>
+                      )}
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeClass}`}
+                      >
+                        {label}
                       </span>
-                    )}
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeClass}`}
-                    >
-                      {label}
-                    </span>
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+                {showInvoiceCta && (
+                  <Link
+                    href={`/jobs/${job.id}/invoices`}
+                    className="shrink-0 self-start rounded-lg bg-[#2436BB] px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] sm:self-center"
+                  >
+                    {invoiceCtaLabel}
+                  </Link>
+                )}
+              </div>
             );
             })
           )}

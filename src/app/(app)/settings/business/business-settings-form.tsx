@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { updateProfileBusinessInfo } from "@/app/(app)/actions";
 import { validateBusinessProfileFields } from "@/lib/validation/business-profile";
@@ -55,6 +55,16 @@ export function BusinessSettingsForm({
     profile?.default_contract_cancellation_note ?? ""
   );
   const [eTransferEmail, setETransferEmail] = useState(profile?.e_transfer_email ?? "");
+  const successRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!success) return;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    const t = window.setTimeout(() => {
+      successRef.current?.focus();
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [success]);
 
   function clearFieldError(key: string) {
     setFieldErrors((prev) => {
@@ -131,7 +141,13 @@ export function BusinessSettingsForm({
         </div>
       )}
       {success && (
-        <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800">
+        <div
+          ref={successRef}
+          tabIndex={-1}
+          role="status"
+          aria-live="polite"
+          className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+        >
           Business settings saved successfully.
         </div>
       )}

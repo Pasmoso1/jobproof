@@ -534,12 +534,18 @@ export async function sendInvoiceEmail(
   let result: DeliveryResult;
 
   if (!apiKey) {
-    console.warn("[DeliveryService] RESEND_API_KEY not set — invoice email not sent.", {
+    console.warn("[sendInvoiceEmail] RESEND_API_KEY missing", {
       to: options.toEmail,
+      production: isProd,
     });
     result = isProd
       ? { success: false, error: "Email service not configured" }
       : { success: true };
+    if (!isProd) {
+      console.warn(
+        "[sendInvoiceEmail] Development: no API key — treating send as success so you can test the rest of the flow. No real email is sent; check Resend in production."
+      );
+    }
   } else {
     try {
       const resend = new Resend(apiKey);
@@ -590,6 +596,21 @@ export async function sendInvoiceEmail(
       status: result.success ? "success" : "failed",
       errorMessage: result.success ? null : result.error ?? null,
       relatedEntityId: options.deliveryLog.relatedEntityId,
+    });
+  }
+
+  if (result.success) {
+    console.log("[sendInvoiceEmail] completed", {
+      to: options.toEmail,
+      resendMessageId: result.resendMessageId ?? null,
+      hasPdf: Boolean(options.pdfAttachment),
+      emailLogWritten: Boolean(options.deliveryLog),
+    });
+  } else {
+    console.error("[sendInvoiceEmail] failed", {
+      to: options.toEmail,
+      error: result.error ?? "unknown",
+      emailLogWritten: Boolean(options.deliveryLog),
     });
   }
 

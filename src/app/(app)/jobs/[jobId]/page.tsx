@@ -8,6 +8,7 @@ import {
   getContractForJob,
   getChangeOrders,
   getProfile,
+  getInvoiceDeliverySummaryForJobIds,
 } from "../../actions";
 import { isJobLockedForContractEdits } from "@/lib/job-contract-lock";
 import { getJobListStatusDisplay } from "@/lib/job-dashboard-status";
@@ -59,6 +60,12 @@ export default async function JobDetailPage({
   ]);
 
   if (!job) notFound();
+
+  const invSummary = await getInvoiceDeliverySummaryForJobIds([jobId]);
+  const invFlags = invSummary[jobId] ?? {
+    hasAnyInvoice: false,
+    hasSentOrPaidInvoice: false,
+  };
 
   const {
     data: { user },
@@ -203,6 +210,30 @@ export default async function JobDetailPage({
               scope, price, and schedule cannot be changed here — use change orders to amend the
               agreement.
             </p>
+          )}
+          {job.status === "completed" && job.contract_status === "signed" && (
+            <div className="w-full border-t border-zinc-100 pt-4">
+              <div className="rounded-lg border border-[#2436BB]/25 bg-[#2436BB]/5 px-4 py-3 text-sm">
+                <p className="font-medium text-zinc-900">Invoicing</p>
+                <p className="mt-1 text-zinc-600">
+                  {invFlags.hasSentOrPaidInvoice
+                    ? "Send the invoice to the customer again if needed."
+                    : invFlags.hasAnyInvoice
+                      ? "Your invoice is saved but email delivery hasn’t completed yet — open Invoices to send or fix delivery."
+                      : "Create an invoice from the agreed contract total."}
+                </p>
+                <Link
+                  href={`/jobs/${jobId}/invoices`}
+                  className="mt-3 inline-flex rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96]"
+                >
+                  {!invFlags.hasAnyInvoice
+                    ? "Create invoice"
+                    : !invFlags.hasSentOrPaidInvoice
+                      ? "Send invoice"
+                      : "Resend invoice"}
+                </Link>
+              </div>
+            </div>
           )}
         </div>
 
