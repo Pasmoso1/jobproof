@@ -19,7 +19,10 @@ import {
   validateTrade,
 } from "@/lib/validation/job-create";
 import { resolvePublicAppOrigin } from "@/lib/app-origin";
-import { resolveInvoiceTaxRate } from "@/lib/invoice-tax";
+import {
+  invoiceTaxRateDisplayLabel,
+  taxRateFromPropertyProvince,
+} from "@/lib/invoice-tax";
 import { JOB_LOCKED_SIGNED_CONTRACT_MESSAGE } from "@/lib/job-contract-lock";
 import {
   validateChangeOrderDescription,
@@ -28,7 +31,7 @@ import {
   parseNewJobTotal,
   validateChangeOrderNewCompletionDate,
 } from "@/lib/validation/change-order";
-import { sendSigningLinkEmail } from "@/lib/delivery-service";
+import { sendInvoiceEmail, sendSigningLinkEmail } from "@/lib/delivery-service";
 import { generateUUID } from "@/lib/utils/uuid";
 
 export async function getProfile() {
@@ -2686,14 +2689,17 @@ export async function getInvoices(jobId: string) {
 
 /**
  * Create invoice from signed job totals only (contract + signed change orders on the job).
- * Amounts are computed server-side; the client may only adjust tax rate, due date, and notes.
+ * Tax rate is derived from the job’s property province (server-side). Status is `draft` until
+ * the customer notification email succeeds, then updated to `sent` with `sent_at`.
  */
 export async function createInvoice(
   jobId: string,
-  taxRate: number,
   dueDate?: string,
   notes?: string
-) {
+): Promise<
+  | { invoiceId: string; emailSent: boolean; emailError?: string }
+  | { error: string }
+> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -2711,7 +2717,20 @@ export async function createInvoice(
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id, profile_id, deposit_amount, current_contract_total, original_contract_price, tax_rate"
+      `
+      id,
+      profile_id,
+      title,
+      deposit_amount,
+      current_contract_total,
+      original_contract_price,
+      property_province,
+      customers (
+        id,
+        email,
+        full_name
+      )
+    `
     )
     .eq("id", jobId)
     .single();
@@ -2756,7 +2775,9 @@ export async function createInvoice(
     };
   }
 
-  const rate = resolveInvoiceTaxRate(taxRate, job.tax_rate as number | null | undefined);
+  const province =
+    (job as { property_province?: string | null }).property_province ?? null;
+  const rate = taxRateFromPropertyProvince(province);
   const depositRaw = Number(job.deposit_amount ?? 0);
   const depositOnFile = Number.isFinite(depositRaw) && depositRaw > 0 ? depositRaw : 0;
 
@@ -2775,7 +2796,7 @@ export async function createInvoice(
   ];
 
   const notesTrimmed = notes?.trim() || null;
-  const issuedAt = new Date().toISOString();
+  const dueDateTrimmed = dueDate?.trim() || null;
 
   const { data: invoice, error } = await supabase
     .from("invoices")
@@ -2789,28 +2810,107 @@ export async function createInvoice(
       total,
       deposit_credited: depositCredited,
       balance_due: balanceDue,
-      due_date: dueDate || null,
+      due_date: dueDateTrimmed,
       notes: notesTrimmed,
-      status: "sent",
-      sent_at: issuedAt,
+      status: "draft",
+      sent_at: null,
     })
-    .select("id")
+    .select("id, invoice_number")
     .single();
 
   if (error) return { error: error.message };
+  if (!invoice?.id) return { error: "Failed to create invoice" };
 
-  if (invoice?.id) {
-    const lineItemRows = lineItems.map((item, i) => ({
-      invoice_id: invoice.id,
-      description: item.description,
-      amount: item.amount,
-      quantity: item.quantity ?? 1,
-      sort_order: i,
-    }));
-    await supabase.from("invoice_line_items").insert(lineItemRows);
+  const lineItemRows = lineItems.map((item, i) => ({
+    invoice_id: invoice.id,
+    description: item.description,
+    amount: item.amount,
+    quantity: item.quantity ?? 1,
+    sort_order: i,
+  }));
+  await supabase.from("invoice_line_items").insert(lineItemRows);
+
+  const customerRow = Array.isArray(
+    (job as { customers?: unknown }).customers
+  )
+    ? (job as { customers: { email?: string | null; full_name?: string | null }[] })
+        .customers[0]
+    : (job as { customers?: { email?: string | null; full_name?: string | null } })
+        .customers;
+
+  const customerEmail = customerRow?.email?.trim() ?? "";
+  const customerName = customerRow?.full_name?.trim() ?? "there";
+
+  const invoiceLabel =
+    invoice.invoice_number?.trim() ||
+    `Invoice ${String(invoice.id).slice(0, 8)}`;
+
+  const dueDateFormatted =
+    dueDateTrimmed && !Number.isNaN(Date.parse(dueDateTrimmed + "T12:00:00"))
+      ? new Date(dueDateTrimmed + "T12:00:00").toLocaleDateString(undefined, {
+          dateStyle: "long",
+        })
+      : null;
+
+  const taxRateLabel = invoiceTaxRateDisplayLabel(province);
+
+  if (!customerEmail) {
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/jobs/${jobId}/invoices`);
+    return {
+      invoiceId: invoice.id,
+      emailSent: false,
+      emailError:
+        "Invoice saved as draft — the customer has no email on file. Add their email on the job, then resend from invoice history when supported.",
+    };
+  }
+
+  const sendResult = await sendInvoiceEmail({
+    toEmail: customerEmail,
+    toName: customerName,
+    jobTitle: String((job as { title?: string }).title ?? "Job"),
+    businessDisplayName: profile.business_name,
+    businessPhone: profile.phone,
+    replyToEmail: user.email ?? null,
+    invoiceLabel,
+    subtotal,
+    taxAmount,
+    taxRateLabel,
+    total,
+    depositReceived: depositCredited,
+    balanceDue,
+    dueDate: dueDateFormatted,
+    notes: notesTrimmed,
+    deliveryLog: {
+      profileId: profile.id,
+      type: "invoice",
+      relatedEntityId: invoice.id,
+    },
+  });
+
+  if (!sendResult.success) {
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/jobs/${jobId}/invoices`);
+    return {
+      invoiceId: invoice.id,
+      emailSent: false,
+      emailError:
+        sendResult.error ??
+        "Invoice saved as draft — the email could not be sent. Check Resend configuration and try again.",
+    };
+  }
+
+  const sentAt = new Date().toISOString();
+  const { error: updateErr } = await supabase
+    .from("invoices")
+    .update({ status: "sent", sent_at: sentAt })
+    .eq("id", invoice.id);
+
+  if (updateErr) {
+    console.error("[createInvoice] failed to mark invoice sent:", updateErr);
   }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/invoices`);
-  return { invoiceId: invoice.id };
+  return { invoiceId: invoice.id, emailSent: true };
 }

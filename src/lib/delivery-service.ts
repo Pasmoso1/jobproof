@@ -375,6 +375,144 @@ export async function sendSignedContractEmail(
   return result;
 }
 
+export interface SendInvoiceEmailOptions {
+  toEmail: string;
+  toName: string;
+  jobTitle: string;
+  businessDisplayName?: string | null;
+  businessPhone?: string | null;
+  replyToEmail?: string | null;
+  invoiceLabel: string;
+  subtotal: number;
+  taxAmount: number;
+  taxRateLabel: string;
+  total: number;
+  depositReceived: number;
+  balanceDue: number;
+  dueDate: string | null;
+  notes: string | null;
+  /** Optional link for contractor-facing tools (customer may not have login). */
+  contractorInvoicesUrl?: string | null;
+  deliveryLog?: EmailDeliveryAuditLog;
+}
+
+function moneyHtml(n: number): string {
+  return escapeHtml(
+    n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  );
+}
+
+function invoiceEmailHtml(opts: SendInvoiceEmailOptions): string {
+  const due =
+    opts.dueDate && opts.dueDate.trim()
+      ? `<p><strong>Due date:</strong> ${escapeHtml(opts.dueDate)}</p>`
+      : "";
+  const notesBlock =
+    opts.notes && opts.notes.trim()
+      ? `<p style="margin-top:12px;"><strong>Notes:</strong><br/>${escapeHtml(opts.notes).replace(/\n/g, "<br/>")}</p>`
+      : "";
+  const contact = [opts.businessPhone, opts.replyToEmail]
+    .filter(Boolean)
+    .map((s) => escapeHtml(String(s)))
+    .join(" • ");
+  const contractorHref = opts.contractorInvoicesUrl
+    ? escapeHtml(opts.contractorInvoicesUrl)
+    : "";
+  const contractorLink = contractorHref
+    ? `<p style="font-size:13px;color:#666;">Contractor: <a href="${contractorHref}" style="color:#2436BB;font-weight:600;">Open invoices for this job in JobProof</a></p>`
+    : "";
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; max-width: 560px;">
+      <p>Hi ${escapeHtml(opts.toName || "there")},</p>
+      <p>
+        Please find your invoice for <strong>${escapeHtml(opts.jobTitle)}</strong> below.
+      </p>
+      <table style="border-collapse:collapse;margin:16px 0;width:100%;max-width:420px;">
+        <tr><td style="padding:6px 12px 6px 0;color:#555;">Subtotal</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.subtotal)}</td></tr>
+        <tr><td style="padding:6px 12px 6px 0;color:#555;">Tax (${escapeHtml(opts.taxRateLabel)})</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.taxAmount)}</td></tr>
+        <tr><td style="padding:6px 12px 6px 0;font-weight:600;">Total</td><td style="padding:6px 0;text-align:right;font-weight:600;">$${moneyHtml(opts.total)}</td></tr>
+        <tr><td style="padding:6px 12px 6px 0;color:#555;">Deposit received (applied)</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.depositReceived)}</td></tr>
+        <tr><td style="padding:6px 12px 6px 0;font-weight:600;color:#2436BB;">Balance due</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#2436BB;">$${moneyHtml(opts.balanceDue)}</td></tr>
+      </table>
+      ${due}
+      ${notesBlock}
+      <p style="font-size:14px;color:#555;">
+        Questions or payment: ${contact || "reply to your contractor."}
+      </p>
+      ${contractorLink}
+      <p style="font-size:13px;color:#888;">— JobProof</p>
+    </div>
+  `;
+}
+
+/**
+ * Sends invoice notification to the customer via Resend (same pattern as signing / signed contract emails).
+ */
+export async function sendInvoiceEmail(
+  options: SendInvoiceEmailOptions
+): Promise<DeliveryResult> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = buildResendFromHeader(options.businessDisplayName ?? null);
+  const title = options.jobTitle.trim() || "Job";
+  const subject = `Invoice: ${options.invoiceLabel} — ${title}`;
+  const isProd = process.env.NODE_ENV === "production";
+  const html = invoiceEmailHtml(options);
+
+  let result: DeliveryResult;
+
+  if (!apiKey) {
+    console.warn("[DeliveryService] RESEND_API_KEY not set — invoice email not sent.", {
+      to: options.toEmail,
+    });
+    result = isProd
+      ? { success: false, error: "Email service not configured" }
+      : { success: true };
+  } else {
+    try {
+      const resend = new Resend(apiKey);
+      const { data, error } = await resend.emails.send({
+        from,
+        to: options.toEmail.trim(),
+        subject,
+        html,
+        ...(options.replyToEmail?.trim()
+          ? { replyTo: options.replyToEmail.trim() }
+          : {}),
+      });
+
+      if (error) {
+        console.error("[DeliveryService] Resend error (invoice):", error);
+        result = {
+          success: false,
+          error:
+            typeof error === "object" && error && "message" in error
+              ? String((error as { message: string }).message)
+              : "Failed to send email",
+        };
+      } else {
+        result = { success: true, resendMessageId: data?.id };
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to send email";
+      console.error("[DeliveryService] sendInvoiceEmail:", e);
+      result = { success: false, error: msg };
+    }
+  }
+
+  if (options.deliveryLog) {
+    await insertEmailLog({
+      profileId: options.deliveryLog.profileId,
+      type: options.deliveryLog.type,
+      recipientEmail: options.toEmail,
+      status: result.success ? "success" : "failed",
+      errorMessage: result.success ? null : result.error ?? null,
+      relatedEntityId: options.deliveryLog.relatedEntityId,
+    });
+  }
+
+  return result;
+}
+
 export interface SendSignedChangeOrderOptions {
   toEmail: string;
   toName: string;

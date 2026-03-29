@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createInvoice } from "@/app/(app)/actions";
 import {
-  DEFAULT_INVOICE_TAX_RATE,
-  resolveInvoiceTaxRate,
+  invoiceTaxRateDisplayLabel,
+  taxRateFromPropertyProvince,
 } from "@/lib/invoice-tax";
 
 type Job = {
@@ -15,7 +15,7 @@ type Job = {
   current_contract_total?: number | null;
   original_contract_price?: number | null;
   deposit_amount?: number | null;
-  tax_rate?: number;
+  property_province?: string | null;
 };
 
 export function InvoiceBuilderForm({
@@ -28,16 +28,11 @@ export function InvoiceBuilderForm({
   contractSigned: boolean;
 }) {
   const router = useRouter();
-  const [taxRate, setTaxRate] = useState(() => {
-    const t = job.tax_rate;
-    if (t != null && Number.isFinite(Number(t)) && Number(t) >= 0) {
-      return String(Number(t));
-    }
-    return String(DEFAULT_INVOICE_TAX_RATE);
-  });
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [emailWarning, setEmailWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const agreedSubtotal = Number(
@@ -50,10 +45,12 @@ export function InvoiceBuilderForm({
       : 0
   );
 
+  const taxRate = taxRateFromPropertyProvince(job.property_province ?? null);
+  const taxRateLabel = invoiceTaxRateDisplayLabel(job.property_province ?? null);
+
   const preview = useMemo(() => {
-    const r = resolveInvoiceTaxRate(parseFloat(taxRate), job.tax_rate);
     const sub = agreedSubtotal;
-    const tax = Math.round(sub * r * 100) / 100;
+    const tax = Math.round(sub * taxRate * 100) / 100;
     const total = Math.round((sub + tax) * 100) / 100;
     const depositCredited = Math.min(depositOnFile, total);
     const balanceDue = Math.round((total - depositCredited) * 100) / 100;
@@ -64,11 +61,17 @@ export function InvoiceBuilderForm({
       depositCredited,
       balanceDue,
     };
-  }, [agreedSubtotal, taxRate, depositOnFile, job.tax_rate]);
+  }, [agreedSubtotal, taxRate, depositOnFile]);
+
+  const showDepositOnFileNote =
+    depositOnFile > 0 &&
+    Math.abs(depositOnFile - preview.depositCredited) > 0.005;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
+    setEmailWarning(null);
     if (!contractSigned) {
       setError("Sign the contract before creating an invoice from agreed amounts.");
       return;
@@ -81,7 +84,6 @@ export function InvoiceBuilderForm({
     setLoading(true);
     const result = await createInvoice(
       jobId,
-      parseFloat(taxRate),
       dueDate || undefined,
       notes.trim() || undefined
     );
@@ -90,6 +92,16 @@ export function InvoiceBuilderForm({
     if (result && "error" in result && result.error) {
       setError(result.error);
       return;
+    }
+
+    if (result && "invoiceId" in result) {
+      if (result.emailSent) {
+        setInfo("Invoice created and emailed to the customer.");
+        setEmailWarning(null);
+      } else {
+        setInfo("Invoice saved.");
+        setEmailWarning(result.emailError ?? null);
+      }
     }
 
     router.refresh();
@@ -113,6 +125,20 @@ export function InvoiceBuilderForm({
             >
               Add business details →
             </Link>
+          )}
+        </div>
+      )}
+
+      {info && (
+        <div
+          className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-950"
+          role="status"
+        >
+          <p>{info}</p>
+          {emailWarning && (
+            <p className="mt-2 border-t border-green-200 pt-2 text-amber-900">
+              {emailWarning}
+            </p>
           )}
         </div>
       )}
@@ -143,40 +169,42 @@ export function InvoiceBuilderForm({
 
       <div className="mt-6 space-y-3 rounded-lg border border-zinc-200 bg-zinc-50/80 p-4 text-sm">
         <div className="flex justify-between gap-4">
-          <span className="text-zinc-600">Subtotal (agreed work, before tax)</span>
-          <span className="font-medium tabular-nums text-zinc-900">${money(agreedSubtotal)}</span>
+          <span className="text-zinc-600">Subtotal</span>
+          <span className="font-medium tabular-nums text-zinc-900">${money(preview.subtotal)}</span>
         </div>
         <p className="text-xs text-zinc-500">
-          Locked — equals job total from signed contract plus signed change orders.
+          Agreed work from signed contract and change orders (before tax).
         </p>
 
         <div className="flex justify-between gap-4 border-t border-zinc-200 pt-3">
-          <span className="text-zinc-600">
-            Tax ({(resolveInvoiceTaxRate(parseFloat(taxRate), job.tax_rate) * 100).toFixed(2)}%)
-          </span>
+          <span className="text-zinc-600">Tax</span>
           <span className="font-medium tabular-nums text-zinc-900">
             ${money(preview.taxAmount)}
           </span>
         </div>
+        <p className="text-xs text-zinc-500">
+          Rate locked from work location: <span className="font-medium text-zinc-700">{taxRateLabel}</span>
+        </p>
 
         <div className="flex justify-between gap-4 border-t border-zinc-200 pt-3">
-          <span className="font-medium text-zinc-800">Total (subtotal + tax)</span>
+          <span className="font-medium text-zinc-800">Total</span>
           <span className="font-semibold tabular-nums text-zinc-900">
             ${money(preview.total)}
           </span>
         </div>
 
         <div className="flex justify-between gap-4 border-t border-zinc-200 pt-3">
-          <span className="text-zinc-600">Deposit on file (from job)</span>
-          <span className="font-medium tabular-nums text-zinc-900">${money(depositOnFile)}</span>
-        </div>
-
-        <div className="flex justify-between gap-4">
-          <span className="text-zinc-600">Deposit credited (applied to this invoice)</span>
+          <span className="text-zinc-600">Deposit received</span>
           <span className="font-medium tabular-nums text-zinc-900">
             ${money(preview.depositCredited)}
           </span>
         </div>
+        {showDepositOnFileNote && (
+          <p className="text-xs text-zinc-500">
+            Deposit recorded on the job is ${money(depositOnFile)}; only ${money(preview.depositCredited)}{" "}
+            can apply to this invoice (cannot exceed total).
+          </p>
+        )}
 
         <div className="flex justify-between gap-4 border-t border-zinc-200 pt-3">
           <span className="font-semibold text-zinc-900">Balance due</span>
@@ -186,37 +214,17 @@ export function InvoiceBuilderForm({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="taxRate" className="block text-sm font-medium text-zinc-700">
-            Tax rate (editable)
-          </label>
-          <input
-            id="taxRate"
-            type="number"
-            step="0.0001"
-            min="0"
-            value={taxRate}
-            onChange={(e) => setTaxRate(e.target.value)}
-            className="no-spinner mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-          />
-          <p className="mt-1 text-xs text-zinc-500">
-            Decimal rate (e.g. 0.13 for 13%). Uses the job&apos;s rate when set; otherwise defaults
-            to 13%.
-          </p>
-        </div>
-        <div>
-          <label htmlFor="dueDate" className="block text-sm font-medium text-zinc-700">
-            Due date (editable)
-          </label>
-          <input
-            id="dueDate"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-          />
-        </div>
+      <div className="mt-6">
+        <label htmlFor="dueDate" className="block text-sm font-medium text-zinc-700">
+          Due date (optional)
+        </label>
+        <input
+          id="dueDate"
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          className="mt-1 block w-full max-w-xs rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+        />
       </div>
 
       <div className="mt-4">
@@ -238,7 +246,7 @@ export function InvoiceBuilderForm({
         disabled={loading || !contractSigned}
         className="mt-4 rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Creating…" : "Create invoice"}
+        {loading ? "Creating…" : "Create and send invoice"}
       </button>
     </form>
   );
