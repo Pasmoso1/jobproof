@@ -10,7 +10,11 @@ import {
   getInvoiceDeliverySummaryForJobIds,
 } from "../actions";
 import { DashboardAlerts } from "./dashboard-alerts";
-import { getJobListStatusDisplay } from "@/lib/job-dashboard-status";
+import {
+  EMPTY_JOB_OUTSTANDING,
+  getJobOutstandingIndicators,
+  getJobPrimaryLifecycleStatus,
+} from "@/lib/job-dashboard-status";
 
 function formatStorage(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -156,49 +160,60 @@ export default async function DashboardPage() {
               original_contract_price?: number | null;
             }) => {
               const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
-              const { label, badgeClass } = getJobListStatusDisplay(job);
-              const inv = invByJob[job.id];
+              const primary = getJobPrimaryLifecycleStatus(job);
+              const inv = invByJob[job.id] ?? EMPTY_JOB_OUTSTANDING;
+              const outstanding = getJobOutstandingIndicators(job, inv);
               const showInvoiceCta =
                 job.status === "completed" && job.contract_status === "signed";
-              const invoiceCtaLabel = !inv?.hasAnyInvoice
+              const invoiceCtaLabel = !inv.hasAnyInvoice
                 ? "Create invoice"
-                : !inv?.hasSentOrPaidInvoice
+                : !inv.hasSentOrPaidInvoice
                   ? "Send invoice"
                   : "Resend invoice";
               return (
               <div
                 key={job.id}
-                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6"
               >
                 <Link
                   href={`/jobs/${job.id}`}
                   className="min-w-0 flex-1 rounded-lg px-1 py-0.5 transition-colors hover:bg-zinc-50"
                 >
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="font-medium text-zinc-900">{job.title}</p>
-                      <p className="text-sm text-zinc-500">
-                        {customer?.full_name ?? "Unknown customer"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="font-medium text-zinc-900">{job.title}</p>
+                        <p className="text-sm text-zinc-500">
+                          {customer?.full_name ?? "Unknown customer"}
+                        </p>
+                      </div>
                       {(job.current_contract_total ?? job.original_contract_price) != null && (
-                        <span className="text-sm font-medium text-zinc-700">
+                        <span className="shrink-0 text-sm font-medium text-zinc-700 sm:text-right">
                           ${Number(job.current_contract_total ?? job.original_contract_price).toLocaleString()}
                         </span>
                       )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeClass}`}
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${primary.badgeClass}`}
                       >
-                        {label}
+                        {primary.label}
                       </span>
+                      {outstanding.map((ind) => (
+                        <span
+                          key={ind.id}
+                          className={`inline-flex max-w-full rounded-full px-2 py-0.5 text-[11px] font-medium leading-tight ${ind.badgeClass}`}
+                        >
+                          {ind.label}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 </Link>
                 {showInvoiceCta && (
                   <Link
                     href={`/jobs/${job.id}/invoices`}
-                    className="shrink-0 self-start rounded-lg bg-[#2436BB] px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] sm:self-center"
+                    className="shrink-0 self-start rounded-lg bg-[#2436BB] px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] sm:self-start"
                   >
                     {invoiceCtaLabel}
                   </Link>

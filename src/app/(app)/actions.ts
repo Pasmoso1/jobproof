@@ -2697,11 +2697,18 @@ export async function getInvoices(jobId: string) {
   return data ?? [];
 }
 
-/** Per-job flags for dashboard / job CTAs (completed jobs + invoicing). */
+/** Per-job flags: invoices (draft/sent) + change orders awaiting customer signature. */
+export type JobOutstandingSummary = {
+  hasAnyInvoice: boolean;
+  hasSentOrPaidInvoice: boolean;
+  hasDraftInvoice: boolean;
+  changeOrderAwaitingSignature: boolean;
+};
+
 export async function getInvoiceDeliverySummaryForJobIds(
   jobIds: string[]
-): Promise<Record<string, { hasAnyInvoice: boolean; hasSentOrPaidInvoice: boolean }>> {
-  const empty: Record<string, { hasAnyInvoice: boolean; hasSentOrPaidInvoice: boolean }> = {};
+): Promise<Record<string, JobOutstandingSummary>> {
+  const empty: Record<string, JobOutstandingSummary> = {};
   if (jobIds.length === 0) return empty;
 
   const supabase = await createClient();
@@ -2733,7 +2740,12 @@ export async function getInvoiceDeliverySummaryForJobIds(
     .in("job_id", [...allowed]);
 
   for (const id of allowed) {
-    empty[id] = { hasAnyInvoice: false, hasSentOrPaidInvoice: false };
+    empty[id] = {
+      hasAnyInvoice: false,
+      hasSentOrPaidInvoice: false,
+      hasDraftInvoice: false,
+      changeOrderAwaitingSignature: false,
+    };
   }
   for (const r of rows ?? []) {
     const jid = r.job_id as string;
@@ -2742,7 +2754,22 @@ export async function getInvoiceDeliverySummaryForJobIds(
     if (r.status === "sent" || r.status === "paid") {
       empty[jid].hasSentOrPaidInvoice = true;
     }
+    if (r.status === "draft") {
+      empty[jid].hasDraftInvoice = true;
+    }
   }
+
+  const { data: coRows } = await supabase
+    .from("change_orders")
+    .select("job_id")
+    .in("job_id", [...allowed])
+    .eq("status", "sent");
+
+  for (const r of coRows ?? []) {
+    const jid = r.job_id as string;
+    if (empty[jid]) empty[jid].changeOrderAwaitingSignature = true;
+  }
+
   return empty;
 }
 

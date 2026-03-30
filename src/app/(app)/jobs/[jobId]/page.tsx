@@ -11,7 +11,11 @@ import {
   getInvoiceDeliverySummaryForJobIds,
 } from "../../actions";
 import { isJobLockedForContractEdits } from "@/lib/job-contract-lock";
-import { getJobListStatusDisplay } from "@/lib/job-dashboard-status";
+import {
+  EMPTY_JOB_OUTSTANDING,
+  getJobOutstandingIndicators,
+  getJobPrimaryLifecycleStatus,
+} from "@/lib/job-dashboard-status";
 import {
   formatDateEastern,
   formatDateTimeEastern,
@@ -62,10 +66,7 @@ export default async function JobDetailPage({
   if (!job) notFound();
 
   const invSummary = await getInvoiceDeliverySummaryForJobIds([jobId]);
-  const invFlags = invSummary[jobId] ?? {
-    hasAnyInvoice: false,
-    hasSentOrPaidInvoice: false,
-  };
+  const invFlags = invSummary[jobId] ?? EMPTY_JOB_OUTSTANDING;
 
   const {
     data: { user },
@@ -84,7 +85,8 @@ export default async function JobDetailPage({
       postal_code: profile.postal_code,
     });
 
-  const listStatus = getJobListStatusDisplay(job);
+  const primaryStatus = getJobPrimaryLifecycleStatus(job);
+  const outstandingIndicators = getJobOutstandingIndicators(job, invFlags);
 
   return (
     <div className="space-y-6">
@@ -133,25 +135,20 @@ export default async function JobDetailPage({
                 <span className="ml-2 text-zinc-500">• {customer.email}</span>
               )}
             </p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <span
-                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${listStatus.badgeClass}`}
+                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${primaryStatus.badgeClass}`}
               >
-                {listStatus.label}
+                {primaryStatus.label}
               </span>
-              {job.contract_status && job.contract_status !== "none" && (
+              {outstandingIndicators.map((ind) => (
                 <span
-                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    job.contract_status === "signed"
-                      ? "bg-green-100 text-green-800"
-                      : job.contract_status === "pending"
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-zinc-100 text-zinc-700"
-                  }`}
+                  key={ind.id}
+                  className={`inline-flex max-w-full rounded-full px-2 py-0.5 text-[11px] font-medium leading-tight ${ind.badgeClass}`}
                 >
-                  Contract: {job.contract_status}
+                  {ind.label}
                 </span>
-              )}
+              ))}
               {(job.current_contract_total ?? job.original_contract_price) != null && (
                 <span className="text-sm font-medium text-zinc-700">
                   ${Number(job.current_contract_total ?? job.original_contract_price).toLocaleString()}
@@ -218,9 +215,11 @@ export default async function JobDetailPage({
                 <p className="mt-1 text-zinc-600">
                   {invFlags.hasSentOrPaidInvoice
                     ? "Send the invoice to the customer again if needed."
-                    : invFlags.hasAnyInvoice
-                      ? "Your invoice is saved but email delivery hasn’t completed yet — open Invoices to send or fix delivery."
-                      : "Create an invoice from the agreed contract total."}
+                    : invFlags.hasDraftInvoice
+                      ? "You have a draft invoice — open Invoices to review, send, or finish it."
+                      : invFlags.hasAnyInvoice
+                        ? "Your invoice is saved but email delivery hasn’t completed yet — open Invoices to send or fix delivery."
+                        : "Create an invoice from the agreed contract total."}
                 </p>
                 <Link
                   href={`/jobs/${jobId}/invoices`}
