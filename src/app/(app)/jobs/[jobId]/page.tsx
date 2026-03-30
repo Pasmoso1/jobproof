@@ -15,6 +15,7 @@ import {
   EMPTY_JOB_OUTSTANDING,
   getJobOutstandingIndicators,
   getJobPrimaryLifecycleStatus,
+  outstandingIndicatorLinkClassName,
 } from "@/lib/job-dashboard-status";
 import {
   formatDateEastern,
@@ -86,7 +87,7 @@ export default async function JobDetailPage({
     });
 
   const primaryStatus = getJobPrimaryLifecycleStatus(job);
-  const outstandingIndicators = getJobOutstandingIndicators(job, invFlags);
+  const outstandingIndicators = getJobOutstandingIndicators(jobId, job, invFlags);
 
   return (
     <div className="space-y-6">
@@ -141,14 +142,24 @@ export default async function JobDetailPage({
               >
                 {primaryStatus.label}
               </span>
-              {outstandingIndicators.map((ind) => (
-                <span
-                  key={ind.id}
-                  className={`inline-flex max-w-full rounded-full px-2 py-0.5 text-[11px] font-medium leading-tight ${ind.badgeClass}`}
+              {outstandingIndicators.length > 0 && (
+                <ul
+                  className="contents m-0 list-none p-0"
+                  aria-label="Outstanding actions for this job"
                 >
-                  {ind.label}
-                </span>
-              ))}
+                  {outstandingIndicators.map((ind) => (
+                    <li key={ind.id} className="inline">
+                      <Link
+                        href={ind.href}
+                        aria-label={ind.ariaLabel}
+                        className={`${outstandingIndicatorLinkClassName} ${ind.badgeClass}`}
+                      >
+                        {ind.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {(job.current_contract_total ?? job.original_contract_price) != null && (
                 <span className="text-sm font-medium text-zinc-700">
                   ${Number(job.current_contract_total ?? job.original_contract_price).toLocaleString()}

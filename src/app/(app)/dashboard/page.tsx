@@ -14,6 +14,7 @@ import {
   EMPTY_JOB_OUTSTANDING,
   getJobOutstandingIndicators,
   getJobPrimaryLifecycleStatus,
+  outstandingIndicatorLinkClassName,
 } from "@/lib/job-dashboard-status";
 
 function formatStorage(bytes: number): string {
@@ -162,7 +163,7 @@ export default async function DashboardPage() {
               const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
               const primary = getJobPrimaryLifecycleStatus(job);
               const inv = invByJob[job.id] ?? EMPTY_JOB_OUTSTANDING;
-              const outstanding = getJobOutstandingIndicators(job, inv);
+              const outstanding = getJobOutstandingIndicators(job.id, job, inv);
               const showInvoiceCta =
                 job.status === "completed" && job.contract_status === "signed";
               const invoiceCtaLabel = !inv.hasAnyInvoice
@@ -175,11 +176,11 @@ export default async function DashboardPage() {
                 key={job.id}
                 className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6"
               >
-                <Link
-                  href={`/jobs/${job.id}`}
-                  className="min-w-0 flex-1 rounded-lg px-1 py-0.5 transition-colors hover:bg-zinc-50"
-                >
-                  <div className="flex flex-col gap-2">
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/jobs/${job.id}`}
+                    className="block rounded-lg px-1 py-0.5 transition-colors hover:bg-zinc-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2436BB] focus-visible:ring-offset-2"
+                  >
                     <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <p className="font-medium text-zinc-900">{job.title}</p>
@@ -193,23 +194,33 @@ export default async function DashboardPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${primary.badgeClass}`}
+                  </Link>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 px-1">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${primary.badgeClass}`}
+                    >
+                      {primary.label}
+                    </span>
+                    {outstanding.length > 0 && (
+                      <ul
+                        className="contents m-0 list-none p-0"
+                        aria-label="Outstanding actions for this job"
                       >
-                        {primary.label}
-                      </span>
-                      {outstanding.map((ind) => (
-                        <span
-                          key={ind.id}
-                          className={`inline-flex max-w-full rounded-full px-2 py-0.5 text-[11px] font-medium leading-tight ${ind.badgeClass}`}
-                        >
-                          {ind.label}
-                        </span>
-                      ))}
-                    </div>
+                        {outstanding.map((ind) => (
+                          <li key={ind.id} className="inline">
+                            <Link
+                              href={ind.href}
+                              aria-label={ind.ariaLabel}
+                              className={`${outstandingIndicatorLinkClassName} ${ind.badgeClass}`}
+                            >
+                              {ind.label}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                </Link>
+                </div>
                 {showInvoiceCta && (
                   <Link
                     href={`/jobs/${job.id}/invoices`}

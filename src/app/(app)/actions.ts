@@ -2703,6 +2703,8 @@ export type JobOutstandingSummary = {
   hasSentOrPaidInvoice: boolean;
   hasDraftInvoice: boolean;
   changeOrderAwaitingSignature: boolean;
+  /** `status === 'sent'` change order ids for this job (for dashboard/detail links). */
+  sentChangeOrderIds: string[];
 };
 
 export async function getInvoiceDeliverySummaryForJobIds(
@@ -2745,6 +2747,7 @@ export async function getInvoiceDeliverySummaryForJobIds(
       hasSentOrPaidInvoice: false,
       hasDraftInvoice: false,
       changeOrderAwaitingSignature: false,
+      sentChangeOrderIds: [],
     };
   }
   for (const r of rows ?? []) {
@@ -2761,13 +2764,17 @@ export async function getInvoiceDeliverySummaryForJobIds(
 
   const { data: coRows } = await supabase
     .from("change_orders")
-    .select("job_id")
+    .select("id, job_id")
     .in("job_id", [...allowed])
-    .eq("status", "sent");
+    .eq("status", "sent")
+    .order("created_at", { ascending: true });
 
   for (const r of coRows ?? []) {
     const jid = r.job_id as string;
-    if (empty[jid]) empty[jid].changeOrderAwaitingSignature = true;
+    const cid = r.id as string;
+    if (!empty[jid]) continue;
+    empty[jid].sentChangeOrderIds.push(cid);
+    empty[jid].changeOrderAwaitingSignature = true;
   }
 
   return empty;

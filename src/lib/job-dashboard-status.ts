@@ -4,6 +4,7 @@ export type JobOutstandingFlags = {
   hasSentOrPaidInvoice: boolean;
   hasDraftInvoice: boolean;
   changeOrderAwaitingSignature: boolean;
+  sentChangeOrderIds: string[];
 };
 
 export const EMPTY_JOB_OUTSTANDING: JobOutstandingFlags = {
@@ -11,7 +12,12 @@ export const EMPTY_JOB_OUTSTANDING: JobOutstandingFlags = {
   hasSentOrPaidInvoice: false,
   hasDraftInvoice: false,
   changeOrderAwaitingSignature: false,
+  sentChangeOrderIds: [],
 };
+
+/** Shared styles for clickable outstanding chips (Link). */
+export const outstandingIndicatorLinkClassName =
+  "inline-flex max-w-full rounded-full px-2 py-0.5 text-[11px] font-medium leading-tight transition-colors hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2436BB] focus-visible:ring-offset-2";
 
 export type JobPrimaryLifecycleStatus = {
   label: string;
@@ -59,13 +65,30 @@ export type OutstandingIndicator = {
   id: string;
   label: string;
   badgeClass: string;
+  href: string;
+  ariaLabel: string;
 };
+
+function changeOrderAwaitingHref(jobId: string, sentIds: string[]): string {
+  if (sentIds.length === 1) {
+    return `/jobs/${jobId}/change-orders/${sentIds[0]}`;
+  }
+  return `/jobs/${jobId}/change-orders`;
+}
+
+function changeOrderAwaitingAriaLabel(sentIds: string[]): string {
+  if (sentIds.length === 1) {
+    return "Open change order awaiting signature";
+  }
+  return "View change orders awaiting signature";
+}
 
 /**
  * Extra badges for parallel work (contract, change orders, invoices).
- * Shown after the primary lifecycle badge.
+ * Shown after the primary lifecycle badge. Each item includes a route for the contractor action.
  */
 export function getJobOutstandingIndicators(
+  jobId: string,
   job: { status: string; contract_status?: string | null },
   o: JobOutstandingFlags
 ): OutstandingIndicator[] {
@@ -73,6 +96,7 @@ export function getJobOutstandingIndicators(
   const contract = job.contract_status ?? "none";
   const signed = contract === "signed";
   const voided = contract === "void";
+  const contractPage = `/jobs/${jobId}/contract`;
 
   if (job.status === "active" && !voided && !signed) {
     if (contract === "pending") {
@@ -80,12 +104,16 @@ export function getJobOutstandingIndicators(
         id: "contract_pending",
         label: "Contract awaiting signature",
         badgeClass: "bg-amber-50 text-amber-900 ring-1 ring-amber-200",
+        href: contractPage,
+        ariaLabel: "Open contract — sent, awaiting customer signature",
       });
     } else if (contract === "draft" || contract === "none") {
       out.push({
         id: "contract_unsigned",
         label: "Contract unsigned",
         badgeClass: "bg-orange-50 text-orange-900 ring-1 ring-orange-200",
+        href: contractPage,
+        ariaLabel: "Open contract builder",
       });
     }
   }
@@ -96,10 +124,13 @@ export function getJobOutstandingIndicators(
 
   if (job.status === "active" || job.status === "completed") {
     if (o.changeOrderAwaitingSignature) {
+      const sentIds = o.sentChangeOrderIds;
       out.push({
         id: "co_awaiting",
         label: "Change order awaiting signature",
         badgeClass: "bg-amber-50 text-amber-950 ring-1 ring-amber-300",
+        href: changeOrderAwaitingHref(jobId, sentIds),
+        ariaLabel: changeOrderAwaitingAriaLabel(sentIds),
       });
     }
     if (o.hasDraftInvoice) {
@@ -107,6 +138,8 @@ export function getJobOutstandingIndicators(
         id: "invoice_draft",
         label: "Draft invoice",
         badgeClass: "bg-violet-50 text-violet-900 ring-1 ring-violet-200",
+        href: `/jobs/${jobId}/invoices`,
+        ariaLabel: "Open invoices — finish or send draft",
       });
     }
     if (!o.hasSentOrPaidInvoice && !o.hasDraftInvoice) {
@@ -114,6 +147,8 @@ export function getJobOutstandingIndicators(
         id: "invoice_unsent",
         label: "Invoice not sent",
         badgeClass: "bg-sky-50 text-sky-900 ring-1 ring-sky-200",
+        href: `/jobs/${jobId}/invoices`,
+        ariaLabel: "Open invoices to create or send invoice",
       });
     }
   }
