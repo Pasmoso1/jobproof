@@ -38,6 +38,8 @@ import {
 import { sendInvoiceEmail, sendSigningLinkEmail } from "@/lib/delivery-service";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
 import { generateUUID } from "@/lib/utils/uuid";
+import type { JobOutstandingFlags } from "@/lib/job-dashboard-status";
+import { pickSentInvoiceDisplay } from "@/lib/completed-job-invoice-ui";
 
 export async function getProfile() {
   const supabase = await createClient();
@@ -2698,14 +2700,7 @@ export async function getInvoices(jobId: string) {
 }
 
 /** Per-job flags: invoices (draft/sent) + change orders awaiting customer signature. */
-export type JobOutstandingSummary = {
-  hasAnyInvoice: boolean;
-  hasSentOrPaidInvoice: boolean;
-  hasDraftInvoice: boolean;
-  changeOrderAwaitingSignature: boolean;
-  /** `status === 'sent'` change order ids for this job (for dashboard/detail links). */
-  sentChangeOrderIds: string[];
-};
+export type JobOutstandingSummary = JobOutstandingFlags;
 
 export async function getInvoiceDeliverySummaryForJobIds(
   jobIds: string[]
@@ -2738,8 +2733,21 @@ export async function getInvoiceDeliverySummaryForJobIds(
 
   const { data: rows } = await supabase
     .from("invoices")
-    .select("job_id, status")
+    .select("job_id, status, sent_at, due_date, paid_at")
     .in("job_id", [...allowed]);
+
+  const invRowsByJob = new Map<
+    string,
+    {
+      status: string;
+      sent_at: string | null;
+      due_date: string | null;
+      paid_at: string | null;
+    }[]
+  >();
+  for (const id of allowed) {
+    invRowsByJob.set(id, []);
+  }
 
   for (const id of allowed) {
     empty[id] = {
@@ -2748,17 +2756,36 @@ export async function getInvoiceDeliverySummaryForJobIds(
       hasDraftInvoice: false,
       changeOrderAwaitingSignature: false,
       sentChangeOrderIds: [],
+      sentInvoiceDisplay: null,
     };
   }
   for (const r of rows ?? []) {
     const jid = r.job_id as string;
     if (!empty[jid]) continue;
     empty[jid].hasAnyInvoice = true;
-    if (r.status === "sent" || r.status === "paid") {
+    if (
+      r.status === "sent" ||
+      r.status === "paid" ||
+      r.status === "overdue"
+    ) {
       empty[jid].hasSentOrPaidInvoice = true;
     }
     if (r.status === "draft") {
       empty[jid].hasDraftInvoice = true;
+    }
+    invRowsByJob.get(jid)?.push({
+      status: r.status as string,
+      sent_at: (r.sent_at as string | null) ?? null,
+      due_date: (r.due_date as string | null) ?? null,
+      paid_at: (r.paid_at as string | null) ?? null,
+    });
+  }
+
+  for (const id of allowed) {
+    if (empty[id].hasSentOrPaidInvoice) {
+      empty[id].sentInvoiceDisplay = pickSentInvoiceDisplay(
+        invRowsByJob.get(id) ?? []
+      );
     }
   }
 

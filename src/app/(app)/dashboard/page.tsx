@@ -10,6 +10,7 @@ import {
   getInvoiceDeliverySummaryForJobIds,
 } from "../actions";
 import { DashboardAlerts } from "./dashboard-alerts";
+import { getCompletedJobInvoiceUi } from "@/lib/completed-job-invoice-ui";
 import {
   EMPTY_JOB_OUTSTANDING,
   getJobOutstandingIndicators,
@@ -164,18 +165,16 @@ export default async function DashboardPage() {
               const primary = getJobPrimaryLifecycleStatus(job);
               const inv = invByJob[job.id] ?? EMPTY_JOB_OUTSTANDING;
               const outstanding = getJobOutstandingIndicators(job.id, job, inv);
-              const showInvoiceCta =
-                job.status === "completed" && job.contract_status === "signed";
-              const invoiceCtaLabel = !inv.hasAnyInvoice
-                ? "Create invoice"
-                : !inv.hasSentOrPaidInvoice
-                  ? "Send invoice"
-                  : "Resend invoice";
+              const invoiceUi =
+                job.status === "completed" && job.contract_status === "signed"
+                  ? getCompletedJobInvoiceUi(job.id, inv)
+                  : null;
               return (
               <div
                 key={job.id}
-                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6"
+                className="flex flex-col gap-2 px-4 py-4 sm:px-6"
               >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/jobs/${job.id}`}
@@ -219,15 +218,29 @@ export default async function DashboardPage() {
                         ))}
                       </ul>
                     )}
+                    {invoiceUi && (
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium leading-tight ${invoiceUi.statusBadgeClass}`}
+                      >
+                        {invoiceUi.statusLabel}
+                      </span>
+                    )}
                   </div>
                 </div>
-                {showInvoiceCta && (
+                {invoiceUi && (
                   <Link
-                    href={`/jobs/${job.id}/invoices`}
-                    className="shrink-0 self-start rounded-lg bg-[#2436BB] px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] sm:self-start"
+                    href={invoiceUi.invoicesHref}
+                    aria-label={`${invoiceUi.actionLabel} for ${job.title}`}
+                    className="shrink-0 self-start rounded-lg bg-[#2436BB] px-4 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2436BB] focus-visible:ring-offset-2 sm:self-start"
                   >
-                    {invoiceCtaLabel}
+                    {invoiceUi.actionLabel}
                   </Link>
+                )}
+                </div>
+                {invoiceUi?.billingDetailLine && (
+                  <p className="px-1 text-xs leading-snug text-zinc-600">
+                    {invoiceUi.billingDetailLine}
+                  </p>
                 )}
               </div>
             );

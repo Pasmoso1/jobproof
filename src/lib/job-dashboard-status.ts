@@ -1,3 +1,10 @@
+/** Representative sent/paid/overdue row for billing summary UI (per job). */
+export type SentInvoiceDisplay = {
+  status: "sent" | "paid" | "overdue";
+  sent_at: string | null;
+  due_date: string | null;
+};
+
 /** Flags from `getInvoiceDeliverySummaryForJobIds` (invoices + change orders). */
 export type JobOutstandingFlags = {
   hasAnyInvoice: boolean;
@@ -5,6 +12,8 @@ export type JobOutstandingFlags = {
   hasDraftInvoice: boolean;
   changeOrderAwaitingSignature: boolean;
   sentChangeOrderIds: string[];
+  /** Set when `hasSentOrPaidInvoice`; chosen invoice for due/sent copy. */
+  sentInvoiceDisplay: SentInvoiceDisplay | null;
 };
 
 export const EMPTY_JOB_OUTSTANDING: JobOutstandingFlags = {
@@ -13,6 +22,7 @@ export const EMPTY_JOB_OUTSTANDING: JobOutstandingFlags = {
   hasDraftInvoice: false,
   changeOrderAwaitingSignature: false,
   sentChangeOrderIds: [],
+  sentInvoiceDisplay: null,
 };
 
 /** Shared styles for clickable outstanding chips (Link). */
@@ -133,23 +143,26 @@ export function getJobOutstandingIndicators(
         ariaLabel: changeOrderAwaitingAriaLabel(sentIds),
       });
     }
-    if (o.hasDraftInvoice) {
-      out.push({
-        id: "invoice_draft",
-        label: "Draft invoice",
-        badgeClass: "bg-violet-50 text-violet-900 ring-1 ring-violet-200",
-        href: `/jobs/${jobId}/invoices`,
-        ariaLabel: "Open invoices — finish or send draft",
-      });
-    }
-    if (!o.hasSentOrPaidInvoice && !o.hasDraftInvoice) {
-      out.push({
-        id: "invoice_unsent",
-        label: "Invoice not sent",
-        badgeClass: "bg-sky-50 text-sky-900 ring-1 ring-sky-200",
-        href: `/jobs/${jobId}/invoices`,
-        ariaLabel: "Open invoices to create or send invoice",
-      });
+    // Completed jobs: invoice state + CTA live in dedicated UI (dashboard + job callout).
+    if (job.status === "active") {
+      if (o.hasDraftInvoice) {
+        out.push({
+          id: "invoice_draft",
+          label: "Draft invoice",
+          badgeClass: "bg-violet-50 text-violet-900 ring-1 ring-violet-200",
+          href: `/jobs/${jobId}/invoices`,
+          ariaLabel: "Open invoices — finish or send draft",
+        });
+      }
+      if (!o.hasSentOrPaidInvoice && !o.hasDraftInvoice) {
+        out.push({
+          id: "invoice_unsent",
+          label: "Invoice not sent",
+          badgeClass: "bg-sky-50 text-sky-900 ring-1 ring-sky-200",
+          href: `/jobs/${jobId}/invoices`,
+          ariaLabel: "Open invoices to create or send invoice",
+        });
+      }
     }
   }
 

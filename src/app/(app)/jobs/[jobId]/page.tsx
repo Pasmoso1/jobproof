@@ -11,6 +11,7 @@ import {
   getInvoiceDeliverySummaryForJobIds,
 } from "../../actions";
 import { isJobLockedForContractEdits } from "@/lib/job-contract-lock";
+import { getCompletedJobInvoiceUi } from "@/lib/completed-job-invoice-ui";
 import {
   EMPTY_JOB_OUTSTANDING,
   getJobOutstandingIndicators,
@@ -88,6 +89,10 @@ export default async function JobDetailPage({
 
   const primaryStatus = getJobPrimaryLifecycleStatus(job);
   const outstandingIndicators = getJobOutstandingIndicators(jobId, job, invFlags);
+  const completedInvoiceUi =
+    job.status === "completed" && job.contract_status === "signed"
+      ? getCompletedJobInvoiceUi(jobId, invFlags)
+      : null;
 
   return (
     <div className="space-y-6">
@@ -219,28 +224,39 @@ export default async function JobDetailPage({
               agreement.
             </p>
           )}
-          {job.status === "completed" && job.contract_status === "signed" && (
+          {completedInvoiceUi && (
             <div className="w-full border-t border-zinc-100 pt-4">
               <div className="rounded-lg border border-[#2436BB]/25 bg-[#2436BB]/5 px-4 py-3 text-sm">
-                <p className="font-medium text-zinc-900">Invoicing</p>
-                <p className="mt-1 text-zinc-600">
-                  {invFlags.hasSentOrPaidInvoice
-                    ? "Send the invoice to the customer again if needed."
-                    : invFlags.hasDraftInvoice
-                      ? "You have a draft invoice — open Invoices to review, send, or finish it."
-                      : invFlags.hasAnyInvoice
-                        ? "Your invoice is saved but email delivery hasn’t completed yet — open Invoices to send or fix delivery."
-                        : "Create an invoice from the agreed contract total."}
+                <div className="flex flex-wrap items-center gap-2 gap-y-1.5">
+                  <p className="font-medium text-zinc-900">Invoicing</p>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${completedInvoiceUi.statusBadgeClass}`}
+                  >
+                    {completedInvoiceUi.statusLabel}
+                  </span>
+                </div>
+                {completedInvoiceUi.billingDetailLine && (
+                  <p className="mt-1.5 text-sm font-medium text-zinc-800">
+                    {completedInvoiceUi.billingDetailLine}
+                  </p>
+                )}
+                <p className="mt-2 text-zinc-600">
+                  {completedInvoiceUi.statusKind === "overdue"
+                    ? "This invoice is past due. Follow up with the customer or resend if they need another copy."
+                    : completedInvoiceUi.statusKind === "paid"
+                      ? "Payment has been recorded. Use the button below if the customer needs another copy."
+                      : completedInvoiceUi.statusKind === "sent"
+                        ? "This invoice has been sent to the customer. Use the button below if they need another copy."
+                        : completedInvoiceUi.statusKind === "draft"
+                          ? "You have a draft saved — open Invoices to review details and send it when you’re ready."
+                          : "No invoice has been sent yet. Create one from the agreed contract total."}
                 </p>
                 <Link
-                  href={`/jobs/${jobId}/invoices`}
-                  className="mt-3 inline-flex rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96]"
+                  href={completedInvoiceUi.invoicesHref}
+                  aria-label={`${completedInvoiceUi.actionLabel} for this job`}
+                  className="mt-3 inline-flex rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#2436BB]"
                 >
-                  {!invFlags.hasAnyInvoice
-                    ? "Create invoice"
-                    : !invFlags.hasSentOrPaidInvoice
-                      ? "Send invoice"
-                      : "Resend invoice"}
+                  {completedInvoiceUi.actionLabel}
                 </Link>
               </div>
             </div>
