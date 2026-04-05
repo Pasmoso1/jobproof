@@ -240,6 +240,11 @@ export default async function JobDetailPage({
                     {completedInvoiceUi.billingDetailLine}
                   </p>
                 )}
+                {completedInvoiceUi.viewedDetailLine && (
+                  <p className="mt-1.5 text-sm text-zinc-600">
+                    {completedInvoiceUi.viewedDetailLine}
+                  </p>
+                )}
                 <p className="mt-2 text-zinc-600">
                   {completedInvoiceUi.statusKind === "overdue"
                     ? "This invoice is past due. Follow up with the customer or resend if they need another copy."

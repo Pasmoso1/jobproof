@@ -14,6 +14,10 @@ import {
   formatDateTimeEastern,
   formatLocalDateStringEastern,
 } from "@/lib/datetime-eastern";
+import {
+  invoiceCustomerViewSecondaryLine,
+  invoiceStatusesWhereCustomerViewApplies,
+} from "@/lib/invoice-viewed-display";
 
 export default async function ProofReportPage({
   params,
@@ -376,22 +380,33 @@ export default async function ProofReportPage({
                     status: string;
                     sent_at?: string | null;
                     created_at: string;
+                    viewed_at?: string | null;
                   }) => {
                     const amt =
                       inv.balance_due != null && inv.balance_due !== undefined
                         ? Number(inv.balance_due)
                         : Number(inv.total);
+                    const customerViewLine = invoiceCustomerViewSecondaryLine({
+                      viewedAt: inv.viewed_at,
+                      showNotYetViewed: invoiceStatusesWhereCustomerViewApplies(inv.status),
+                      invoiceStatus: inv.status,
+                    });
                     return (
-                      <li key={inv.id} className="flex flex-col gap-0.5 text-sm sm:flex-row sm:justify-between">
-                        <span className="text-zinc-900">
-                          {inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`}
-                          {inv.sent_at && (
-                            <span className="ml-2 text-zinc-500">
-                              · Issued {formatDateTimeEastern(inv.sent_at)}
-                            </span>
+                      <li key={inv.id} className="flex flex-col gap-1 text-sm sm:flex-row sm:justify-between">
+                        <div className="min-w-0">
+                          <span className="text-zinc-900">
+                            {inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`}
+                            {inv.sent_at && (
+                              <span className="ml-2 text-zinc-500">
+                                · Issued {formatDateTimeEastern(inv.sent_at)}
+                              </span>
+                            )}
+                          </span>
+                          {customerViewLine && (
+                            <p className="mt-0.5 text-xs text-zinc-500">{customerViewLine}</p>
                           )}
-                        </span>
-                        <span className="font-medium text-zinc-900">
+                        </div>
+                        <span className="shrink-0 font-medium text-zinc-900 sm:text-right">
                           ${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
                           <span className="font-normal text-zinc-500">({inv.status})</span>
                         </span>

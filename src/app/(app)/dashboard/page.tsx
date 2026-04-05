@@ -242,6 +242,11 @@ export default async function DashboardPage() {
                     {invoiceUi.billingDetailLine}
                   </p>
                 )}
+                {invoiceUi?.viewedDetailLine && (
+                  <p className="px-1 text-xs leading-snug text-zinc-500">
+                    {invoiceUi.viewedDetailLine}
+                  </p>
+                )}
               </div>
             );
             })

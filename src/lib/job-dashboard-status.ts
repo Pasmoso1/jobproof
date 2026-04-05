@@ -3,6 +3,8 @@ export type SentInvoiceDisplay = {
   status: "sent" | "paid" | "overdue";
   sent_at: string | null;
   due_date: string | null;
+  /** First public invoice page open (customer), Eastern shown in UI */
+  viewed_at: string | null;
 };
 
 /** Flags from `getInvoiceDeliverySummaryForJobIds` (invoices + change orders). */

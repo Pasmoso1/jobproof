@@ -22,6 +22,8 @@ export interface Profile {
   storage_limit_mb: number;
   business_name: string | null;
   contractor_name: string | null;
+  /** Shown on invoices / PDFs / public invoice; app falls back to auth email when null */
+  business_contact_email?: string | null;
   /** Interac e-Transfer receiving address for invoices */
   e_transfer_email?: string | null;
   phone: string | null;

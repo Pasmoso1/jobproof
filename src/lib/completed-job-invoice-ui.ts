@@ -3,6 +3,7 @@ import {
   formatLocalDateStringEastern,
 } from "@/lib/datetime-eastern";
 import type { JobOutstandingFlags, SentInvoiceDisplay } from "@/lib/job-dashboard-status";
+import { invoiceCustomerViewSecondaryLine } from "@/lib/invoice-viewed-display";
 
 export type CompletedJobInvoiceStatusKind =
   | "sent"
@@ -18,6 +19,8 @@ export type CompletedJobInvoiceUi = {
   statusBadgeClass: string;
   /** One short line: due date, sent date, or paid + sent (Eastern). */
   billingDetailLine: string | null;
+  /** Customer public-page view (sent / paid / overdue only). */
+  viewedDetailLine: string | null;
   actionLabel: string;
   invoicesHref: string;
 };
@@ -27,6 +30,7 @@ type InvoiceRow = {
   sent_at: string | null;
   due_date: string | null;
   paid_at: string | null;
+  viewed_at: string | null;
 };
 
 /**
@@ -51,6 +55,7 @@ export function pickSentInvoiceDisplay(rows: InvoiceRow[]): SentInvoiceDisplay |
       status: "overdue",
       sent_at: pick.sent_at,
       due_date: pick.due_date,
+      viewed_at: pick.viewed_at ?? null,
     };
   }
 
@@ -63,6 +68,7 @@ export function pickSentInvoiceDisplay(rows: InvoiceRow[]): SentInvoiceDisplay |
       status: "sent",
       sent_at: pick.sent_at,
       due_date: pick.due_date,
+      viewed_at: pick.viewed_at ?? null,
     };
   }
 
@@ -74,6 +80,7 @@ export function pickSentInvoiceDisplay(rows: InvoiceRow[]): SentInvoiceDisplay |
     status: "paid",
     sent_at: pick.sent_at,
     due_date: pick.due_date,
+    viewed_at: pick.viewed_at ?? null,
   };
 }
 
@@ -110,6 +117,11 @@ export function getCompletedJobInvoiceUi(
   if (o.hasSentOrPaidInvoice) {
     const display = o.sentInvoiceDisplay;
     const billingDetailLine = buildBillingDetailLine(display);
+    const viewedDetailLine = invoiceCustomerViewSecondaryLine({
+      viewedAt: display?.viewed_at,
+      showNotYetViewed: true,
+      invoiceStatus: display?.status,
+    });
 
     if (display?.status === "overdue") {
       return {
@@ -117,6 +129,7 @@ export function getCompletedJobInvoiceUi(
         statusLabel: "Invoice overdue",
         statusBadgeClass: "bg-red-100 text-red-900 ring-1 ring-red-300",
         billingDetailLine,
+        viewedDetailLine,
         actionLabel: "Resend invoice",
         invoicesHref,
       };
@@ -128,6 +141,7 @@ export function getCompletedJobInvoiceUi(
         statusLabel: "Invoice paid",
         statusBadgeClass: "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200",
         billingDetailLine,
+        viewedDetailLine,
         actionLabel: "Resend invoice",
         invoicesHref,
       };
@@ -138,6 +152,7 @@ export function getCompletedJobInvoiceUi(
       statusLabel: "Invoice sent",
       statusBadgeClass: "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200",
       billingDetailLine,
+      viewedDetailLine,
       actionLabel: "Resend invoice",
       invoicesHref,
     };
@@ -148,6 +163,7 @@ export function getCompletedJobInvoiceUi(
       statusLabel: "Draft invoice",
       statusBadgeClass: "bg-violet-50 text-violet-900 ring-1 ring-violet-200",
       billingDetailLine: null,
+      viewedDetailLine: null,
       actionLabel: "Send invoice",
       invoicesHref,
     };
@@ -157,6 +173,7 @@ export function getCompletedJobInvoiceUi(
     statusLabel: "Invoice not sent",
     statusBadgeClass: "bg-sky-50 text-sky-900 ring-1 ring-sky-200",
     billingDetailLine: null,
+    viewedDetailLine: null,
     actionLabel: "Create invoice",
     invoicesHref,
   };

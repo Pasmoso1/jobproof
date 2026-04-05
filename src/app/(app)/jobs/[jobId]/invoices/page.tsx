@@ -2,6 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getJob, getInvoices, getProfile, getContractForJob } from "@/app/(app)/actions";
 import { formatDateEastern, formatDateTimeEastern } from "@/lib/datetime-eastern";
+import {
+  invoiceCustomerViewSecondaryLine,
+  invoiceStatusesWhereCustomerViewApplies,
+} from "@/lib/invoice-viewed-display";
 import { InvoiceBuilderForm, type LatestInvoiceSummary } from "./invoice-builder-form";
 import {
   InvoicePageNotices,
@@ -155,11 +159,17 @@ export default async function InvoicesPage({
                 status: string;
                 created_at: string;
                 sent_at?: string | null;
+                viewed_at?: string | null;
               }) => {
                 const displayAmount =
                   inv.balance_due != null && inv.balance_due !== undefined
                     ? Number(inv.balance_due)
                     : Number(inv.total);
+                const customerViewLine = invoiceCustomerViewSecondaryLine({
+                  viewedAt: inv.viewed_at,
+                  showNotYetViewed: invoiceStatusesWhereCustomerViewApplies(inv.status),
+                  invoiceStatus: inv.status,
+                });
                 return (
                   <div
                     key={inv.id}
@@ -181,12 +191,17 @@ export default async function InvoicesPage({
                               ? "text-green-700"
                               : inv.status === "sent"
                                 ? "text-amber-700"
-                                : "text-zinc-600"
+                                : inv.status === "overdue"
+                                  ? "text-red-700"
+                                  : "text-zinc-600"
                           }
                         >
                           {inv.status}
                         </span>
                       </p>
+                      {customerViewLine && (
+                        <p className="mt-0.5 text-xs text-zinc-500">{customerViewLine}</p>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="font-medium text-zinc-900">

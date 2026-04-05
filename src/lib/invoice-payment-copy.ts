@@ -1,5 +1,6 @@
 /**
  * Payment / contact copy for invoices (email + public invoice page).
+ * @param contractorContactEmail — business contact email (profile + optional auth fallback), or null
  */
 export function buildInvoicePaymentBlocks(
   profile: {
@@ -9,7 +10,7 @@ export function buildInvoicePaymentBlocks(
     e_transfer_email?: string | null;
   },
   bizName: string,
-  userEmail: string | null | undefined
+  contractorContactEmail: string | null | undefined
 ): { paymentInstructions: string; paymentContactLines: string[] } {
   const et = profile.e_transfer_email?.trim() || null;
   const paymentContactLines = [
@@ -17,7 +18,9 @@ export function buildInvoicePaymentBlocks(
       ? `Contact: ${profile.contractor_name.trim()}`
       : null,
     profile.phone?.trim() ? `Phone: ${profile.phone.trim()}` : null,
-    userEmail?.trim() ? `Email: ${userEmail.trim()}` : null,
+    contractorContactEmail?.trim()
+      ? `Email: ${contractorContactEmail.trim()}`
+      : null,
     et ? `E-transfer: ${et}` : null,
   ].filter(Boolean) as string[];
 

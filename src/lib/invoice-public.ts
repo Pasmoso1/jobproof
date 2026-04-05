@@ -85,7 +85,7 @@ type ProfileJoin = {
   postal_code: string | null;
   e_transfer_email: string | null;
   default_contract_payment_terms: string | null;
-  user_id: string;
+  business_contact_email: string | null;
 };
 
 type CustomerJoin = {
@@ -170,7 +170,7 @@ export async function fetchPublicInvoicePageData(
         postal_code,
         e_transfer_email,
         default_contract_payment_terms,
-        user_id
+        business_contact_email
       )
     `
     )
@@ -183,19 +183,7 @@ export async function fetchPublicInvoicePageData(
   const job = unwrapOne(row.jobs as JobJoin | JobJoin[] | null);
   if (!profile) return null;
 
-  let contractorEmail: string | null = null;
-  if (profile.user_id) {
-    try {
-      const { data, error: authErr } = await admin.auth.admin.getUserById(
-        profile.user_id
-      );
-      if (!authErr && data?.user?.email) {
-        contractorEmail = data.user.email;
-      }
-    } catch {
-      /* non-blocking */
-    }
-  }
+  const contractorEmail = profile.business_contact_email?.trim() || null;
 
   const customer = unwrapOne(job?.customers ?? null);
   const province = job?.property_province ?? null;

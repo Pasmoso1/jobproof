@@ -20,6 +20,7 @@ type Profile = {
   default_contract_warranty_note?: string | null;
   default_contract_cancellation_note?: string | null;
   e_transfer_email?: string | null;
+  business_contact_email?: string | null;
 } | null;
 
 export function BusinessSettingsForm({
@@ -36,6 +37,9 @@ export function BusinessSettingsForm({
 
   const [businessName, setBusinessName] = useState(profile?.business_name ?? "");
   const [contractorName, setContractorName] = useState(profile?.contractor_name ?? "");
+  const [businessContactEmail, setBusinessContactEmail] = useState(
+    () => profile?.business_contact_email?.trim() || userEmail
+  );
   const [phone, setPhone] = useState(profile?.phone ?? "");
   const [addressLine1, setAddressLine1] = useState(profile?.address_line_1 ?? "");
   const [addressLine2, setAddressLine2] = useState(profile?.address_line_2 ?? "");
@@ -98,6 +102,7 @@ export function BusinessSettingsForm({
     const formData = new FormData();
     formData.set("business_name", businessName.trim());
     formData.set("contractor_name", contractorName.trim());
+    formData.set("business_contact_email", businessContactEmail.trim());
     formData.set("phone", phone.trim());
     formData.set("address_line_1", addressLine1.trim());
     formData.set("address_line_2", addressLine2.trim());
@@ -190,24 +195,33 @@ export function BusinessSettingsForm({
       </div>
 
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-zinc-700">
-          Email <span className="text-red-500">*</span>
+        <label htmlFor="businessContactEmail" className="block text-sm font-medium text-zinc-700">
+          Business contact email
         </label>
         <input
-          id="email"
+          id="businessContactEmail"
           type="email"
-          value={userEmail}
-          disabled
-          className="mt-1 block w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2.5 text-zinc-600"
-          aria-invalid={!!fieldErrors.account_email}
+          value={businessContactEmail}
+          onChange={(e) => {
+            setBusinessContactEmail(e.target.value);
+            clearFieldError("business_contact_email");
+          }}
+          placeholder={userEmail || "you@example.com"}
+          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+          aria-invalid={!!fieldErrors.business_contact_email}
         />
-        {fieldErrors.account_email && (
+        {fieldErrors.business_contact_email && (
           <p className="mt-1 text-sm text-red-600" role="alert">
-            {fieldErrors.account_email}
+            {fieldErrors.business_contact_email}
           </p>
         )}
         <p className="mt-1 text-xs text-zinc-500">
-          From your account. If this looks wrong, update your email in your auth provider or contact support.
+          Shown on invoices, invoice emails, and the customer invoice page. Pre-filled from your login
+          email; change it if customers should reach you at a different address.
+        </p>
+        <p className="mt-2 text-xs text-zinc-500">
+          <span className="font-medium text-zinc-600">Login email</span> (account sign-in):{" "}
+          <span className="text-zinc-700">{userEmail || "—"}</span>
         </p>
       </div>
 

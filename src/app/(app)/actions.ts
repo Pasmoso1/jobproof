@@ -41,6 +41,7 @@ import { generateUUID } from "@/lib/utils/uuid";
 import type { JobOutstandingFlags } from "@/lib/job-dashboard-status";
 import { pickSentInvoiceDisplay } from "@/lib/completed-job-invoice-ui";
 import { buildInvoicePaymentBlocks } from "@/lib/invoice-payment-copy";
+import { resolveContractorContactEmail } from "@/lib/contractor-contact-email";
 import { randomUUID } from "node:crypto";
 
 export async function getProfile() {
@@ -150,11 +151,25 @@ export async function updateProfileBusinessInfo(formData: FormData) {
     };
   }
 
+  const businessContactEmail =
+    String(formData.get("business_contact_email") ?? "").trim() || null;
+  if (
+    businessContactEmail &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(businessContactEmail)
+  ) {
+    return {
+      fieldErrors: {
+        business_contact_email: "Enter a valid email address.",
+      },
+    };
+  }
+
   const { error } = await supabase
     .from("profiles")
     .update({
       business_name: businessName,
       contractor_name: contractorName,
+      business_contact_email: businessContactEmail,
       e_transfer_email: eTransferEmail,
       phone,
       address_line_1: addressLine1,
@@ -2735,7 +2750,7 @@ export async function getInvoiceDeliverySummaryForJobIds(
 
   const { data: rows } = await supabase
     .from("invoices")
-    .select("job_id, status, sent_at, due_date, paid_at")
+    .select("job_id, status, sent_at, due_date, paid_at, viewed_at")
     .in("job_id", [...allowed]);
 
   const invRowsByJob = new Map<
@@ -2745,6 +2760,7 @@ export async function getInvoiceDeliverySummaryForJobIds(
       sent_at: string | null;
       due_date: string | null;
       paid_at: string | null;
+      viewed_at: string | null;
     }[]
   >();
   for (const id of allowed) {
@@ -2780,6 +2796,7 @@ export async function getInvoiceDeliverySummaryForJobIds(
       sent_at: (r.sent_at as string | null) ?? null,
       due_date: (r.due_date as string | null) ?? null,
       paid_at: (r.paid_at as string | null) ?? null,
+      viewed_at: (r.viewed_at as string | null) ?? null,
     });
   }
 
@@ -2895,7 +2912,7 @@ export async function createInvoice(
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, default_contract_payment_terms, e_transfer_email"
+      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, default_contract_payment_terms, e_transfer_email, business_contact_email"
     )
     .eq("user_id", user.id)
     .single();
@@ -3027,10 +3044,11 @@ export async function createInvoice(
   );
 
   const bizName = profile.business_name?.trim() || "Your contractor";
+  const contractorContactEmail = resolveContractorContactEmail(profile, user.email);
   const { paymentInstructions, paymentContactLines } = buildInvoicePaymentBlocks(
     profile,
     bizName,
-    user.email
+    contractorContactEmail
   );
 
   const pdfFilenameBase =
@@ -3052,7 +3070,7 @@ export async function createInvoice(
         businessName: bizName,
         contactName: profile.contractor_name?.trim() || null,
         phone: profile.phone?.trim() || null,
-        email: user.email?.trim() || null,
+        email: contractorContactEmail,
         addressLines: contractorAddressLines,
       },
       customer: {
@@ -3123,13 +3141,13 @@ export async function createInvoice(
     toName: customerName,
     jobTitle: String((job as { title?: string }).title ?? "Job"),
     businessDisplayName: profile.business_name,
-    replyToEmail: user.email ?? null,
+    replyToEmail: contractorContactEmail ?? user.email ?? null,
     publicInvoiceUrl,
     contractor: {
       businessName: bizName,
       contactName: profile.contractor_name?.trim() || null,
       phone: profile.phone?.trim() || null,
-      email: user.email?.trim() || null,
+      email: contractorContactEmail,
       addressLines: contractorAddressLines,
     },
     customer: {
@@ -3219,7 +3237,7 @@ export async function resendInvoice(
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, default_contract_payment_terms, e_transfer_email"
+      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, default_contract_payment_terms, e_transfer_email, business_contact_email"
     )
     .eq("user_id", user.id)
     .single();
@@ -3339,10 +3357,11 @@ export async function resendInvoice(
     job as Parameters<typeof formatJobServiceAddressLines>[0]
   );
   const bizName = profile.business_name?.trim() || "Your contractor";
+  const contractorContactEmail = resolveContractorContactEmail(profile, user.email);
   const { paymentInstructions, paymentContactLines } = buildInvoicePaymentBlocks(
     profile,
     bizName,
-    user.email
+    contractorContactEmail
   );
 
   const pdfFilenameBase =
@@ -3361,7 +3380,7 @@ export async function resendInvoice(
         businessName: bizName,
         contactName: profile.contractor_name?.trim() || null,
         phone: profile.phone?.trim() || null,
-        email: user.email?.trim() || null,
+        email: contractorContactEmail,
         addressLines: contractorAddressLines,
       },
       customer: {
@@ -3422,13 +3441,13 @@ export async function resendInvoice(
     toName: customerName,
     jobTitle: String((job as { title?: string }).title ?? "Job"),
     businessDisplayName: profile.business_name,
-    replyToEmail: user.email ?? null,
+    replyToEmail: contractorContactEmail ?? user.email ?? null,
     publicInvoiceUrl,
     contractor: {
       businessName: bizName,
       contactName: profile.contractor_name?.trim() || null,
       phone: profile.phone?.trim() || null,
-      email: user.email?.trim() || null,
+      email: contractorContactEmail,
       addressLines: contractorAddressLines,
     },
     customer: {
