@@ -269,6 +269,9 @@ export interface Invoice {
   id: string;
   job_id: string;
   profile_id: string;
+  /** Unguessable token for customer-facing /invoice/[token] (no auth). */
+  public_token?: string;
+  viewed_at?: string | null;
   invoice_number: string | null;
   status: InvoiceStatusType;
   subtotal: number;

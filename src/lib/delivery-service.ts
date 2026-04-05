@@ -410,6 +410,8 @@ export interface SendInvoiceEmailOptions {
   paymentContactLines: string[];
   notes: string | null;
   pdfAttachment?: { filename: string; contentBase64: string };
+  /** Customer-facing page (no login), e.g. https://…/invoice/{public_token} */
+  publicInvoiceUrl?: string | null;
   deliveryLog?: EmailDeliveryAuditLog;
 }
 
@@ -467,6 +469,16 @@ function invoiceEmailHtml(opts: SendInvoiceEmailOptions): string {
     ? `<p style="margin-top:14px;font-size:14px;color:#374151;">A detailed PDF copy is attached to this email.</p>`
     : "";
 
+  const viewOnlineBlock =
+    opts.publicInvoiceUrl?.trim() &&
+    /^https?:\/\//i.test(opts.publicInvoiceUrl.trim())
+      ? `<div style="margin-top:20px;padding:16px 18px;background:#eef2ff;border-radius:10px;border:1px solid #c7d2fe;">
+          <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#2436BB;">View your invoice online</p>
+          <p style="margin:0 0 12px;font-size:14px;color:#1e293b;">Open your invoice in the browser to view details, download a PDF, or print — no sign-in required.</p>
+          <a href="${escapeHtml(opts.publicInvoiceUrl.trim())}" style="display:inline-block;padding:10px 18px;background:#2436BB;color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">View invoice</a>
+        </div>`
+      : "";
+
   return `
     <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.55; max-width: 600px; color: #111827;">
       <p style="font-size:16px;">Hi ${escapeHtml(opts.toName || "there")},</p>
@@ -475,6 +487,7 @@ function invoiceEmailHtml(opts: SendInvoiceEmailOptions): string {
         <strong>${escapeHtml(opts.jobTitle)}</strong>.
       </p>
       ${pdfNote}
+      ${viewOnlineBlock}
 
       <div style="margin-top:22px;padding:14px 16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
         <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2436BB;text-transform:uppercase;letter-spacing:0.04em;">Contractor</p>

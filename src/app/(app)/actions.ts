@@ -40,6 +40,8 @@ import { buildInvoicePdf } from "@/lib/invoice-pdf";
 import { generateUUID } from "@/lib/utils/uuid";
 import type { JobOutstandingFlags } from "@/lib/job-dashboard-status";
 import { pickSentInvoiceDisplay } from "@/lib/completed-job-invoice-ui";
+import { buildInvoicePaymentBlocks } from "@/lib/invoice-payment-copy";
+import { randomUUID } from "node:crypto";
 
 export async function getProfile() {
   const supabase = await createClient();
@@ -2835,39 +2837,6 @@ function formatJobServiceAddressLines(job: {
   return [street, cityLine].filter((s) => s.trim().length > 0);
 }
 
-function buildInvoicePaymentBlocks(
-  profile: {
-    contractor_name?: string | null;
-    phone?: string | null;
-    default_contract_payment_terms?: string | null;
-    e_transfer_email?: string | null;
-  },
-  bizName: string,
-  userEmail: string | null | undefined
-): { paymentInstructions: string; paymentContactLines: string[] } {
-  const et = profile.e_transfer_email?.trim() || null;
-  const paymentContactLines = [
-    profile.contractor_name?.trim()
-      ? `Contact: ${profile.contractor_name.trim()}`
-      : null,
-    profile.phone?.trim() ? `Phone: ${profile.phone.trim()}` : null,
-    userEmail?.trim() ? `Email: ${userEmail.trim()}` : null,
-    et ? `E-transfer: ${et}` : null,
-  ].filter(Boolean) as string[];
-
-  const etSentence = et
-    ? ` For Interac e-Transfer, send payment to ${et}.`
-    : "";
-
-  const defaultPaymentCopy = `Please pay the balance due using the method you agreed with ${bizName}.${etSentence} If you have not arranged payment yet, use the payment contact information below.`;
-
-  const paymentInstructions = profile.default_contract_payment_terms?.trim()
-    ? `${profile.default_contract_payment_terms.trim()}\n\n${defaultPaymentCopy}`
-    : defaultPaymentCopy;
-
-  return { paymentInstructions, paymentContactLines };
-}
-
 /**
  * Create invoice from signed job totals only (contract + signed change orders on the job).
  * Tax rate is derived from the job’s property province (server-side). Status is `draft` until
@@ -2987,11 +2956,14 @@ export async function createInvoice(
     return { error: "Due date is required." };
   }
 
+  const publicToken = randomUUID();
+
   const { data: invoice, error } = await supabase
     .from("invoices")
     .insert({
       job_id: jobId,
       profile_id: profile.id,
+      public_token: publicToken,
       line_items: lineItems,
       agreed_work_subtotal: agreedWorkSubtotal,
       subtotal,
@@ -3004,7 +2976,7 @@ export async function createInvoice(
       status: "draft",
       sent_at: null,
     })
-    .select("id, invoice_number, created_at")
+    .select("id, invoice_number, created_at, public_token")
     .single();
 
   if (error) return { error: error.message };
@@ -3142,12 +3114,17 @@ export async function createInvoice(
     };
   }
 
+  const publicInvoiceUrl = `${resolvePublicAppOrigin()}/invoice/${String(
+    (invoice as { public_token: string }).public_token
+  )}`;
+
   const sendResult = await sendInvoiceEmail({
     toEmail: customerEmail,
     toName: customerName,
     jobTitle: String((job as { title?: string }).title ?? "Job"),
     businessDisplayName: profile.business_name,
     replyToEmail: user.email ?? null,
+    publicInvoiceUrl,
     contractor: {
       businessName: bizName,
       contactName: profile.contractor_name?.trim() || null,
@@ -3435,12 +3412,18 @@ export async function resendInvoice(
     pdfAttachment = undefined;
   }
 
+  const publicToken = (invRow as { public_token?: string }).public_token?.trim();
+  const publicInvoiceUrl = publicToken
+    ? `${resolvePublicAppOrigin()}/invoice/${publicToken}`
+    : null;
+
   const sendResult = await sendInvoiceEmail({
     toEmail: customerEmail,
     toName: customerName,
     jobTitle: String((job as { title?: string }).title ?? "Job"),
     businessDisplayName: profile.business_name,
     replyToEmail: user.email ?? null,
+    publicInvoiceUrl,
     contractor: {
       businessName: bizName,
       contactName: profile.contractor_name?.trim() || null,
