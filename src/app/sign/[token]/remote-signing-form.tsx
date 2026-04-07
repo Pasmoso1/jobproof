@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signContractRemote } from "@/app/(app)/actions";
+import { validateCustomerPhone } from "@/lib/validation/job-create";
 
 export function RemoteSigningForm({ token }: { token: string }) {
   const router = useRouter();
@@ -16,12 +17,17 @@ export function RemoteSigningForm({ token }: { token: string }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const phoneErr = validateCustomerPhone(signerPhone);
+    if (phoneErr) {
+      setError(phoneErr);
+      return;
+    }
     setLoading(true);
 
     const result = await signContractRemote(token, {
       signerName: signerName.trim(),
       signerEmail: signerEmail.trim(),
-      signerPhone: signerPhone.trim() || undefined,
+      signerPhone: signerPhone.trim(),
       consentCheckbox: consentChecked,
     });
 
@@ -84,11 +90,12 @@ export function RemoteSigningForm({ token }: { token: string }) {
           htmlFor="signerPhone"
           className="block text-sm font-medium text-zinc-700"
         >
-          Phone
+          Phone <span className="text-red-500">*</span>
         </label>
         <input
           id="signerPhone"
           type="tel"
+          required
           value={signerPhone}
           onChange={(e) => setSignerPhone(e.target.value)}
           placeholder="(555) 123-4567"

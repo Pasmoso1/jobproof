@@ -24,6 +24,15 @@ export interface SendSigningLinkOptions {
   /** Contractor business name for From: "{name} via JobProof <email>". Omit to use "JobProof <email>". */
   businessDisplayName?: string | null;
   deliveryLog?: EmailDeliveryAuditLog;
+  /** When set, email lists subtotal, tax, total, deposit, and balance (matches contract + invoice logic). */
+  contractPricing?: {
+    subtotalPreTax: number;
+    taxShortLabel: string;
+    taxAmount: number;
+    totalIncludingTax: number;
+    deposit: number;
+    balanceDueOnCompletion: number;
+  } | null;
 }
 
 export interface DeliveryResult {
@@ -33,15 +42,40 @@ export interface DeliveryResult {
   resendMessageId?: string;
 }
 
+function moneyEmail(n: number): string {
+  return `$${Number(n).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 function signingLinkEmailHtml(opts: SendSigningLinkOptions): string {
   const exp = formatDateTimeEastern(opts.expiresAt);
   const href = opts.signingUrl.replace(/"/g, "%22");
+  const p = opts.contractPricing;
+  const pricingBlock =
+    p != null
+      ? `
+      <table style="border-collapse:collapse;margin:16px 0;font-size:14px;color:#333;max-width:100%;">
+        <tr><td style="padding:4px 12px 4px 0;color:#555;">Contract subtotal (before tax)</td><td style="padding:4px 0;font-weight:600;">${escapeHtml(moneyEmail(p.subtotalPreTax))}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#555;">Tax (${escapeHtml(p.taxShortLabel)})</td><td style="padding:4px 0;font-weight:600;">${escapeHtml(moneyEmail(p.taxAmount))}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#555;">Total contract price (including tax)</td><td style="padding:4px 0;font-weight:600;">${escapeHtml(moneyEmail(p.totalIncludingTax))}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#555;">Deposit</td><td style="padding:4px 0;font-weight:600;">${escapeHtml(moneyEmail(p.deposit))}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#555;">Balance due on completion</td><td style="padding:4px 0;font-weight:600;">${escapeHtml(moneyEmail(p.balanceDueOnCompletion))}</td></tr>
+      </table>
+      <p style="font-size:13px;color:#555;">
+        The <strong>balance due on completion</strong> is your remaining amount after the deposit, based on the
+        <strong>total contract price including tax</strong> (not the pre-tax subtotal alone).
+      </p>
+    `
+      : "";
   return `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; max-width: 560px;">
       <p>Hi ${escapeHtml(opts.toName || "there")},</p>
       <p>
         Please review and sign the document for <strong>${escapeHtml(opts.jobTitle)}</strong>.
       </p>
+      ${pricingBlock}
       <p>
         <a href="${href}" style="display:inline-block;background:#2436BB;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
           Open signing page

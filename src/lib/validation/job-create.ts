@@ -36,6 +36,19 @@ export function validateCustomerEmailForRemote(raw: string | null | undefined): 
   return null;
 }
 
+const PHONE_DIGITS_MIN = 10;
+
+/** Non-empty phone with enough digits for reachability (client + server). */
+export function validateCustomerPhone(raw: string | null | undefined): string | null {
+  const v = String(raw ?? "").trim();
+  if (!v) return "Customer phone number is required.";
+  const digits = v.replace(/\D/g, "");
+  if (digits.length < PHONE_DIGITS_MIN) {
+    return "Enter a valid phone number (at least 10 digits).";
+  }
+  return null;
+}
+
 export function isValidCustomerEmail(raw: string | null | undefined): boolean {
   return validateCustomerEmail(raw) === null;
 }

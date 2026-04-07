@@ -8,7 +8,10 @@ import {
   getContractPdfSignedUrl,
   getProfile,
 } from "@/app/(app)/actions";
-import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
+import {
+  computeContractPricingBreakdown,
+  formatContractMoney,
+} from "@/lib/contract-tax-pricing";
 import { formatDateEastern } from "@/lib/datetime-eastern";
 import { ContractBuilderForm } from "./contract-builder-form";
 
@@ -51,7 +54,11 @@ export default async function ContractBuilderPage({
       displayContract.deposit_amount != null && Number(displayContract.deposit_amount) > 0
         ? Number(displayContract.deposit_amount)
         : null;
-    const signedBalanceDue = balanceDueOnCompletion(signedPrice, signedDeposit);
+    const signedBreakdown = computeContractPricingBreakdown(
+      signedPrice,
+      signedDeposit,
+      job.property_province
+    );
 
     return (
       <div className="mx-auto max-w-3xl">
@@ -83,28 +90,42 @@ export default async function ContractBuilderPage({
                 {displayContract.signing_method} signing
               </span>
             )}
-            {displayContract.price != null && (
+            {signedBreakdown != null && (
               <span className="font-medium text-zinc-900">
-                ${Number(displayContract.price).toLocaleString()}
+                {formatContractMoney(signedBreakdown.totalIncludingTax)} total (incl. tax)
               </span>
             )}
           </div>
-          {signedPrice != null && (
-            <dl className="mt-4 grid gap-2 border-t border-zinc-100 pt-4 text-sm sm:grid-cols-3">
+          {signedBreakdown != null && (
+            <dl className="mt-4 grid gap-2 border-t border-zinc-100 pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
               <div>
-                <dt className="text-zinc-500">Contract total</dt>
-                <dd className="font-medium text-zinc-900">${signedPrice.toLocaleString()}</dd>
+                <dt className="text-zinc-500">Contract subtotal (before tax)</dt>
+                <dd className="font-medium text-zinc-900">
+                  {formatContractMoney(signedBreakdown.subtotalPreTax)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Tax ({signedBreakdown.taxShortLabel})</dt>
+                <dd className="font-medium text-zinc-900">
+                  {formatContractMoney(signedBreakdown.taxAmount)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Total (including tax)</dt>
+                <dd className="font-medium text-zinc-900">
+                  {formatContractMoney(signedBreakdown.totalIncludingTax)}
+                </dd>
               </div>
               <div>
                 <dt className="text-zinc-500">Deposit</dt>
                 <dd className="font-medium text-zinc-900">
-                  {signedDeposit != null ? `$${signedDeposit.toLocaleString()}` : "—"}
+                  {formatContractMoney(signedBreakdown.depositApplied)}
                 </dd>
               </div>
-              <div>
+              <div className="sm:col-span-2 lg:col-span-1">
                 <dt className="text-zinc-500">Balance due on completion</dt>
                 <dd className="font-semibold text-[#2436BB]">
-                  {signedBalanceDue != null ? `$${signedBalanceDue.toLocaleString()}` : "—"}
+                  {formatContractMoney(signedBreakdown.balanceDueOnCompletion)}
                 </dd>
               </div>
             </dl>

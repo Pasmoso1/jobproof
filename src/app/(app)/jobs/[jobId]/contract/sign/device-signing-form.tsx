@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signContractDevice } from "@/app/(app)/actions";
+import { validateCustomerPhone } from "@/lib/validation/job-create";
 import { ContractPreview } from "../contract-preview";
 
 export function DeviceSigningForm({
@@ -19,6 +20,7 @@ export function DeviceSigningForm({
   contractorEmail,
   contractorPhone,
   contractorAddress,
+  propertyProvince,
 }: {
   contractId: string;
   jobId: string;
@@ -28,6 +30,7 @@ export function DeviceSigningForm({
   customerEmail: string | null;
   customerPhone: string | null;
   propertyAddress: string;
+  propertyProvince: string | null;
   businessName?: string | null;
   contractorEmail?: string | null;
   contractorPhone?: string | null;
@@ -44,12 +47,17 @@ export function DeviceSigningForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const phErr = validateCustomerPhone(signerPhone);
+    if (phErr) {
+      setError(phErr);
+      return;
+    }
     setLoading(true);
 
     const result = await signContractDevice(contractId, {
       signerName: signerName.trim(),
       signerEmail: signerEmail.trim(),
-      signerPhone: signerPhone.trim() || undefined,
+      signerPhone: signerPhone.trim(),
       consentCheckbox: consentChecked,
     });
 
@@ -108,11 +116,7 @@ export function DeviceSigningForm({
             contractorEmail={contractorEmail ?? null}
             contractorPhone={contractorPhone ?? null}
             contractorAddress={contractorAddress ?? null}
-            taxRate={
-              contractData.tax_rate != null && Number(contractData.tax_rate) > 0
-                ? Number(contractData.tax_rate)
-                : null
-            }
+            propertyProvince={propertyProvince}
             warrantyNote={String(contractData.warranty_note ?? "") || null}
             cancellationNote={String(contractData.cancellation_change_note ?? "") || null}
           />
@@ -151,11 +155,12 @@ export function DeviceSigningForm({
 
       <div>
         <label htmlFor="signerPhone" className="block text-sm font-medium text-zinc-700">
-          Customer phone
+          Customer phone <span className="text-red-500">*</span>
         </label>
         <input
           id="signerPhone"
           type="tel"
+          required
           value={signerPhone}
           onChange={(e) => setSignerPhone(e.target.value)}
           placeholder="(555) 123-4567"

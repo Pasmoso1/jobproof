@@ -2,7 +2,10 @@
  * Signed contract PDF generation (server-only). Uploads to Supabase `contract-pdfs` bucket.
  */
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
+import {
+  computeContractPricingBreakdown,
+  formatContractMoney,
+} from "@/lib/contract-tax-pricing";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -43,6 +46,8 @@ export type SignedContractPdfInput = {
   signedIp?: string | null;
   signedUserAgent?: string | null;
   consentCheckbox?: boolean | null;
+  /** Job property province — tax matches invoices when set. */
+  propertyProvince?: string | null;
 };
 
 function money(n: number | null | undefined): string {
@@ -196,23 +201,46 @@ export async function buildSignedContractPdfBytes(
   labeledParagraph(layout, "Estimated completion", completionDate || "—");
 
   heading(layout, "Pricing");
-  labeledParagraph(layout, "Contract total", money(input.price));
-  labeledParagraph(layout, "Deposit", money(input.depositAmount));
-  const pdfBalance = balanceDueOnCompletion(input.price ?? null, input.depositAmount ?? null);
-  labeledParagraph(
-    layout,
-    "Balance due on completion",
-    pdfBalance != null ? money(pdfBalance) : "—"
+  const pdfPricing = computeContractPricingBreakdown(
+    input.price,
+    input.depositAmount,
+    input.propertyProvince
   );
-  labeledParagraph(
-    layout,
-    "Tax",
-    input.taxIncluded
-      ? `Included${input.taxRate != null && input.taxRate > 0 ? ` (${input.taxRate}% noted)` : ""}`
-      : input.taxRate != null && input.taxRate > 0
-        ? `${input.taxRate}%`
-        : "—"
-  );
+  if (pdfPricing) {
+    labeledParagraph(
+      layout,
+      "Contract subtotal (before tax)",
+      formatContractMoney(pdfPricing.subtotalPreTax)
+    );
+    labeledParagraph(
+      layout,
+      `Tax (${pdfPricing.taxShortLabel})`,
+      formatContractMoney(pdfPricing.taxAmount)
+    );
+    labeledParagraph(
+      layout,
+      "Total contract price (including tax)",
+      formatContractMoney(pdfPricing.totalIncludingTax)
+    );
+    labeledParagraph(layout, "Deposit", formatContractMoney(pdfPricing.depositApplied));
+    labeledParagraph(
+      layout,
+      "Balance due on completion",
+      formatContractMoney(pdfPricing.balanceDueOnCompletion)
+    );
+  } else {
+    labeledParagraph(layout, "Contract subtotal (before tax)", money(input.price));
+    labeledParagraph(layout, "Deposit", money(input.depositAmount));
+    labeledParagraph(
+      layout,
+      "Tax",
+      input.taxIncluded
+        ? `Included${input.taxRate != null && input.taxRate > 0 ? ` (${input.taxRate}% noted)` : ""}`
+        : input.taxRate != null && input.taxRate > 0
+          ? `${input.taxRate}%`
+          : "—"
+    );
+  }
   labeledParagraph(layout, "Payment terms", input.paymentTerms || "—");
 
   heading(layout, "Scope of work");
@@ -299,7 +327,8 @@ export async function buildSignedContractPdfBytes(
   return doc.save();
 }
 
-export function contractDbRowToPdfInput(row: {
+export function contractDbRowToPdfInput(
+  row: {
   id: string;
   profile_id: string;
   job_id: string;
@@ -330,7 +359,9 @@ export function contractDbRowToPdfInput(row: {
   signed_ip_address: string | null;
   signed_user_agent: string | null;
   consent_checkbox_boolean: boolean | null;
-}): SignedContractPdfInput {
+  },
+  opts?: { propertyProvince?: string | null }
+): SignedContractPdfInput {
   return {
     contractId: row.id,
     profileId: row.profile_id,
@@ -362,6 +393,7 @@ export function contractDbRowToPdfInput(row: {
     signedIp: row.signed_ip_address,
     signedUserAgent: row.signed_user_agent,
     consentCheckbox: row.consent_checkbox_boolean,
+    propertyProvince: opts?.propertyProvince ?? null,
   };
 }
 

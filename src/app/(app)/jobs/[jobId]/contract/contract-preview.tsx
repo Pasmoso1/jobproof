@@ -1,4 +1,7 @@
-import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
+import {
+  computeContractPricingBreakdown,
+  formatContractMoney,
+} from "@/lib/contract-tax-pricing";
 import { formatDateEastern, formatLocalDateStringEastern } from "@/lib/datetime-eastern";
 
 type ContractPreviewProps = {
@@ -8,6 +11,7 @@ type ContractPreviewProps = {
   customerPhone: string | null;
   propertyAddress: string;
   scopeOfWork: string;
+  /** Pre-tax contract subtotal (same basis as invoice subtotal). */
   contractPrice: number | null;
   depositAmount: number | null;
   paymentTerms: string;
@@ -18,8 +22,8 @@ type ContractPreviewProps = {
   contractorEmail?: string | null;
   contractorPhone?: string | null;
   contractorAddress?: string | null;
-  /** Decimal rate e.g. 0.13 for 13% */
-  taxRate?: number | null;
+  /** Job work location — sales tax rate matches invoices. */
+  propertyProvince?: string | null;
   warrantyNote?: string | null;
   cancellationNote?: string | null;
 };
@@ -41,11 +45,15 @@ export function ContractPreview({
   contractorEmail,
   contractorPhone,
   contractorAddress,
-  taxRate,
+  propertyProvince,
   warrantyNote,
   cancellationNote,
 }: ContractPreviewProps) {
-  const balanceDue = balanceDueOnCompletion(contractPrice, depositAmount);
+  const pricing = computeContractPricingBreakdown(
+    contractPrice,
+    depositAmount,
+    propertyProvince
+  );
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white shadow-sm">
@@ -129,36 +137,43 @@ export function ContractPreview({
         {/* Contract price */}
         <section className="px-6 py-4">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Contract Price
+            Contract pricing
           </h3>
           <div className="mt-2 space-y-1">
-            {contractPrice != null && contractPrice > 0 && (
-              <p className="text-sm font-semibold text-zinc-900">
-                Total: ${Number(contractPrice).toLocaleString()}
-              </p>
-            )}
-            {depositAmount != null && depositAmount > 0 && (
-              <p className="text-sm text-zinc-600">
-                Deposit: ${Number(depositAmount).toLocaleString()}
-              </p>
-            )}
-            {balanceDue != null && (
-              <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2">
-                <p className="text-sm font-semibold text-blue-950">
-                  Balance due on completion: ${balanceDue.toLocaleString()}
+            {pricing ? (
+              <>
+                <p className="text-sm text-zinc-700">
+                  <span className="text-zinc-500">Contract subtotal (before tax): </span>
+                  <span className="font-medium text-zinc-900">
+                    {formatContractMoney(pricing.subtotalPreTax)}
+                  </span>
                 </p>
-                <p className="mt-0.5 text-xs text-blue-900/80">
-                  Contract total minus deposit (amount remaining when work is complete).
+                <p className="text-sm text-zinc-700">
+                  <span className="text-zinc-500">Tax ({pricing.taxShortLabel}): </span>
+                  <span className="font-medium text-zinc-900">
+                    {formatContractMoney(pricing.taxAmount)}
+                  </span>
                 </p>
-              </div>
-            )}
-            {(!contractPrice || contractPrice <= 0) && (
+                <p className="text-sm font-semibold text-zinc-900">
+                  Total contract price (including tax):{" "}
+                  {formatContractMoney(pricing.totalIncludingTax)}
+                </p>
+                <p className="text-sm text-zinc-600">
+                  Deposit: {formatContractMoney(pricing.depositApplied)}
+                </p>
+                <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2">
+                  <p className="text-sm font-semibold text-blue-950">
+                    Balance due on completion:{" "}
+                    {formatContractMoney(pricing.balanceDueOnCompletion)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-blue-900/80">
+                    Total including tax, minus deposit already received (remaining when work is
+                    complete).
+                  </p>
+                </div>
+              </>
+            ) : (
               <p className="text-sm text-zinc-500">—</p>
-            )}
-            {taxRate != null && taxRate > 0 && (
-              <p className="text-sm text-zinc-600">
-                Tax rate: {(taxRate * 100).toLocaleString(undefined, { maximumFractionDigits: 4 })}%
-              </p>
             )}
           </div>
         </section>

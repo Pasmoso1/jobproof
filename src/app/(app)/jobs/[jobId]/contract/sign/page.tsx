@@ -69,6 +69,7 @@ export default async function DeviceSigningPage({
       <DeviceSigningForm
         contractId={activeContract.id}
         jobId={jobId}
+        propertyProvince={job.property_province ?? null}
         contractData={{
           ...(activeContract.contract_data as Record<string, unknown>),
           scope_of_work: activeContract.scope_of_work,

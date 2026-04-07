@@ -15,8 +15,13 @@ import {
   isValidCustomerEmail,
   validateContractBuilderScheduleDates,
   validateCustomerEmailForRemote,
+  validateCustomerPhone,
 } from "@/lib/validation/job-create";
-import { balanceDueOnCompletion } from "@/lib/contract-pricing-display";
+import {
+  invoiceTaxRateDisplayLabel,
+  taxRateFromPropertyProvince,
+} from "@/lib/invoice-tax";
+import { computeContractPricingBreakdown, formatContractMoney } from "@/lib/contract-tax-pricing";
 import { ContractPreview } from "./contract-preview";
 import type { Contract, Profile } from "@/types/database";
 
@@ -128,12 +133,7 @@ function buildContractFormState(
       completionDate: normalizeDateInput(
         (cd.completionDate as string) ?? job.estimated_completion_date ?? undefined
       ),
-      taxRate:
-        existingContract.tax_rate != null && existingContract.tax_rate !== undefined
-          ? String(existingContract.tax_rate)
-          : job.tax_rate != null
-            ? String(job.tax_rate)
-            : "",
+      taxRate: String(taxRateFromPropertyProvince(job.property_province)),
       companyName: existingContract.company_name ?? profile?.business_name ?? "",
       contractorName: existingContract.contractor_name ?? profile?.contractor_name ?? "",
       contractorEmail: existingContract.contractor_email ?? userEmail ?? "",
@@ -170,8 +170,7 @@ function buildContractFormState(
         : "",
     startDate: normalizeDateInput(job.start_date),
     completionDate: normalizeDateInput(job.estimated_completion_date),
-    taxRate:
-      job.tax_rate != null && Number(job.tax_rate) > 0 ? String(job.tax_rate) : "",
+    taxRate: String(taxRateFromPropertyProvince(job.property_province)),
     companyName: profile?.business_name ?? "",
     contractorName: profile?.contractor_name ?? "",
     contractorEmail: userEmail ?? "",
@@ -227,15 +226,16 @@ export function ContractBuilderForm({
   const priceNum = parseFloat(form.contractPrice);
   const hasValidPrice = !Number.isNaN(priceNum) && priceNum > 0;
   const depositNum = parseFloat(form.depositAmount);
-  const taxNum = parseFloat(form.taxRate);
   const depositForBalance =
     !Number.isNaN(depositNum) && depositNum >= 0 ? depositNum : 0;
-  const balanceDueSummary = balanceDueOnCompletion(
+  const pricingSummary = computeContractPricingBreakdown(
     hasValidPrice ? priceNum : null,
-    depositForBalance > 0 ? depositForBalance : null
+    depositForBalance > 0 ? depositForBalance : null,
+    job.property_province
   );
   const propertyAddressDisplay = form.jobAddress.trim() || "—";
   const remoteSigningEmailReady = isValidCustomerEmail(form.customerEmail);
+  const remoteSigningPhoneReady = validateCustomerPhone(form.customerPhone) === null;
 
   function patchForm<K extends keyof ContractFormState>(key: K, value: ContractFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -244,9 +244,11 @@ export function ContractBuilderForm({
   function validateForSigning(): boolean {
     const errs: Record<string, string> = {};
     if (!form.scope?.trim()) errs.scope = "Scope of work is required";
-    if (!hasValidPrice) errs.price = "Contract price is required";
+    if (!hasValidPrice) errs.price = "Contract subtotal (before tax) is required";
     if (!form.customerName?.trim()) errs.customerName = "Customer name is required";
     if (!form.paymentTerms?.trim()) errs.paymentTerms = "Payment terms are required";
+    const phErr = validateCustomerPhone(form.customerPhone);
+    if (phErr) errs.customerPhone = phErr;
     const dateErrs = validateContractBuilderScheduleDates(
       form.startDate,
       form.completionDate
@@ -283,7 +285,7 @@ export function ContractBuilderForm({
       depositAmount:
         !Number.isNaN(depositNum) && depositNum >= 0 ? depositNum : undefined,
       paymentTerms: form.paymentTerms.trim() || undefined,
-      taxRate: !Number.isNaN(taxNum) && taxNum >= 0 ? taxNum : 0,
+      taxRate: taxRateFromPropertyProvince(job.property_province),
       warrantyNote: form.warrantyNote.trim() || undefined,
       cancellationChangeNote: form.cancellationNote.trim() || undefined,
     };
@@ -421,6 +423,12 @@ export function ContractBuilderForm({
       return;
     }
 
+    const remotePhoneErr = validateCustomerPhone(form.customerPhone);
+    if (remotePhoneErr) {
+      setValidationErrors((p) => ({ ...p, customerPhone: remotePhoneErr }));
+      return;
+    }
+
     if (!validateForSigning()) {
       return;
     }
@@ -516,29 +524,51 @@ export function ContractBuilderForm({
             <dd className="font-medium text-zinc-900">{propertyAddressDisplay}</dd>
           </div>
           <div>
-            <dt className="text-zinc-500">Contract price</dt>
+            <dt className="text-zinc-500">Contract subtotal (before tax)</dt>
             <dd className="font-medium text-zinc-900">
-              {hasValidPrice ? `$${priceNum.toLocaleString()}` : "—"}
+              {pricingSummary
+                ? formatContractMoney(pricingSummary.subtotalPreTax)
+                : hasValidPrice
+                  ? `$${priceNum.toLocaleString()}`
+                  : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-zinc-500">Tax</dt>
+            <dd className="font-medium text-zinc-900">
+              {pricingSummary ? formatContractMoney(pricingSummary.taxAmount) : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-zinc-500">Total (including tax)</dt>
+            <dd className="font-medium text-zinc-900">
+              {pricingSummary
+                ? formatContractMoney(pricingSummary.totalIncludingTax)
+                : "—"}
             </dd>
           </div>
           <div>
             <dt className="text-zinc-500">Deposit</dt>
             <dd className="font-medium text-zinc-900">
-              {depositForBalance > 0 ? `$${depositForBalance.toLocaleString()}` : "—"}
+              {pricingSummary
+                ? formatContractMoney(pricingSummary.depositApplied)
+                : depositForBalance > 0
+                  ? `$${depositForBalance.toLocaleString()}`
+                  : "—"}
             </dd>
           </div>
           <div>
             <dt className="text-zinc-500">Balance due on completion</dt>
             <dd className="font-semibold text-[#2436BB]">
-              {balanceDueSummary != null ? `$${balanceDueSummary.toLocaleString()}` : "—"}
+              {pricingSummary
+                ? formatContractMoney(pricingSummary.balanceDueOnCompletion)
+                : "—"}
             </dd>
           </div>
           <div>
-            <dt className="text-zinc-500">Tax rate</dt>
+            <dt className="text-zinc-500">Sales tax (from property province)</dt>
             <dd className="font-medium text-zinc-900">
-              {form.taxRate.trim() && !Number.isNaN(taxNum)
-                ? `${(taxNum * 100).toLocaleString(undefined, { maximumFractionDigits: 4 })}%`
-                : "—"}
+              {invoiceTaxRateDisplayLabel(job.property_province)}
             </dd>
           </div>
           <div className="sm:col-span-2">
@@ -621,15 +651,29 @@ export function ContractBuilderForm({
             </div>
             <div>
               <label htmlFor="customerPhone" className="block text-sm font-medium text-zinc-700">
-                Customer phone
+                Customer phone <span className="text-red-500">*</span>
               </label>
               <input
                 id="customerPhone"
                 type="tel"
+                required
                 value={form.customerPhone}
-                onChange={(e) => patchForm("customerPhone", e.target.value)}
-                className={inputCls}
+                onChange={(e) => {
+                  patchForm("customerPhone", e.target.value);
+                  if (validationErrors.customerPhone)
+                    setValidationErrors((p) => ({ ...p, customerPhone: "" }));
+                }}
+                className={validationErrors.customerPhone ? fieldClass(true) : inputCls}
+                aria-invalid={!!validationErrors.customerPhone}
               />
+              <p className="mt-1 text-xs text-zinc-500">
+                Required before sending or signing the contract.
+              </p>
+              {validationErrors.customerPhone && (
+                <p className="mt-1 text-sm text-red-600" role="alert">
+                  {validationErrors.customerPhone}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -706,10 +750,14 @@ export function ContractBuilderForm({
 
         <div className="space-y-4 border-b border-zinc-100 pb-6">
           <h3 className="text-sm font-semibold text-zinc-900">Financial</h3>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <p className="text-xs text-zinc-600">
+            Contract amount is the subtotal before tax. Sales tax matches your invoice and is based on
+            the job property province ({invoiceTaxRateDisplayLabel(job.property_province)}).
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="contractPrice" className="block text-sm font-medium text-zinc-700">
-                Contract price ($) <span className="text-red-500">*</span>
+                Contract subtotal — before tax ($) <span className="text-red-500">*</span>
               </label>
               <input
                 id="contractPrice"
@@ -737,22 +785,6 @@ export function ContractBuilderForm({
                 inputMode="decimal"
                 value={form.depositAmount}
                 onChange={(e) => patchForm("depositAmount", e.target.value)}
-                className={`no-spinner ${inputCls}`}
-              />
-            </div>
-            <div>
-              <label htmlFor="taxRateField" className="block text-sm font-medium text-zinc-700">
-                Tax rate (e.g. 0.13)
-              </label>
-              <input
-                id="taxRateField"
-                type="number"
-                step="0.0001"
-                min="0"
-                max="1"
-                value={form.taxRate}
-                onChange={(e) => patchForm("taxRate", e.target.value)}
-                placeholder="0.13"
                 className={`no-spinner ${inputCls}`}
               />
             </div>
@@ -908,11 +940,13 @@ export function ContractBuilderForm({
 
         {(validationErrors.customerName ||
           validationErrors.price ||
-          validationErrors.customer_email) && (
+          validationErrors.customer_email ||
+          validationErrors.customerPhone) && (
           <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
             {validationErrors.customerName && <p>{validationErrors.customerName}</p>}
             {validationErrors.price && <p>{validationErrors.price}</p>}
             {validationErrors.customer_email && <p>{validationErrors.customer_email}</p>}
+            {validationErrors.customerPhone && <p>{validationErrors.customerPhone}</p>}
           </div>
         )}
 
@@ -941,7 +975,7 @@ export function ContractBuilderForm({
               contractorEmail={form.contractorEmail.trim() || null}
               contractorPhone={form.contractorPhone.trim() || null}
               contractorAddress={form.contractorAddress.trim() || null}
-              taxRate={!Number.isNaN(taxNum) && taxNum > 0 ? taxNum : null}
+              propertyProvince={job.property_province ?? null}
               warrantyNote={form.warrantyNote.trim() || null}
               cancellationNote={form.cancellationNote.trim() || null}
             />
@@ -1000,11 +1034,13 @@ export function ContractBuilderForm({
             </button>
             <button
               type="button"
-              disabled={loading || !remoteSigningEmailReady}
+              disabled={loading || !remoteSigningEmailReady || !remoteSigningPhoneReady}
               title={
                 !remoteSigningEmailReady
                   ? "Add a valid customer email to send a remote signing link."
-                  : undefined
+                  : !remoteSigningPhoneReady
+                    ? "Add a valid customer phone number to send a remote signing link."
+                    : undefined
               }
               onClick={handleSendForRemoteSigning}
               className="rounded-lg border-2 border-[#2436BB] bg-white px-6 py-3 font-medium text-[#2436BB] transition-colors hover:bg-[#2436BB]/5 focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"

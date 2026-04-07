@@ -6,6 +6,7 @@ import { createJob, createCustomer } from "../../actions";
 import {
   parsePositiveContractPrice,
   validateCustomerEmail,
+  validateCustomerPhone,
   validateJobEstimatedScheduleDates,
   validateScopeOfWork,
   validateTrade,
@@ -34,6 +35,9 @@ export function CreateJobForm({ customers }: { customers: Customer[] }) {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerNotes, setCustomerNotes] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? "");
+  const [existingCustomerPhone, setExistingCustomerPhone] = useState(
+    () => customers[0]?.phone?.trim() ?? ""
+  );
 
   const [title, setTitle] = useState("");
   const [scopeOfWork, setScopeOfWork] = useState("");
@@ -65,6 +69,8 @@ export function CreateJobForm({ customers }: { customers: Customer[] }) {
     if (useNewCustomer) {
       const emErr = validateCustomerEmail(customerEmail);
       if (emErr) errs.customer_email = emErr;
+      const phErr = validateCustomerPhone(customerPhone);
+      if (phErr) errs.customer_phone = phErr;
     } else {
       if (!selectedCustomerId) {
         errs.customer_selection = "Please select a customer.";
@@ -72,6 +78,8 @@ export function CreateJobForm({ customers }: { customers: Customer[] }) {
         const c = customers.find((x) => x.id === selectedCustomerId);
         const emErr = validateCustomerEmail(c?.email ?? "");
         if (emErr) errs.customer_email = emErr;
+        const phErr = validateCustomerPhone(existingCustomerPhone);
+        if (phErr) errs.customer_phone = phErr;
       }
     }
 
@@ -130,6 +138,9 @@ export function CreateJobForm({ customers }: { customers: Customer[] }) {
     formData.set("start_date", startDate.trim() || "");
     formData.set("estimated_completion_date", estimatedCompletionDate.trim() || "");
     formData.set("original_contract_price", originalContractPrice.trim() || "");
+    if (!useNewCustomer) {
+      formData.set("customer_phone", existingCustomerPhone.trim());
+    }
 
     const result = await createJob(formData);
 
@@ -244,16 +255,32 @@ export function CreateJobForm({ customers }: { customers: Customer[] }) {
             </div>
             <div>
               <label htmlFor="customerPhone" className="block text-sm font-medium text-zinc-700">
-                Phone
+                Phone <span className="text-red-500">*</span>
               </label>
               <input
                 id="customerPhone"
                 type="tel"
+                required={useNewCustomer}
                 value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
+                onChange={(e) => {
+                  setCustomerPhone(e.target.value);
+                  setFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.customer_phone;
+                    return next;
+                  });
+                }}
                 placeholder="(555) 123-4567"
-                className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
+                  fieldErrors.customer_phone ? "border-red-500 focus:border-red-500" : "border-zinc-300 focus:border-[#2436BB]"
+                }`}
+                aria-invalid={!!fieldErrors.customer_phone}
               />
+              {fieldErrors.customer_phone && (
+                <p className="mt-1 text-sm text-red-600" role="alert">
+                  {fieldErrors.customer_phone}
+                </p>
+              )}
             </div>
             <div className="sm:col-span-2">
               <label htmlFor="customerNotes" className="block text-sm font-medium text-zinc-700">
@@ -278,11 +305,15 @@ export function CreateJobForm({ customers }: { customers: Customer[] }) {
               id="customer"
               value={selectedCustomerId}
               onChange={(e) => {
-                setSelectedCustomerId(e.target.value);
+                const id = e.target.value;
+                setSelectedCustomerId(id);
+                const sel = customers.find((x) => x.id === id);
+                setExistingCustomerPhone(sel?.phone?.trim() ?? "");
                 setFieldErrors((prev) => {
                   const next = { ...prev };
                   delete next.customer_email;
                   delete next.customer_selection;
+                  delete next.customer_phone;
                   return next;
                 });
               }}
@@ -315,6 +346,40 @@ export function CreateJobForm({ customers }: { customers: Customer[] }) {
                 {fieldErrors.customer_email}
               </p>
             )}
+            <div className="mt-4">
+              <label
+                htmlFor="existingCustomerPhone"
+                className="block text-sm font-medium text-zinc-700"
+              >
+                Customer phone <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="existingCustomerPhone"
+                type="tel"
+                value={existingCustomerPhone}
+                onChange={(e) => {
+                  setExistingCustomerPhone(e.target.value);
+                  setFieldErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.customer_phone;
+                    return next;
+                  });
+                }}
+                placeholder="(555) 123-4567"
+                className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
+                  fieldErrors.customer_phone ? "border-red-500 focus:border-red-500" : "border-zinc-300 focus:border-[#2436BB]"
+                }`}
+                aria-invalid={!!fieldErrors.customer_phone}
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                Required for contracts and signing. You can add or update the number here for this job.
+              </p>
+              {fieldErrors.customer_phone && (
+                <p className="mt-1 text-sm text-red-600" role="alert">
+                  {fieldErrors.customer_phone}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>

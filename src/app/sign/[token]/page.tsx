@@ -77,6 +77,7 @@ export default async function RemoteSigningPage({
     warranty_note?: string | null;
     cancellation_change_note?: string | null;
     contract_data?: { scope?: string; terms?: string; startDate?: string; completionDate?: string };
+    property_province?: string | null;
   };
 
   return (
@@ -111,9 +112,7 @@ export default async function RemoteSigningPage({
               contractorEmail={cd.contractor_email ?? null}
               contractorPhone={cd.contractor_phone ?? null}
               contractorAddress={cd.contractor_address ?? null}
-              taxRate={
-                cd.tax_rate != null && Number(cd.tax_rate) > 0 ? Number(cd.tax_rate) : null
-              }
+              propertyProvince={cd.property_province ?? null}
               warrantyNote={cd.warranty_note?.trim() ? cd.warranty_note : null}
               cancellationNote={
                 cd.cancellation_change_note?.trim() ? cd.cancellation_change_note : null

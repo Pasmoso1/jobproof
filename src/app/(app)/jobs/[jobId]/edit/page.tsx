@@ -72,6 +72,7 @@ export default async function EditJobPage({
         job={job}
         customerName={customer?.full_name?.trim() || ""}
         customerEmailInitial={customer?.email ?? ""}
+        customerPhoneInitial={customer?.phone ?? ""}
       />
     </div>
   );

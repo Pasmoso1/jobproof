@@ -7,6 +7,7 @@ import { updateJob } from "../../../actions";
 import {
   parsePositiveContractPrice,
   validateCustomerEmail,
+  validateCustomerPhone,
   validateJobEstimatedScheduleDates,
   validateScopeOfWork,
   validateTrade,
@@ -33,12 +34,14 @@ export function EditJobForm({
   job,
   customerName,
   customerEmailInitial,
+  customerPhoneInitial,
 }: {
   job: Job;
   /** Linked customer display name (read-only here). */
   customerName: string;
   /** Initial email; edits persist to the customer record on save. */
   customerEmailInitial: string;
+  customerPhoneInitial: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +74,7 @@ export function EditJobForm({
     job.original_contract_price != null ? String(job.original_contract_price) : ""
   );
   const [customerEmail, setCustomerEmail] = useState(customerEmailInitial.trim());
+  const [customerPhone, setCustomerPhone] = useState(customerPhoneInitial.trim());
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,6 +89,8 @@ export function EditJobForm({
     if (tradeErr) errs.service_category = tradeErr;
     const custEmailErr = validateCustomerEmail(customerEmail);
     if (custEmailErr) errs.customer_email = custEmailErr;
+    const custPhoneErr = validateCustomerPhone(customerPhone);
+    if (custPhoneErr) errs.customer_phone = custPhoneErr;
     const scheduleErrs = validateJobEstimatedScheduleDates(startDate, estimatedCompletionDate);
     if (scheduleErrs) Object.assign(errs, scheduleErrs);
     if (Object.keys(errs).length > 0) {
@@ -109,6 +115,7 @@ export function EditJobForm({
     formData.set("estimated_completion_date", estimatedCompletionDate.trim() || "");
     formData.set("original_contract_price", originalContractPrice.trim() || "");
     formData.set("customer_email", customerEmail.trim());
+    formData.set("customer_phone", customerPhone.trim());
 
     const result = await updateJob(job.id, formData);
 
@@ -141,8 +148,8 @@ export function EditJobForm({
       <div className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-5">
         <h2 className="text-lg font-semibold text-zinc-900">Customer</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          This job is linked to a customer. You can fix their email here; it updates their profile for
-          all jobs using this customer.
+          This job is linked to a customer. Email and phone updates apply to their profile for all jobs
+          using this customer.
         </p>
         <div className="mt-4 space-y-4">
           <div>
@@ -186,6 +193,40 @@ export function EditJobForm({
             {fieldErrors.customer_email && (
               <p id="customer-email-error" className="mt-1 text-sm text-red-600" role="alert">
                 {fieldErrors.customer_email}
+              </p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="customerPhone" className="block text-sm font-medium text-zinc-700">
+              Customer phone <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="customerPhone"
+              type="tel"
+              autoComplete="tel"
+              value={customerPhone}
+              onChange={(e) => {
+                setCustomerPhone(e.target.value);
+                setFieldErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.customer_phone;
+                  return next;
+                });
+              }}
+              placeholder="(555) 123-4567"
+              className={`mt-1 block w-full rounded-lg border px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#2436BB] ${
+                fieldErrors.customer_phone
+                  ? "border-red-500 focus:border-red-500"
+                  : "border-zinc-300 focus:border-[#2436BB]"
+              }`}
+              aria-invalid={!!fieldErrors.customer_phone}
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              Required for contracts and signing.
+            </p>
+            {fieldErrors.customer_phone && (
+              <p className="mt-1 text-sm text-red-600" role="alert">
+                {fieldErrors.customer_phone}
               </p>
             )}
           </div>

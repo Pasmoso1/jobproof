@@ -14,10 +14,12 @@ import {
   parsePositiveContractPrice,
   validateCustomerEmail,
   validateCustomerEmailForRemote,
+  validateCustomerPhone,
   validateJobEstimatedScheduleDates,
   validateScopeOfWork,
   validateTrade,
 } from "@/lib/validation/job-create";
+import { computeContractPricingBreakdown, formatContractMoney } from "@/lib/contract-tax-pricing";
 import { resolvePublicAppOrigin } from "@/lib/app-origin";
 import {
   invoiceTaxShortLabel,
@@ -342,6 +344,11 @@ export async function createCustomer(formData: FormData) {
     return { error: emailErr };
   }
 
+  const phoneErr = validateCustomerPhone(phone ?? "");
+  if (phoneErr) {
+    return { error: phoneErr };
+  }
+
   const { data, error } = await supabase
     .from("customers")
     .insert({
@@ -416,9 +423,18 @@ export async function createJob(formData: FormData) {
     return { fieldErrors: { service_category: tradeErr } };
   }
 
+  const customerPhoneInput = String(formData.get("customer_phone") ?? "").trim();
+  if (customerPhoneInput) {
+    await supabase
+      .from("customers")
+      .update({ phone: customerPhoneInput })
+      .eq("id", customerId)
+      .eq("profile_id", profile.id);
+  }
+
   const { data: customerRow } = await supabase
     .from("customers")
-    .select("email")
+    .select("email, phone")
     .eq("id", customerId)
     .eq("profile_id", profile.id)
     .maybeSingle();
@@ -429,6 +445,10 @@ export async function createJob(formData: FormData) {
   const custEmailErr = validateCustomerEmail(customerRow.email);
   if (custEmailErr) {
     return { fieldErrors: { customer_email: custEmailErr } };
+  }
+  const custPhoneErr = validateCustomerPhone(customerRow.phone ?? customerPhoneInput);
+  if (custPhoneErr) {
+    return { fieldErrors: { customer_phone: custPhoneErr } };
   }
 
   const scopeErr = validateScopeOfWork(scopeOfWork);
@@ -561,6 +581,12 @@ export async function updateJob(jobId: string, formData: FormData) {
     return { fieldErrors: { customer_email: customerEmailFieldErr } };
   }
 
+  const customerPhoneInput = String(formData.get("customer_phone") ?? "").trim();
+  const customerPhoneFieldErr = validateCustomerPhone(customerPhoneInput);
+  if (customerPhoneFieldErr) {
+    return { fieldErrors: { customer_phone: customerPhoneFieldErr } };
+  }
+
   const { data: linkedCustomer } = await supabase
     .from("customers")
     .select("id")
@@ -597,7 +623,7 @@ export async function updateJob(jobId: string, formData: FormData) {
 
   const { error: customerEmailUpdateError } = await supabase
     .from("customers")
-    .update({ email: customerEmailInput })
+    .update({ email: customerEmailInput, phone: customerPhoneInput })
     .eq("id", job.customer_id)
     .eq("profile_id", profile.id);
 
@@ -1119,7 +1145,7 @@ export async function createOrUpdateContract(
 
   const { data: job } = await supabase
     .from("jobs")
-    .select("id, profile_id")
+    .select("id, profile_id, property_province")
     .eq("id", jobId)
     .single();
 
@@ -1136,6 +1162,8 @@ export async function createOrUpdateContract(
   if (!profile || job.profile_id !== profile.id) {
     return { error: "Unauthorized" };
   }
+
+  const jobTaxRate = taxRateFromPropertyProvince(job.property_province);
 
   const { data: existingEditable } = await supabase
     .from("contracts")
@@ -1211,10 +1239,13 @@ export async function createOrUpdateContract(
     const scopeOfWork = structured?.scopeOfWork ?? (contractData.scope as string) ?? "";
     const price = structured?.price ?? (contractData.price as number);
     const customerName = structured?.customerName ?? "";
+    const customerPhone = String(structured?.customerPhone ?? "").trim();
     const paymentTerms = structured?.paymentTerms ?? (contractData.paymentTerms as string) ?? "";
     if (!scopeOfWork?.trim()) return { error: "Scope of work is required before signing." };
     if (price == null || price <= 0) return { error: "Contract price is required before signing." };
     if (!customerName?.trim()) return { error: "Customer name is required before signing." };
+    const custPhoneErr = validateCustomerPhone(customerPhone);
+    if (custPhoneErr) return { error: custPhoneErr };
     if (!paymentTerms?.trim()) return { error: "Payment terms are required before signing." };
     const cdDates = contractData as Record<string, unknown>;
     const schedErr = contractSigningScheduleErrorMessage(
@@ -1251,7 +1282,7 @@ export async function createOrUpdateContract(
     deposit_amount: structured?.depositAmount ?? (contractData.deposit as number) ?? null,
     payment_terms: structured?.paymentTerms ?? (contractData.paymentTerms as string) ?? null,
     tax_included: structured?.taxIncluded ?? false,
-    tax_rate: structured?.taxRate ?? 0,
+    tax_rate: jobTaxRate,
     warranty_note: structured?.warrantyNote ?? null,
     cancellation_change_note: structured?.cancellationChangeNote ?? null,
   };
@@ -1308,7 +1339,7 @@ export async function sendContractForSigning(contractId: string) {
 
   const { data: contract } = await supabase
     .from("contracts")
-    .select("id, job_id, profile_id, status, contract_data")
+    .select("id, job_id, profile_id, status, contract_data, customer_phone")
     .eq("id", contractId)
     .single();
 
@@ -1324,6 +1355,16 @@ export async function sendContractForSigning(contractId: string) {
   );
   if (sendSchedErr) {
     return { error: `${sendSchedErr} Add both dates on the contract before sending for signature.` };
+  }
+
+  const sendPhoneErr = validateCustomerPhone(contract.customer_phone ?? "");
+  if (sendPhoneErr) {
+    return {
+      error:
+        sendPhoneErr === "Customer phone number is required."
+          ? "Customer phone is required before sending for signature. Add it on the contract."
+          : `${sendPhoneErr} Update it on the contract before sending for signature.`,
+    };
   }
 
   const { data: profile } = await supabase
@@ -1387,7 +1428,7 @@ export async function signContractDevice(
   params: {
     signerName: string;
     signerEmail: string;
-    signerPhone?: string;
+    signerPhone: string;
     consentCheckbox: boolean;
   }
 ) {
@@ -1411,6 +1452,11 @@ export async function signContractDevice(
     return { error: deviceSchedErr };
   }
 
+  const devicePhoneErr = validateCustomerPhone(params.signerPhone ?? "");
+  if (devicePhoneErr) {
+    return { error: devicePhoneErr };
+  }
+
   const headersList = await headers();
   const ip = clientIpFromRequestHeaders(headersList);
   const userAgent = headersList.get("user-agent")?.trim() || null;
@@ -1419,7 +1465,7 @@ export async function signContractDevice(
     p_contract_id: contractId,
     p_signer_name: params.signerName,
     p_signer_email: params.signerEmail,
-    p_signer_phone: params.signerPhone ?? null,
+    p_signer_phone: params.signerPhone.trim(),
     p_consent_checkbox: params.consentCheckbox,
     p_signed_ip_address: ip,
     p_signed_user_agent: userAgent,
@@ -1453,6 +1499,14 @@ function formatContractDateForEmail(v: unknown): string {
   return s;
 }
 
+function jobProvinceFromContractEmbed(contract: {
+  jobs?: { property_province?: string | null } | { property_province?: string | null }[] | null;
+}): string | null {
+  const j = contract.jobs;
+  if (!j) return null;
+  return Array.isArray(j) ? j[0]?.property_province ?? null : j.property_province ?? null;
+}
+
 function buildSignedContractSummaryRows(contract: {
   job_title: string | null;
   job_address: string | null;
@@ -1461,20 +1515,45 @@ function buildSignedContractSummaryRows(contract: {
   contract_data: unknown;
   deposit_amount: number | null;
   payment_terms: string | null;
+  jobs?: { property_province?: string | null } | { property_province?: string | null }[] | null;
 }): { label: string; value: string }[] {
   const cd = (contract.contract_data as Record<string, unknown>) ?? {};
   const scopeRaw = String(contract.scope_of_work ?? cd.scope ?? "").trim();
   const scopeDisplay =
     scopeRaw.length > 450 ? `${scopeRaw.slice(0, 447)}…` : scopeRaw || "—";
-  const price = contract.price;
-  const priceStr =
-    price != null && Number.isFinite(Number(price))
-      ? `$${Number(price).toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`
-      : "—";
-  const dep = contract.deposit_amount;
+  const province = jobProvinceFromContractEmbed(contract);
+  const breakdown = computeContractPricingBreakdown(
+    contract.price,
+    contract.deposit_amount,
+    province
+  );
+  const pricingRows: { label: string; value: string }[] = breakdown
+    ? [
+        {
+          label: "Contract subtotal (before tax)",
+          value: formatContractMoney(breakdown.subtotalPreTax),
+        },
+        {
+          label: `Tax (${breakdown.taxShortLabel})`,
+          value: formatContractMoney(breakdown.taxAmount),
+        },
+        {
+          label: "Total contract price (including tax)",
+          value: formatContractMoney(breakdown.totalIncludingTax),
+        },
+        { label: "Deposit", value: formatContractMoney(breakdown.depositApplied) },
+        {
+          label: "Balance due on completion",
+          value: formatContractMoney(breakdown.balanceDueOnCompletion),
+        },
+      ]
+    : [
+        { label: "Contract subtotal (before tax)", value: "—" },
+        { label: "Tax", value: "—" },
+        { label: "Total contract price (including tax)", value: "—" },
+        { label: "Deposit", value: "—" },
+        { label: "Balance due on completion", value: "—" },
+      ];
   return [
     { label: "Contract / job", value: contract.job_title?.trim() || "—" },
     { label: "Property / job address", value: contract.job_address?.trim() || "—" },
@@ -1483,17 +1562,7 @@ function buildSignedContractSummaryRows(contract: {
       label: "Estimated completion",
       value: formatContractDateForEmail(cd.completionDate),
     },
-    { label: "Contract price", value: priceStr },
-    {
-      label: "Deposit",
-      value:
-        dep != null && Number(dep) > 0
-          ? `$${Number(dep).toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}`
-          : "—",
-    },
+    ...pricingRows,
     { label: "Scope of work", value: scopeDisplay },
     {
       label: "Payment terms",
@@ -1506,7 +1575,7 @@ async function deliverSignedContract(contractId: string) {
   const supabase = await createClient();
   const { data: contract } = await supabase
     .from("contracts")
-    .select("*")
+    .select("*, jobs(property_province)")
     .eq("id", contractId)
     .single();
 
@@ -1518,7 +1587,11 @@ async function deliverSignedContract(contractId: string) {
   const { sendSignedContractEmail } = await import("@/lib/delivery-service");
   const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
 
-  const pdfPath = await generateSignedContractPdf(contractDbRowToPdfInput(contract));
+  const pdfPath = await generateSignedContractPdf(
+    contractDbRowToPdfInput(contract, {
+      propertyProvince: jobProvinceFromContractEmbed(contract),
+    })
+  );
 
   let effectivePdfPath = contract.pdf_path ?? null;
   if (pdfPath) {
@@ -1658,7 +1731,7 @@ export async function signContractRemote(
   params: {
     signerName: string;
     signerEmail: string;
-    signerPhone?: string;
+    signerPhone: string;
     consentCheckbox: boolean;
   }
 ) {
@@ -1684,6 +1757,11 @@ export async function signContractRemote(
     };
   }
 
+  const remotePhoneErr = validateCustomerPhone(params.signerPhone ?? "");
+  if (remotePhoneErr) {
+    return { error: remotePhoneErr };
+  }
+
   const supabase = await createClient();
   const headersList = await headers();
   const ip = clientIpFromRequestHeaders(headersList);
@@ -1693,7 +1771,7 @@ export async function signContractRemote(
     p_token: token,
     p_signer_name: params.signerName.trim(),
     p_signer_email: params.signerEmail.trim(),
-    p_signer_phone: params.signerPhone?.trim() ?? null,
+    p_signer_phone: params.signerPhone.trim(),
     p_consent_checkbox: params.consentCheckbox,
     p_signed_ip_address: ip,
     p_signed_user_agent: userAgent,
@@ -1859,6 +1937,30 @@ export async function sendRemoteContractSigningLink(params: {
   const baseUrl = resolvePublicAppOrigin(params.publicOrigin);
   const signingUrl = `${baseUrl}/sign/${tokenResult.token}`;
 
+  const { data: pricingRow } = await supabase
+    .from("contracts")
+    .select("price, deposit_amount, jobs(property_province)")
+    .eq("id", params.contractId)
+    .single();
+
+  const remoteBreakdown = computeContractPricingBreakdown(
+    pricingRow?.price ?? null,
+    pricingRow?.deposit_amount ?? null,
+    jobProvinceFromContractEmbed(
+      pricingRow as Parameters<typeof jobProvinceFromContractEmbed>[0]
+    )
+  );
+  const contractPricing = remoteBreakdown
+    ? {
+        subtotalPreTax: remoteBreakdown.subtotalPreTax,
+        taxShortLabel: remoteBreakdown.taxShortLabel,
+        taxAmount: remoteBreakdown.taxAmount,
+        totalIncludingTax: remoteBreakdown.totalIncludingTax,
+        deposit: remoteBreakdown.depositApplied,
+        balanceDueOnCompletion: remoteBreakdown.balanceDueOnCompletion,
+      }
+    : null;
+
   const emailResult = await sendSigningLinkEmail({
     toEmail: params.toEmail.trim(),
     toName: params.customerName.trim() || "Customer",
@@ -1866,6 +1968,7 @@ export async function sendRemoteContractSigningLink(params: {
     jobTitle: params.jobTitle.trim(),
     expiresAt: new Date(tokenResult.expiresAt),
     businessDisplayName: profile.business_name ?? null,
+    contractPricing,
     deliveryLog: {
       profileId: profile.id,
       type: "contract",
@@ -1924,7 +2027,7 @@ export async function ensureSignedContractPdf(
 
   const { data: contract } = await supabase
     .from("contracts")
-    .select("*")
+    .select("*, jobs(property_province)")
     .eq("id", contractId)
     .single();
 
@@ -1949,7 +2052,11 @@ export async function ensureSignedContractPdf(
   const { generateSignedContractPdf, contractDbRowToPdfInput } = await import(
     "@/lib/contract-pdf"
   );
-  const pdfPath = await generateSignedContractPdf(contractDbRowToPdfInput(contract));
+  const pdfPath = await generateSignedContractPdf(
+    contractDbRowToPdfInput(contract, {
+      propertyProvince: jobProvinceFromContractEmbed(contract),
+    })
+  );
   if (pdfPath) {
     await supabase.from("contracts").update({ pdf_path: pdfPath }).eq("id", contractId);
     revalidatePath(`/jobs/${contract.job_id}`);
