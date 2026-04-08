@@ -23,6 +23,7 @@ import {
   formatDateTimeEastern,
   formatLocalDateStringEastern,
 } from "@/lib/datetime-eastern";
+import { InvoiceReminderButton } from "./invoices/invoice-reminder-button";
 import { MarkJobCompleteButton } from "./mark-job-complete-button";
 import { UpdateTimelinePhotos } from "./update-timeline-photos";
 
@@ -256,13 +257,29 @@ export default async function JobDetailPage({
                           ? "You have a draft saved — open Invoices to review details and send it when you’re ready."
                           : "No invoice has been sent yet. Create one from the agreed contract total."}
                 </p>
-                <Link
-                  href={completedInvoiceUi.invoicesHref}
-                  aria-label={`${completedInvoiceUi.actionLabel} for this job`}
-                  className="mt-3 inline-flex rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#2436BB]"
-                >
-                  {completedInvoiceUi.actionLabel}
-                </Link>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Link
+                    href={completedInvoiceUi.invoicesHref}
+                    aria-label={`${completedInvoiceUi.actionLabel} for this job`}
+                    className="inline-flex rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#2436BB]"
+                  >
+                    {completedInvoiceUi.actionLabel}
+                  </Link>
+                  {completedInvoiceUi.reminderInvoiceId &&
+                    (completedInvoiceUi.statusKind === "sent" ||
+                      completedInvoiceUi.statusKind === "overdue") && (
+                      <InvoiceReminderButton
+                        jobId={jobId}
+                        invoiceId={completedInvoiceUi.reminderInvoiceId}
+                        invoiceStatus={
+                          completedInvoiceUi.statusKind === "overdue"
+                            ? "overdue"
+                            : "sent"
+                        }
+                        className="inline-flex rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-950 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      />
+                    )}
+                </div>
               </div>
             </div>
           )}

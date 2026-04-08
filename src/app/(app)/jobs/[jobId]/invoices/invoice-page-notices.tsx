@@ -3,7 +3,14 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 
-export type InvoicePageNoticeKind = "sent" | "resent" | "draft" | "failed" | null;
+export type InvoicePageNoticeKind =
+  | "sent"
+  | "resent"
+  | "draft"
+  | "failed"
+  | "reminderSent"
+  | "reminderFailed"
+  | null;
 
 export function InvoicePageNotices({
   jobId,
@@ -68,6 +75,39 @@ export function InvoicePageNotices({
         <p className="mt-1 text-green-900">
           The invoice email was sent again. Invoice history below should show the updated status.
         </p>
+        {dismiss}
+      </div>
+    );
+  }
+
+  if (notice === "reminderSent") {
+    return (
+      <div
+        ref={ref}
+        tabIndex={-1}
+        role="status"
+        aria-live="polite"
+        className={`${base} border-green-200 bg-green-50 text-green-950 focus-visible:ring-green-500`}
+      >
+        <p className="font-semibold text-green-900">Reminder sent to customer.</p>
+        {dismiss}
+      </div>
+    );
+  }
+
+  if (notice === "reminderFailed") {
+    return (
+      <div
+        ref={ref}
+        tabIndex={-1}
+        role="alert"
+        aria-live="assertive"
+        className={`${base} border-red-200 bg-red-50 text-red-900 focus-visible:ring-red-500`}
+      >
+        <p className="font-semibold">Reminder could not be sent. Please try again.</p>
+        {message?.trim() && (
+          <p className="mt-1 text-sm text-red-800/95">{message}</p>
+        )}
         {dismiss}
       </div>
     );

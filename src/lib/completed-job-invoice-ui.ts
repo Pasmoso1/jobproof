@@ -23,9 +23,12 @@ export type CompletedJobInvoiceUi = {
   viewedDetailLine: string | null;
   actionLabel: string;
   invoicesHref: string;
+  /** Latest representative invoice for reminders (sent / overdue only). */
+  reminderInvoiceId: string | null;
 };
 
 type InvoiceRow = {
+  id: string;
   status: string;
   sent_at: string | null;
   due_date: string | null;
@@ -52,6 +55,7 @@ export function pickSentInvoiceDisplay(rows: InvoiceRow[]): SentInvoiceDisplay |
       return (b.sent_at ?? "").localeCompare(a.sent_at ?? "");
     })[0];
     return {
+      invoice_id: pick.id,
       status: "overdue",
       sent_at: pick.sent_at,
       due_date: pick.due_date,
@@ -65,6 +69,7 @@ export function pickSentInvoiceDisplay(rows: InvoiceRow[]): SentInvoiceDisplay |
       (a, b) => (b.sent_at ?? "").localeCompare(a.sent_at ?? "")
     )[0];
     return {
+      invoice_id: pick.id,
       status: "sent",
       sent_at: pick.sent_at,
       due_date: pick.due_date,
@@ -77,6 +82,7 @@ export function pickSentInvoiceDisplay(rows: InvoiceRow[]): SentInvoiceDisplay |
     (b.paid_at ?? b.sent_at ?? "").localeCompare(a.paid_at ?? a.sent_at ?? "")
   )[0];
   return {
+    invoice_id: pick.id,
     status: "paid",
     sent_at: pick.sent_at,
     due_date: pick.due_date,
@@ -132,6 +138,7 @@ export function getCompletedJobInvoiceUi(
         viewedDetailLine,
         actionLabel: "Resend invoice",
         invoicesHref,
+        reminderInvoiceId: display.invoice_id,
       };
     }
 
@@ -144,6 +151,7 @@ export function getCompletedJobInvoiceUi(
         viewedDetailLine,
         actionLabel: "Resend invoice",
         invoicesHref,
+        reminderInvoiceId: null,
       };
     }
 
@@ -155,6 +163,7 @@ export function getCompletedJobInvoiceUi(
       viewedDetailLine,
       actionLabel: "Resend invoice",
       invoicesHref,
+      reminderInvoiceId: display?.invoice_id ?? null,
     };
   }
   if (o.hasDraftInvoice) {
@@ -166,6 +175,7 @@ export function getCompletedJobInvoiceUi(
       viewedDetailLine: null,
       actionLabel: "Send invoice",
       invoicesHref,
+      reminderInvoiceId: null,
     };
   }
   return {
@@ -176,5 +186,6 @@ export function getCompletedJobInvoiceUi(
     viewedDetailLine: null,
     actionLabel: "Create invoice",
     invoicesHref,
+    reminderInvoiceId: null,
   };
 }

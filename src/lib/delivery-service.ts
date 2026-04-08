@@ -664,6 +664,227 @@ export async function sendInvoiceEmail(
   return result;
 }
 
+export type InvoiceReminderKind = "standard" | "overdue";
+/** Internal only — never referenced in email copy. */
+export type InvoiceReminderTone = "soft" | "firm";
+
+export interface SendInvoiceReminderOptions {
+  toEmail: string;
+  toName: string;
+  jobTitle: string;
+  businessDisplayName?: string | null;
+  replyToEmail?: string | null;
+  /** Required — same public invoice URL as initial send. */
+  publicInvoiceUrl: string;
+  reminderKind: InvoiceReminderKind;
+  /** Softer vs slightly firmer opening for standard reminders only (no “viewed” language). */
+  reminderTone: InvoiceReminderTone;
+  contractor: InvoiceEmailPartyBlock;
+  customer: InvoiceEmailCustomerBlock;
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string | null;
+  subtotal: number;
+  taxAmount: number;
+  taxRateLabel: string;
+  total: number;
+  depositReceived: number;
+  balanceDue: number;
+  paymentInstructions: string;
+  paymentContactLines: string[];
+  notes: string | null;
+  deliveryLog?: EmailDeliveryAuditLog;
+}
+
+function invoiceReminderOpeningParagraph(
+  jobTitle: string,
+  kind: InvoiceReminderKind,
+  tone: InvoiceReminderTone
+): string {
+  const t = jobTitle.trim() || "your job";
+  if (kind === "overdue") {
+    return `This is a reminder that your invoice for <strong>${escapeHtml(t)}</strong> is now overdue.`;
+  }
+  if (tone === "firm") {
+    return `We're following up on your invoice for <strong>${escapeHtml(t)}</strong>. Please review the details below when you have a moment.`;
+  }
+  return `Just a quick reminder about your invoice for <strong>${escapeHtml(t)}</strong>.`;
+}
+
+export function invoiceReminderEmailHtml(opts: SendInvoiceReminderOptions): string {
+  const c = opts.contractor;
+  const cu = opts.customer;
+  const contractorBody = [
+    c.businessName,
+    c.contactName ? `Contact: ${c.contactName}` : null,
+    c.phone ? `Phone: ${c.phone}` : null,
+    c.email ? `Email: ${c.email}` : null,
+    ...c.addressLines,
+  ]
+    .filter(Boolean)
+    .map((s) => String(s));
+
+  const customerBody = [
+    cu.name,
+    cu.email ? `Email: ${cu.email}` : null,
+    cu.phone ? `Phone: ${cu.phone}` : null,
+    ...(cu.serviceAddressLines.some((l) => l.trim())
+      ? ["Service address:", ...cu.serviceAddressLines.filter((l) => l.trim())]
+      : []),
+  ]
+    .filter(Boolean)
+    .map((s) => String(s));
+
+  const paymentContactBlock =
+    opts.paymentContactLines.filter((l) => l.trim()).length > 0
+      ? `<p style="margin:12px 0 4px;font-weight:600;">Payment contact</p>${linesToHtml(opts.paymentContactLines)}`
+      : "";
+
+  const notesBlock =
+    opts.notes && opts.notes.trim()
+      ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 6px;font-weight:600;">Notes</p>
+          <div style="font-size:14px;color:#374151;">${escapeHtml(opts.notes).replace(/\n/g, "<br/>")}</div>
+        </div>`
+      : "";
+
+  const href = opts.publicInvoiceUrl.trim();
+  const viewOnlineBlock =
+    href && /^https?:\/\//i.test(href)
+      ? `<div style="margin-top:20px;padding:16px 18px;background:#eef2ff;border-radius:10px;border:1px solid #c7d2fe;">
+          <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#2436BB;">View your invoice online</p>
+          <p style="margin:0 0 12px;font-size:14px;color:#1e293b;">Open your invoice in the browser to view details, download a PDF, or print — no sign-in required.</p>
+          <a href="${escapeHtml(href)}" style="display:inline-block;padding:10px 18px;background:#2436BB;color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">View invoice</a>
+        </div>`
+      : "";
+
+  return `
+    <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.55; max-width: 600px; color: #111827;">
+      <p style="font-size:16px;">Hi ${escapeHtml(opts.toName || "there")},</p>
+      <p style="font-size:15px;">
+        ${invoiceReminderOpeningParagraph(opts.jobTitle, opts.reminderKind, opts.reminderTone)}
+      </p>
+      ${viewOnlineBlock}
+
+      <div style="margin-top:22px;padding:14px 16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
+        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2436BB;text-transform:uppercase;letter-spacing:0.04em;">Contractor</p>
+        ${linesToHtml(contractorBody)}
+      </div>
+
+      <div style="margin-top:16px;padding:14px 16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
+        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2436BB;text-transform:uppercase;letter-spacing:0.04em;">Customer &amp; job address</p>
+        ${linesToHtml(customerBody)}
+      </div>
+
+      <div style="margin-top:20px;">
+        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2436BB;text-transform:uppercase;letter-spacing:0.04em;">Invoice summary</p>
+        <table style="border-collapse:collapse;width:100%;max-width:440px;font-size:14px;">
+          <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Invoice number</td><td style="padding:4px 0;text-align:right;font-weight:600;">${escapeHtml(opts.invoiceNumber)}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Issue date</td><td style="padding:4px 0;text-align:right;">${escapeHtml(opts.issueDate)}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Due date</td><td style="padding:4px 0;text-align:right;">${opts.dueDate ? escapeHtml(opts.dueDate) : "—"}</td></tr>
+        </table>
+        <table style="border-collapse:collapse;margin-top:14px;width:100%;max-width:440px;font-size:14px;">
+          <tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Subtotal</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.subtotal)}</td></tr>
+          <tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Tax (${escapeHtml(opts.taxRateLabel)})</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.taxAmount)}</td></tr>
+          <tr><td style="padding:6px 12px 6px 0;font-weight:600;">Total</td><td style="padding:6px 0;text-align:right;font-weight:600;">$${moneyHtml(opts.total)}</td></tr>
+          <tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Deposit received</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.depositReceived)}</td></tr>
+          <tr><td style="padding:8px 12px 6px 0;font-weight:700;color:#2436BB;">Balance due</td><td style="padding:8px 0;text-align:right;font-weight:700;color:#2436BB;">$${moneyHtml(opts.balanceDue)}</td></tr>
+        </table>
+      </div>
+
+      <div style="margin-top:22px;padding:14px 16px;background:#fffbeb;border-radius:10px;border:1px solid #fcd34d;">
+        <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.04em;">How to pay</p>
+        <div style="font-size:14px;color:#78350f;">${escapeHtml(opts.paymentInstructions).replace(/\n/g, "<br/>")}</div>
+        ${paymentContactBlock}
+      </div>
+
+      ${notesBlock}
+
+      <p style="margin-top:22px;font-size:13px;color:#6b7280;">Thank you for your business.</p>
+      <p style="font-size:12px;color:#9ca3af;">— JobProof</p>
+    </div>
+  `;
+}
+
+/**
+ * Sends a manual invoice reminder (does not change invoice status).
+ */
+export async function sendInvoiceReminderEmail(
+  options: SendInvoiceReminderOptions
+): Promise<DeliveryResult> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = buildResendFromHeader(
+    options.businessDisplayName ?? options.contractor.businessName ?? null
+  );
+  const title = options.jobTitle.trim() || "Job";
+  const subject =
+    options.reminderKind === "overdue"
+      ? `Invoice overdue — ${title}`
+      : `Reminder: Invoice for ${title}`;
+  const isProd = process.env.NODE_ENV === "production";
+  const html = invoiceReminderEmailHtml(options);
+
+  let result: DeliveryResult;
+
+  if (!apiKey) {
+    console.warn("[sendInvoiceReminderEmail] RESEND_API_KEY missing", {
+      to: options.toEmail,
+      production: isProd,
+    });
+    result = isProd
+      ? { success: false, error: "Email service not configured" }
+      : { success: true };
+    if (!isProd) {
+      console.warn(
+        "[sendInvoiceReminderEmail] Development: no API key — treating send as success."
+      );
+    }
+  } else {
+    try {
+      const resend = new Resend(apiKey);
+      const { data, error } = await resend.emails.send({
+        from,
+        to: options.toEmail.trim(),
+        subject,
+        html,
+        ...(options.replyToEmail?.trim()
+          ? { replyTo: options.replyToEmail.trim() }
+          : {}),
+      });
+
+      if (error) {
+        console.error("[DeliveryService] Resend error (invoice reminder):", error);
+        result = {
+          success: false,
+          error:
+            typeof error === "object" && error && "message" in error
+              ? String((error as { message: string }).message)
+              : "Failed to send email",
+        };
+      } else {
+        result = { success: true, resendMessageId: data?.id };
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to send email";
+      console.error("[DeliveryService] sendInvoiceReminderEmail:", e);
+      result = { success: false, error: msg };
+    }
+  }
+
+  if (options.deliveryLog) {
+    await insertEmailLog({
+      profileId: options.deliveryLog.profileId,
+      type: options.deliveryLog.type,
+      recipientEmail: options.toEmail,
+      status: result.success ? "success" : "failed",
+      errorMessage: result.success ? null : result.error ?? null,
+      relatedEntityId: options.deliveryLog.relatedEntityId,
+    });
+  }
+
+  return result;
+}
+
 export interface SendSignedChangeOrderOptions {
   toEmail: string;
   toName: string;

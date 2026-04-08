@@ -37,7 +37,11 @@ import {
   parseNewJobTotal,
   validateChangeOrderNewCompletionDate,
 } from "@/lib/validation/change-order";
-import { sendInvoiceEmail, sendSigningLinkEmail } from "@/lib/delivery-service";
+import {
+  sendInvoiceEmail,
+  sendInvoiceReminderEmail,
+  sendSigningLinkEmail,
+} from "@/lib/delivery-service";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
 import { generateUUID } from "@/lib/utils/uuid";
 import type { JobOutstandingFlags } from "@/lib/job-dashboard-status";
@@ -2857,12 +2861,13 @@ export async function getInvoiceDeliverySummaryForJobIds(
 
   const { data: rows } = await supabase
     .from("invoices")
-    .select("job_id, status, sent_at, due_date, paid_at, viewed_at")
+    .select("id, job_id, status, sent_at, due_date, paid_at, viewed_at")
     .in("job_id", [...allowed]);
 
   const invRowsByJob = new Map<
     string,
     {
+      id: string;
       status: string;
       sent_at: string | null;
       due_date: string | null;
@@ -2899,6 +2904,7 @@ export async function getInvoiceDeliverySummaryForJobIds(
       empty[jid].hasDraftInvoice = true;
     }
     invRowsByJob.get(jid)?.push({
+      id: r.id as string,
       status: r.status as string,
       sent_at: (r.sent_at as string | null) ?? null,
       due_date: (r.due_date as string | null) ?? null,
@@ -3612,4 +3618,236 @@ export async function resendInvoice(
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/invoices`);
   return { emailSent: true };
+}
+
+/**
+ * Manual invoice reminder — does not change invoice status. Email copy never references customer view tracking.
+ */
+export async function sendInvoiceReminder(
+  invoiceId: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: invRow, error: invErr } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("id", invoiceId)
+    .single();
+
+  if (invErr || !invRow) return { success: false, error: "Invoice not found" };
+
+  const status = String(invRow.status ?? "");
+  if (status !== "sent" && status !== "overdue") {
+    return {
+      success: false,
+      error: "Reminders can only be sent for invoices that are sent or overdue.",
+    };
+  }
+
+  const jobId = String(invRow.job_id);
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, default_contract_payment_terms, e_transfer_email, business_contact_email"
+    )
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile || invRow.profile_id !== profile.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  if (
+    !isBusinessProfileCompleteForApp({
+      business_name: profile.business_name,
+      account_email: user.email ?? "",
+      phone: profile.phone,
+      address_line_1: profile.address_line_1,
+      city: profile.city,
+      province: profile.province,
+      postal_code: profile.postal_code,
+    })
+  ) {
+    return {
+      success: false,
+      error:
+        "Please complete your business profile before proceeding. Go to Settings → Business.",
+    };
+  }
+
+  const { data: job } = await supabase
+    .from("jobs")
+    .select(
+      `
+      id,
+      profile_id,
+      title,
+      property_province,
+      property_address_line_1,
+      property_address_line_2,
+      property_city,
+      property_postal_code,
+      customers (
+        id,
+        email,
+        full_name,
+        phone
+      )
+    `
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (!job || job.profile_id !== profile.id) {
+    return { success: false, error: "Job not found" };
+  }
+
+  const customerRow = Array.isArray((job as { customers?: unknown }).customers)
+    ? (
+        job as {
+          customers: {
+            email?: string | null;
+            full_name?: string | null;
+            phone?: string | null;
+          }[];
+        }
+      ).customers[0]
+    : (
+        job as {
+          customers?: {
+            email?: string | null;
+            full_name?: string | null;
+            phone?: string | null;
+          };
+        }
+      ).customers;
+
+  const customerEmail = customerRow?.email?.trim() ?? "";
+  const customerName = customerRow?.full_name?.trim() ?? "there";
+
+  if (!customerEmail) {
+    return {
+      success: false,
+      error:
+        "Customer has no email on file. Add their email on the job before sending a reminder.",
+    };
+  }
+
+  const province =
+    (job as { property_province?: string | null }).property_province ?? null;
+  const taxRateLabel = invoiceTaxShortLabel(province);
+
+  const subtotal = Number(invRow.subtotal);
+  const taxAmount = Number(invRow.tax_amount);
+  const total = Number(invRow.total);
+  const depositCredited = Number(invRow.deposit_credited ?? 0);
+  const balanceDue = Number(invRow.balance_due ?? Math.max(0, total - depositCredited));
+
+  const invoiceNumberDisplay =
+    (invRow.invoice_number as string | null)?.trim() ||
+    `Invoice ${String(invRow.id).slice(0, 8)}`;
+
+  const dueRaw = (invRow.due_date as string | null)?.trim() || null;
+  const dueDateFormatted = dueRaw
+    ? formatLocalDateStringEastern(dueRaw)
+    : "Not specified";
+
+  const issueDateFormatted = formatDateEastern(String(invRow.created_at));
+
+  const notesTrimmed =
+    typeof invRow.notes === "string" ? invRow.notes.trim() || null : null;
+
+  const contractorAddressLines = formatProfileAddressLines(profile);
+  const serviceAddressLines = formatJobServiceAddressLines(
+    job as Parameters<typeof formatJobServiceAddressLines>[0]
+  );
+  const bizName = profile.business_name?.trim() || "Your contractor";
+  const contractorContactEmail = resolveContractorContactEmail(profile, user.email);
+  const { paymentInstructions, paymentContactLines } = buildInvoicePaymentBlocks(
+    profile,
+    bizName,
+    contractorContactEmail
+  );
+
+  const publicToken = (invRow as { public_token?: string }).public_token?.trim();
+  const publicInvoiceUrl = publicToken
+    ? `${resolvePublicAppOrigin()}/invoice/${publicToken}`
+    : null;
+
+  if (!publicInvoiceUrl) {
+    return {
+      success: false,
+      error:
+        "This invoice does not have a public link yet. Contact support or resend the invoice once.",
+    };
+  }
+
+  const viewedAtRaw = (invRow as { viewed_at?: string | null }).viewed_at;
+  const hasViewedSignal =
+    typeof viewedAtRaw === "string" && viewedAtRaw.trim().length > 0;
+
+  const reminderKind = status === "overdue" ? ("overdue" as const) : ("standard" as const);
+  const reminderTone: "soft" | "firm" =
+    reminderKind === "standard" && hasViewedSignal ? "firm" : "soft";
+
+  const sendResult = await sendInvoiceReminderEmail({
+    toEmail: customerEmail,
+    toName: customerName,
+    jobTitle: String((job as { title?: string }).title ?? "Job"),
+    businessDisplayName: profile.business_name,
+    replyToEmail: contractorContactEmail ?? user.email ?? null,
+    publicInvoiceUrl,
+    reminderKind,
+    reminderTone,
+    contractor: {
+      businessName: bizName,
+      contactName: profile.contractor_name?.trim() || null,
+      phone: profile.phone?.trim() || null,
+      email: contractorContactEmail,
+      addressLines: contractorAddressLines,
+    },
+    customer: {
+      name: customerName,
+      email: customerRow?.email?.trim() || null,
+      phone: customerRow?.phone?.trim() || null,
+      serviceAddressLines,
+    },
+    invoiceNumber: invoiceNumberDisplay,
+    issueDate: issueDateFormatted,
+    dueDate: dueDateFormatted,
+    subtotal,
+    taxAmount,
+    taxRateLabel,
+    total,
+    depositReceived: depositCredited,
+    balanceDue,
+    paymentInstructions,
+    paymentContactLines,
+    notes: notesTrimmed,
+    deliveryLog: {
+      profileId: profile.id,
+      /** Same `invoice` row as initial send; distinguish reminders by send path in app logs if needed. */
+      type: "invoice",
+      relatedEntityId: String(invRow.id),
+    },
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/invoices`);
+
+  if (!sendResult.success) {
+    return {
+      success: false,
+      error:
+        sendResult.error ??
+        "Reminder could not be sent. Please try again.",
+    };
+  }
+
+  return { success: true };
 }

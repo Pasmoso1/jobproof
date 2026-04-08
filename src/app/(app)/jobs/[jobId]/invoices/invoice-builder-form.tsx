@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createInvoice, resendInvoice } from "@/app/(app)/actions";
+import { InvoiceReminderButton } from "./invoice-reminder-button";
 import {
   invoiceTaxShortLabel,
   taxRateFromPropertyProvince,
@@ -183,14 +184,24 @@ function ResendInvoicePanel({
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={handleResend}
-        disabled={loading || !contractSigned}
-        className="mt-6 rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {loading ? "Sending…" : "Resend invoice"}
-      </button>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={loading || !contractSigned}
+          className="rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? "Sending…" : "Resend invoice"}
+        </button>
+        {(invoice.status === "sent" || invoice.status === "overdue") && (
+          <InvoiceReminderButton
+            jobId={jobId}
+            invoiceId={invoice.id}
+            invoiceStatus={invoice.status === "overdue" ? "overdue" : "sent"}
+            disabled={!contractSigned}
+          />
+        )}
+      </div>
     </div>
   );
 }

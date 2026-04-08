@@ -48,7 +48,9 @@ export default async function InvoicesPage({
     rawNotice === "sent" ||
     rawNotice === "resent" ||
     rawNotice === "draft" ||
-    rawNotice === "failed"
+    rawNotice === "failed" ||
+    rawNotice === "reminderSent" ||
+    rawNotice === "reminderFailed"
       ? rawNotice
       : null;
   const rawMsg = firstSearchParam(sp.invMsg)?.trim();

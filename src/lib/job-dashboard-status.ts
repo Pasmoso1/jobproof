@@ -1,5 +1,7 @@
 /** Representative sent/paid/overdue row for billing summary UI (per job). */
 export type SentInvoiceDisplay = {
+  /** Representative row for this job’s billing summary (sent / paid / overdue). */
+  invoice_id: string;
   status: "sent" | "paid" | "overdue";
   sent_at: string | null;
   due_date: string | null;
