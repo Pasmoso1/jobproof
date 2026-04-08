@@ -21,6 +21,8 @@ import {
   invoiceCustomerViewSecondaryLine,
   invoiceStatusesWhereCustomerViewApplies,
 } from "@/lib/invoice-viewed-display";
+import { contractorInvoicePaymentStatusLabel } from "@/lib/invoice-payment-display";
+import { grossBalanceAfterDeposit, roundInvoiceMoney } from "@/lib/invoice-payment-recalc";
 
 export default async function ProofReportPage({
   params,
@@ -388,6 +390,7 @@ export default async function ProofReportPage({
                     id: string;
                     invoice_number: string | null;
                     total: number;
+                    deposit_credited?: number | null;
                     balance_due?: number | null;
                     amount_paid_total?: number | null;
                     status: string;
@@ -397,11 +400,14 @@ export default async function ProofReportPage({
                     paid_at?: string | null;
                     last_payment_at?: string | null;
                   }) => {
+                    const deposit = Number(inv.deposit_credited ?? 0);
+                    const total = Number(inv.total);
+                    const grossAfterDeposit = grossBalanceAfterDeposit(total, deposit);
+                    const paidTotal = roundInvoiceMoney(Number(inv.amount_paid_total ?? 0));
                     const balance =
                       inv.balance_due != null && inv.balance_due !== undefined
-                        ? Number(inv.balance_due)
-                        : Number(inv.total);
-                    const paidTotal = Number(inv.amount_paid_total ?? 0);
+                        ? roundInvoiceMoney(Number(inv.balance_due))
+                        : roundInvoiceMoney(grossAfterDeposit - paidTotal);
                     const customerViewLine = invoiceCustomerViewSecondaryLine({
                       viewedAt: inv.viewed_at,
                       showNotYetViewed: invoiceStatusesWhereCustomerViewApplies(inv.status),
@@ -411,61 +417,108 @@ export default async function ProofReportPage({
                     return (
                       <li
                         key={inv.id}
-                        className="border-b border-zinc-100 pb-3 last:border-0 last:pb-0"
+                        className="border-b border-zinc-100 pb-4 last:border-0 last:pb-0"
                       >
                         <div className="flex flex-col gap-1 text-sm sm:flex-row sm:justify-between">
                           <div className="min-w-0">
-                            <span className="text-zinc-900">
+                            <span className="font-medium text-zinc-900">
                               {inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`}
-                              {inv.sent_at && (
-                                <span className="ml-2 text-zinc-500">
-                                  · Issued {formatDateTimeEastern(inv.sent_at)}
-                                </span>
-                              )}
                             </span>
+                            {inv.sent_at && (
+                              <p className="mt-0.5 text-xs text-zinc-500">
+                                Issued {formatDateTimeEastern(inv.sent_at)}
+                              </p>
+                            )}
                             {customerViewLine && (
                               <p className="mt-0.5 text-xs text-zinc-500">{customerViewLine}</p>
                             )}
                           </div>
-                          <div className="shrink-0 text-right text-sm">
-                            <p className="font-medium text-zinc-900">
-                              Balance $
+                          <div className="shrink-0 text-sm sm:text-right">
+                            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                              Status
+                            </p>
+                            <p className="font-semibold text-zinc-900">
+                              {contractorInvoicePaymentStatusLabel(inv.status)}
+                            </p>
+                          </div>
+                        </div>
+                        <dl className="mt-3 grid gap-2 rounded-lg border border-zinc-100 bg-zinc-50/60 px-3 py-2 text-xs sm:grid-cols-2">
+                          {deposit > 0.0001 && (
+                            <div>
+                              <dt className="text-zinc-500">Deposit credited</dt>
+                              <dd className="font-medium tabular-nums text-zinc-900">
+                                $
+                                {deposit.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </dd>
+                            </div>
+                          )}
+                          <div>
+                            <dt className="text-zinc-500">Amount due after deposit</dt>
+                            <dd className="font-medium tabular-nums text-zinc-900">
+                              $
+                              {grossAfterDeposit.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-zinc-500">Payments received</dt>
+                            <dd className="font-medium tabular-nums text-zinc-900">
+                              $
+                              {paidTotal.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-zinc-500">Remaining balance</dt>
+                            <dd className="font-semibold tabular-nums text-[#2436BB]">
+                              $
                               {balance.toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })}
-                            </p>
-                            <p className="text-zinc-500">Status: {inv.status.replace(/_/g, " ")}</p>
+                            </dd>
                           </div>
-                        </div>
-                        {paidTotal > 0.0001 && (
-                          <p className="mt-2 text-xs text-zinc-600">
-                            Paid to date $
-                            {paidTotal.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </p>
-                        )}
+                        </dl>
                         {inv.paid_at?.trim() && inv.status === "paid" && (
-                          <p className="mt-1 text-xs text-zinc-600">
-                            Marked paid in full {formatDateTimeEastern(inv.paid_at)}
+                          <p className="mt-2 text-xs font-medium text-emerald-800">
+                            Paid in full · {formatDateEastern(inv.paid_at, { dateStyle: "medium" })}
                           </p>
                         )}
                         {pays.length > 0 && (
-                          <ul className="mt-2 space-y-1 border-t border-zinc-100 pt-2 text-xs text-zinc-600">
-                            {pays.map((p, idx) => (
-                              <li key={`${inv.id}-pay-${idx}`}>
-                                {formatLocalDateStringEastern(p.paid_on, { dateStyle: "medium" })} · $
-                                {Number(p.amount).toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}{" "}
-                                · {formatInvoicePaymentMethod(p.payment_method)}
-                                {p.note?.trim() ? ` · ${p.note.trim()}` : ""}
-                              </li>
-                            ))}
-                          </ul>
+                          <div className="mt-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                              Payment log
+                            </p>
+                            <ul className="mt-1.5 space-y-1.5 text-xs text-zinc-700">
+                              {pays.map((p) => (
+                                <li
+                                  key={p.id}
+                                  className="rounded-md border border-zinc-100 bg-white px-2 py-1.5"
+                                >
+                                  <span className="font-medium tabular-nums text-zinc-900">
+                                    $
+                                    {Number(p.amount).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
+                                  </span>
+                                  <span className="text-zinc-600">
+                                    {" "}
+                                    · {formatLocalDateStringEastern(p.paid_on, { dateStyle: "medium" })}{" "}
+                                    · {formatInvoicePaymentMethod(p.payment_method)}
+                                    {p.note?.trim() ? ` · ${p.note.trim()}` : ""}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
                         )}
                       </li>
                     );

@@ -205,6 +205,9 @@ export default async function PublicInvoicePage({
                 <dd className="tabular-nums">${money(data.balanceDue)}</dd>
               </div>
             </dl>
+            <p className="mt-3 rounded-md bg-zinc-50 px-3 py-2 text-xs leading-relaxed text-zinc-600">
+              Already paid? Please contact the contractor if your payment is not yet reflected here.
+            </p>
           </section>
 
           {data.notes ? (

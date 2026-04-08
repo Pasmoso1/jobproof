@@ -6,6 +6,7 @@ import {
   getProfile,
   getContractForJob,
   getInvoiceReminderSendPreviewForInvoice,
+  getInvoicePaymentDetailsForInvoice,
 } from "@/app/(app)/actions";
 import { formatDateEastern, formatDateTimeEastern } from "@/lib/datetime-eastern";
 import {
@@ -103,6 +104,7 @@ export default async function InvoicesPage({
                 : null,
             paid_at: (inv as { paid_at?: string | null }).paid_at ?? null,
             last_payment_at: (inv as { last_payment_at?: string | null }).last_payment_at ?? null,
+            sent_at: (inv as { sent_at?: string | null }).sent_at ?? null,
             viewed_at: (inv as { viewed_at?: string | null }).viewed_at ?? null,
             due_date: inv.due_date,
             status: inv.status,
@@ -112,6 +114,10 @@ export default async function InvoicesPage({
 
   const reminderPreview = latestInvoice
     ? await getInvoiceReminderSendPreviewForInvoice(latestInvoice.id)
+    : null;
+
+  const invoicePaymentDetails = latestInvoice
+    ? await getInvoicePaymentDetailsForInvoice(latestInvoice.id)
     : null;
 
   const invoiceReminderHints =
@@ -180,6 +186,7 @@ export default async function InvoicesPage({
         contractSigned={contractSigned}
         latestInvoice={latestInvoice}
         invoiceReminderHints={invoiceReminderHints}
+        invoicePaymentDetails={invoicePaymentDetails ?? []}
       />
 
       <div className="mt-8 rounded-xl border border-zinc-200 bg-white">

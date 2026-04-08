@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { createInvoice, resendInvoice } from "@/app/(app)/actions";
 import { InvoiceReminderButton } from "./invoice-reminder-button";
 import { RecordPaymentModal } from "./record-payment-modal";
+import { InvoicePaymentsPanel } from "./invoice-payments-panel";
+import type { InvoicePaymentDetailRow } from "@/app/(app)/actions";
 import {
   invoiceTaxShortLabel,
   taxRateFromPropertyProvince,
@@ -36,6 +38,7 @@ export type LatestInvoiceSummary = {
   amount_paid_total?: number | null;
   paid_at?: string | null;
   last_payment_at?: string | null;
+  sent_at?: string | null;
   due_date: string | null;
   status: string;
   viewed_at?: string | null;
@@ -58,12 +61,14 @@ export function InvoiceBuilderForm({
   contractSigned,
   latestInvoice,
   invoiceReminderHints,
+  invoicePaymentDetails,
 }: {
   jobId: string;
   job: Job;
   contractSigned: boolean;
   latestInvoice: LatestInvoiceSummary | null;
   invoiceReminderHints?: InvoiceReminderHints | null;
+  invoicePaymentDetails?: InvoicePaymentDetailRow[] | null;
 }) {
   if (latestInvoice) {
     return (
@@ -72,6 +77,7 @@ export function InvoiceBuilderForm({
         contractSigned={contractSigned}
         invoice={latestInvoice}
         invoiceReminderHints={invoiceReminderHints ?? null}
+        invoicePaymentDetails={invoicePaymentDetails ?? []}
       />
     );
   }
@@ -86,11 +92,13 @@ function ResendInvoicePanel({
   contractSigned,
   invoice,
   invoiceReminderHints,
+  invoicePaymentDetails,
 }: {
   jobId: string;
   contractSigned: boolean;
   invoice: LatestInvoiceSummary;
   invoiceReminderHints: InvoiceReminderHints | null;
+  invoicePaymentDetails: InvoicePaymentDetailRow[];
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -312,6 +320,12 @@ function ResendInvoicePanel({
         remainingBalance={balance}
         open={payOpen}
         onClose={() => setPayOpen(false)}
+      />
+
+      <InvoicePaymentsPanel
+        jobId={jobId}
+        invoice={invoice}
+        paymentRows={invoicePaymentDetails}
       />
     </div>
   );

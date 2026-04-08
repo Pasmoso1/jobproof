@@ -49,6 +49,13 @@ import { pickSentInvoiceDisplay } from "@/lib/completed-job-invoice-ui";
 import { isInvoicePaymentMethod } from "@/lib/invoice-payment-method";
 import { buildInvoicePaymentBlocks } from "@/lib/invoice-payment-copy";
 import { resolveContractorContactEmail } from "@/lib/contractor-contact-email";
+import {
+  computePaymentDerivedState,
+  grossBalanceAfterDeposit,
+  INVOICE_PAYMENT_EPS,
+  resolvePaidAtAfterRecalc,
+  roundInvoiceMoney,
+} from "@/lib/invoice-payment-recalc";
 import { randomUUID } from "node:crypto";
 
 export async function getProfile() {
@@ -3726,8 +3733,77 @@ export async function resendInvoice(
   return { emailSent: true };
 }
 
-function roundInvoiceMoney(n: number): number {
-  return Math.round(n * 100) / 100;
+async function syncInvoicePaymentTotalsFromDb(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  invoiceId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: invRow, error: invErr } = await supabase
+    .from("invoices")
+    .select(
+      "id, job_id, status, total, deposit_credited, due_date, sent_at, paid_at"
+    )
+    .eq("id", invoiceId)
+    .single();
+
+  if (invErr || !invRow) return { ok: false, error: "Invoice not found" };
+
+  const status = String(invRow.status ?? "");
+  if (status === "draft") {
+    return { ok: false, error: "This invoice is not payable." };
+  }
+
+  const { data: payRows, error: payErr } = await supabase
+    .from("invoice_payments")
+    .select("amount, created_at")
+    .eq("invoice_id", invoiceId);
+
+  if (payErr) {
+    console.error("[syncInvoicePaymentTotalsFromDb] payments query:", payErr);
+    return { ok: false, error: "Could not load payments." };
+  }
+
+  const paymentSum = roundInvoiceMoney(
+    (payRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+  );
+
+  let lastPaymentAt: string | null = null;
+  for (const r of payRows ?? []) {
+    const c = r.created_at as string | undefined;
+    if (!c?.trim()) continue;
+    if (!lastPaymentAt || c > lastPaymentAt) lastPaymentAt = c;
+  }
+
+  const derived = computePaymentDerivedState({
+    total: Number(invRow.total),
+    depositCredited: Number(invRow.deposit_credited ?? 0),
+    paymentSum,
+    dueDateYmd: invRow.due_date,
+    sentAt: invRow.sent_at,
+  });
+
+  const newPaidAt = resolvePaidAtAfterRecalc({
+    previousStatus: status,
+    newStatus: derived.status,
+    previousPaidAt: invRow.paid_at,
+  });
+
+  const { error: updErr } = await supabase
+    .from("invoices")
+    .update({
+      amount_paid_total: derived.amount_paid_total,
+      balance_due: derived.balance_due,
+      status: derived.status,
+      last_payment_at: lastPaymentAt,
+      paid_at: newPaidAt,
+    })
+    .eq("id", invoiceId);
+
+  if (updErr) {
+    console.error("[syncInvoicePaymentTotalsFromDb] update failed:", updErr);
+    return { ok: false, error: updErr.message };
+  }
+
+  return { ok: true };
 }
 
 /**
@@ -3762,9 +3838,7 @@ export async function recordInvoicePayment(
 
   const { data: invRow, error: invErr } = await supabase
     .from("invoices")
-    .select(
-      "id, job_id, profile_id, status, total, deposit_credited, balance_due, amount_paid_total"
-    )
+    .select("id, job_id, profile_id, status, total, deposit_credited")
     .eq("id", invoiceId)
     .single();
 
@@ -3790,29 +3864,29 @@ export async function recordInvoicePayment(
 
   const total = Number(invRow.total);
   const depositCredited = Number(invRow.deposit_credited ?? 0);
-  const fallbackBalance = roundInvoiceMoney(
-    Math.max(0, total - depositCredited)
-  );
-  const balanceRow =
-    invRow.balance_due != null && invRow.balance_due !== undefined
-      ? roundInvoiceMoney(Number(invRow.balance_due))
-      : fallbackBalance;
+  const gross = grossBalanceAfterDeposit(total, depositCredited);
 
-  if (balanceRow <= 0) {
+  const { data: existingPayRows } = await supabase
+    .from("invoice_payments")
+    .select("amount")
+    .eq("invoice_id", invoiceId);
+
+  const currentPaidSum = roundInvoiceMoney(
+    (existingPayRows ?? []).reduce((s, r) => s + Number(r.amount), 0)
+  );
+  const remaining = roundInvoiceMoney(gross - currentPaidSum);
+
+  if (remaining <= INVOICE_PAYMENT_EPS) {
     return { success: false, error: "This invoice has no remaining balance." };
   }
 
-  if (amountNum > balanceRow + 0.0001) {
+  if (amountNum > remaining + INVOICE_PAYMENT_EPS) {
     return {
       success: false,
-      error: `Amount cannot exceed the remaining balance ($${balanceRow.toFixed(2)}).`,
+      error: `Amount cannot exceed the remaining balance ($${remaining.toFixed(2)}).`,
     };
   }
 
-  const prevPaid = roundInvoiceMoney(Number(invRow.amount_paid_total ?? 0));
-  const newPaidTotal = roundInvoiceMoney(prevPaid + amountNum);
-  const newBalance = roundInvoiceMoney(balanceRow - amountNum);
-  const nowIso = new Date().toISOString();
   const noteTrimmed = note?.trim() || null;
 
   const { data: insertedPay, error: payErr } = await supabase
@@ -3833,24 +3907,215 @@ export async function recordInvoicePayment(
     return { success: false, error: payErr?.message || "Could not save payment." };
   }
 
-  const isFullyPaid = newBalance <= 0.0001;
-  const nextStatus = isFullyPaid ? "paid" : "partially_paid";
-
-  const { error: updErr } = await supabase
-    .from("invoices")
-    .update({
-      amount_paid_total: newPaidTotal,
-      balance_due: isFullyPaid ? 0 : newBalance,
-      status: nextStatus,
-      last_payment_at: nowIso,
-      paid_at: isFullyPaid ? nowIso : null,
-    })
-    .eq("id", invoiceId);
-
-  if (updErr) {
-    console.error("[recordInvoicePayment] invoice update failed:", updErr);
+  const sync = await syncInvoicePaymentTotalsFromDb(supabase, invoiceId);
+  if (!sync.ok) {
+    console.error("[recordInvoicePayment] sync failed:", sync.error);
     await supabase.from("invoice_payments").delete().eq("id", insertedPay.id);
-    return { success: false, error: "Payment saved but invoice update failed. Try again." };
+    return {
+      success: false,
+      error: "Payment saved but invoice totals could not be updated. Try again.",
+    };
+  }
+
+  const jobId = String(invRow.job_id);
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/invoices`);
+  revalidatePath(`/jobs/${jobId}/proof`);
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export async function deleteLastInvoicePayment(
+  invoiceId: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: invRow, error: invErr } = await supabase
+    .from("invoices")
+    .select("id, job_id, profile_id, status")
+    .eq("id", invoiceId)
+    .single();
+
+  if (invErr || !invRow) return { success: false, error: "Invoice not found" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile || invRow.profile_id !== profile.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const status = String(invRow.status ?? "");
+  if (
+    status !== "sent" &&
+    status !== "overdue" &&
+    status !== "partially_paid" &&
+    status !== "paid"
+  ) {
+    return { success: false, error: "Payments cannot be removed for this invoice." };
+  }
+
+  const { data: last, error: lastErr } = await supabase
+    .from("invoice_payments")
+    .select("id")
+    .eq("invoice_id", invoiceId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (lastErr || !last?.id) {
+    return { success: false, error: "No payments to remove." };
+  }
+
+  const { error: delErr } = await supabase
+    .from("invoice_payments")
+    .delete()
+    .eq("id", last.id);
+
+  if (delErr) {
+    console.error("[deleteLastInvoicePayment] delete failed:", delErr);
+    return { success: false, error: delErr.message || "Could not remove payment." };
+  }
+
+  const sync = await syncInvoicePaymentTotalsFromDb(supabase, invoiceId);
+  if (!sync.ok) {
+    console.error("[deleteLastInvoicePayment] sync failed after delete:", sync.error);
+    return {
+      success: false,
+      error:
+        "Payment was removed but invoice totals may be out of date. Contact support if this persists.",
+    };
+  }
+
+  const jobId = String(invRow.job_id);
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/invoices`);
+  revalidatePath(`/jobs/${jobId}/proof`);
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export async function updateLastInvoicePayment(
+  invoiceId: string,
+  amount: number,
+  paidOn: string,
+  paymentMethod: string,
+  note?: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  if (!isInvoicePaymentMethod(paymentMethod)) {
+    return { success: false, error: "Invalid payment method." };
+  }
+
+  const paidOnTrim = paidOn?.trim() ?? "";
+  if (!paidOnTrim || !/^\d{4}-\d{2}-\d{2}$/.test(paidOnTrim)) {
+    return { success: false, error: "Payment date must be YYYY-MM-DD." };
+  }
+
+  const amountNum = roundInvoiceMoney(Number(amount));
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    return { success: false, error: "Enter a valid amount greater than zero." };
+  }
+
+  const { data: invRow, error: invErr } = await supabase
+    .from("invoices")
+    .select("id, job_id, profile_id, status, total, deposit_credited")
+    .eq("id", invoiceId)
+    .single();
+
+  if (invErr || !invRow) return { success: false, error: "Invoice not found" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile || invRow.profile_id !== profile.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const status = String(invRow.status ?? "");
+  if (
+    status !== "sent" &&
+    status !== "overdue" &&
+    status !== "partially_paid" &&
+    status !== "paid"
+  ) {
+    return { success: false, error: "This payment cannot be edited." };
+  }
+
+  const { data: last, error: lastErr } = await supabase
+    .from("invoice_payments")
+    .select("id")
+    .eq("invoice_id", invoiceId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (lastErr || !last?.id) {
+    return { success: false, error: "No payment to edit." };
+  }
+
+  const { data: allRows } = await supabase
+    .from("invoice_payments")
+    .select("id, amount")
+    .eq("invoice_id", invoiceId);
+
+  const otherSum = roundInvoiceMoney(
+    (allRows ?? [])
+      .filter((r) => r.id !== last.id)
+      .reduce((s, r) => s + Number(r.amount), 0)
+  );
+  const newTotalPayments = roundInvoiceMoney(otherSum + amountNum);
+  const gross = grossBalanceAfterDeposit(
+    Number(invRow.total),
+    Number(invRow.deposit_credited ?? 0)
+  );
+
+  if (newTotalPayments > gross + INVOICE_PAYMENT_EPS) {
+    return {
+      success: false,
+      error: `Total recorded payments cannot exceed the balance after deposit ($${gross.toFixed(2)}).`,
+    };
+  }
+
+  const noteTrimmed = note?.trim() || null;
+
+  const { error: upErr } = await supabase
+    .from("invoice_payments")
+    .update({
+      amount: amountNum,
+      paid_on: paidOnTrim,
+      payment_method: paymentMethod,
+      note: noteTrimmed,
+    })
+    .eq("id", last.id);
+
+  if (upErr) {
+    console.error("[updateLastInvoicePayment] update failed:", upErr);
+    return { success: false, error: upErr.message || "Could not update payment." };
+  }
+
+  const sync = await syncInvoicePaymentTotalsFromDb(supabase, invoiceId);
+  if (!sync.ok) {
+    console.error("[updateLastInvoicePayment] sync failed:", sync.error);
+    return {
+      success: false,
+      error: "Payment was updated but invoice totals could not be refreshed. Try again.",
+    };
   }
 
   const jobId = String(invRow.job_id);
@@ -3862,12 +4127,50 @@ export async function recordInvoicePayment(
 }
 
 export type InvoicePaymentListRow = {
+  id: string;
   invoice_id: string;
   amount: number;
   paid_on: string;
   payment_method: string;
   note: string | null;
+  created_at: string;
 };
+
+export type InvoicePaymentDetailRow = InvoicePaymentListRow;
+
+/** Sorted payment rows for the contractor invoice page (newest last). */
+export async function getInvoicePaymentDetailsForInvoice(
+  invoiceId: string
+): Promise<InvoicePaymentDetailRow[] | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+  if (!profile) return null;
+
+  const { data: inv } = await supabase
+    .from("invoices")
+    .select("id, profile_id")
+    .eq("id", invoiceId)
+    .single();
+
+  if (!inv || inv.profile_id !== profile.id) return null;
+
+  const { data: rows } = await supabase
+    .from("invoice_payments")
+    .select("id, invoice_id, amount, paid_on, payment_method, note, created_at")
+    .eq("invoice_id", invoiceId)
+    .order("created_at", { ascending: true });
+
+  return (rows ?? []) as InvoicePaymentDetailRow[];
+}
 
 /** Contractor-facing payment history rows for proof / detail UIs. */
 export async function getInvoicePaymentsByInvoiceIds(
@@ -3898,7 +4201,7 @@ export async function getInvoicePaymentsByInvoiceIds(
 
   const { data: rows } = await supabase
     .from("invoice_payments")
-    .select("invoice_id, amount, paid_on, payment_method, note")
+    .select("id, invoice_id, amount, paid_on, payment_method, note, created_at")
     .in("invoice_id", [...allowed])
     .order("paid_on", { ascending: true })
     .order("created_at", { ascending: true });
