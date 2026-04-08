@@ -24,5 +24,10 @@ export function invoiceCustomerViewSecondaryLine(opts: {
 }
 
 export function invoiceStatusesWhereCustomerViewApplies(status: string): boolean {
-  return status === "sent" || status === "paid" || status === "overdue";
+  return (
+    status === "sent" ||
+    status === "paid" ||
+    status === "overdue" ||
+    status === "partially_paid"
+  );
 }

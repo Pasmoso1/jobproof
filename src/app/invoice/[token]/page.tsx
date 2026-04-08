@@ -194,8 +194,14 @@ export default async function PublicInvoicePage({
                 <dt>Deposit received</dt>
                 <dd className="tabular-nums">${money(data.depositCredited)}</dd>
               </div>
+              {data.amountPaidTotal > 0.0001 && (
+                <div className="flex justify-between text-zinc-600">
+                  <dt>Payments received</dt>
+                  <dd className="tabular-nums">${money(data.amountPaidTotal)}</dd>
+                </div>
+              )}
               <div className="flex justify-between border-t border-zinc-200 pt-2 text-base font-bold text-[#2436BB]">
-                <dt>Balance due</dt>
+                <dt>Remaining balance</dt>
                 <dd className="tabular-nums">${money(data.balanceDue)}</dd>
               </div>
             </dl>

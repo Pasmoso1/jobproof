@@ -11,7 +11,13 @@ export type SubscriptionStatus = "trial" | "active" | "cancelled" | "past_due";
 export type JobStatus = "active" | "completed" | "cancelled";
 export type UpdateCategory = "before" | "progress" | "materials" | "issue" | "completion" | "other";
 export type JobContractStatus = "none" | "draft" | "pending" | "signed" | "void";
-export type InvoiceStatus = "none" | "draft" | "sent" | "paid" | "overdue";
+export type InvoiceStatus =
+  | "none"
+  | "draft"
+  | "sent"
+  | "paid"
+  | "overdue"
+  | "partially_paid";
 
 export interface Profile {
   id: string;
@@ -259,12 +265,23 @@ export interface InvoiceLineItemRow {
   created_at: string;
 }
 
-export type InvoiceStatusType = "draft" | "sent" | "paid" | "overdue";
+export type InvoiceStatusType = "draft" | "sent" | "paid" | "overdue" | "partially_paid";
 
 export interface InvoiceLineItem {
   description: string;
   amount: number;
   quantity?: number;
+}
+
+export interface InvoicePaymentRow {
+  id: string;
+  invoice_id: string;
+  profile_id: string;
+  amount: number;
+  paid_on: string;
+  payment_method: "e_transfer" | "cash" | "cheque" | "card" | "other";
+  note: string | null;
+  created_at: string;
 }
 
 export interface Invoice {
@@ -283,6 +300,9 @@ export interface Invoice {
   agreed_work_subtotal?: number | null;
   deposit_credited?: number;
   balance_due?: number;
+  /** Sum of contractor-recorded payments (excludes deposit). */
+  amount_paid_total?: number;
+  last_payment_at?: string | null;
   /** Path in `invoice-pdfs` bucket: `{profile_id}/{invoice_id}.pdf` */
   invoice_pdf_path?: string | null;
   due_date: string | null;

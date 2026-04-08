@@ -10,6 +10,7 @@ export type InvoicePageNoticeKind =
   | "failed"
   | "reminderSent"
   | "reminderFailed"
+  | "paymentRecorded"
   | null;
 
 export function InvoicePageNotices({
@@ -74,6 +75,24 @@ export function InvoicePageNotices({
         <p className="font-semibold text-green-900">Invoice resent</p>
         <p className="mt-1 text-green-900">
           The invoice email was sent again. Invoice history below should show the updated status.
+        </p>
+        {dismiss}
+      </div>
+    );
+  }
+
+  if (notice === "paymentRecorded") {
+    return (
+      <div
+        ref={ref}
+        tabIndex={-1}
+        role="status"
+        aria-live="polite"
+        className={`${base} border-green-200 bg-green-50 text-green-950 focus-visible:ring-green-500`}
+      >
+        <p className="font-semibold text-green-900">Payment recorded</p>
+        <p className="mt-1 text-green-900">
+          Your invoice balance and status have been updated. See details below.
         </p>
         {dismiss}
       </div>

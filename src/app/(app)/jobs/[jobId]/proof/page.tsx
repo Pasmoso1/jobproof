@@ -6,8 +6,11 @@ import {
   getContractForJob,
   getChangeOrders,
   getInvoices,
+  getInvoicePaymentsByInvoiceIds,
   getProfile,
+  type InvoicePaymentListRow,
 } from "@/app/(app)/actions";
+import { formatInvoicePaymentMethod } from "@/lib/invoice-payment-method";
 import { ProofPhotoEvidence } from "./proof-photo-evidence";
 import {
   formatDateEastern,
@@ -35,6 +38,15 @@ export default async function ProofReportPage({
   ]);
 
   if (!job) notFound();
+
+  const invoiceIds = (invoices as { id: string }[]).map((i) => i.id);
+  const paymentRows = await getInvoicePaymentsByInvoiceIds(invoiceIds);
+  const paymentsByInvoice = new Map<string, InvoicePaymentListRow[]>();
+  for (const p of paymentRows) {
+    const list = paymentsByInvoice.get(p.invoice_id) ?? [];
+    list.push(p);
+    paymentsByInvoice.set(p.invoice_id, list);
+  }
 
   const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
   const businessName = (profile as { business_name?: string | null })?.business_name;
@@ -377,39 +389,84 @@ export default async function ProofReportPage({
                     invoice_number: string | null;
                     total: number;
                     balance_due?: number | null;
+                    amount_paid_total?: number | null;
                     status: string;
                     sent_at?: string | null;
                     created_at: string;
                     viewed_at?: string | null;
+                    paid_at?: string | null;
+                    last_payment_at?: string | null;
                   }) => {
-                    const amt =
+                    const balance =
                       inv.balance_due != null && inv.balance_due !== undefined
                         ? Number(inv.balance_due)
                         : Number(inv.total);
+                    const paidTotal = Number(inv.amount_paid_total ?? 0);
                     const customerViewLine = invoiceCustomerViewSecondaryLine({
                       viewedAt: inv.viewed_at,
                       showNotYetViewed: invoiceStatusesWhereCustomerViewApplies(inv.status),
                       invoiceStatus: inv.status,
                     });
+                    const pays = paymentsByInvoice.get(inv.id) ?? [];
                     return (
-                      <li key={inv.id} className="flex flex-col gap-1 text-sm sm:flex-row sm:justify-between">
-                        <div className="min-w-0">
-                          <span className="text-zinc-900">
-                            {inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`}
-                            {inv.sent_at && (
-                              <span className="ml-2 text-zinc-500">
-                                · Issued {formatDateTimeEastern(inv.sent_at)}
-                              </span>
+                      <li
+                        key={inv.id}
+                        className="border-b border-zinc-100 pb-3 last:border-0 last:pb-0"
+                      >
+                        <div className="flex flex-col gap-1 text-sm sm:flex-row sm:justify-between">
+                          <div className="min-w-0">
+                            <span className="text-zinc-900">
+                              {inv.invoice_number ?? `Invoice ${inv.id.slice(0, 8)}`}
+                              {inv.sent_at && (
+                                <span className="ml-2 text-zinc-500">
+                                  · Issued {formatDateTimeEastern(inv.sent_at)}
+                                </span>
+                              )}
+                            </span>
+                            {customerViewLine && (
+                              <p className="mt-0.5 text-xs text-zinc-500">{customerViewLine}</p>
                             )}
-                          </span>
-                          {customerViewLine && (
-                            <p className="mt-0.5 text-xs text-zinc-500">{customerViewLine}</p>
-                          )}
+                          </div>
+                          <div className="shrink-0 text-right text-sm">
+                            <p className="font-medium text-zinc-900">
+                              Balance $
+                              {balance.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </p>
+                            <p className="text-zinc-500">Status: {inv.status.replace(/_/g, " ")}</p>
+                          </div>
                         </div>
-                        <span className="shrink-0 font-medium text-zinc-900 sm:text-right">
-                          ${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                          <span className="font-normal text-zinc-500">({inv.status})</span>
-                        </span>
+                        {paidTotal > 0.0001 && (
+                          <p className="mt-2 text-xs text-zinc-600">
+                            Paid to date $
+                            {paidTotal.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </p>
+                        )}
+                        {inv.paid_at?.trim() && inv.status === "paid" && (
+                          <p className="mt-1 text-xs text-zinc-600">
+                            Marked paid in full {formatDateTimeEastern(inv.paid_at)}
+                          </p>
+                        )}
+                        {pays.length > 0 && (
+                          <ul className="mt-2 space-y-1 border-t border-zinc-100 pt-2 text-xs text-zinc-600">
+                            {pays.map((p, idx) => (
+                              <li key={`${inv.id}-pay-${idx}`}>
+                                {formatLocalDateStringEastern(p.paid_on, { dateStyle: "medium" })} · $
+                                {Number(p.amount).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                · {formatInvoicePaymentMethod(p.payment_method)}
+                                {p.note?.trim() ? ` · ${p.note.trim()}` : ""}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </li>
                     );
                   }

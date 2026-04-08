@@ -52,6 +52,8 @@ export type PublicInvoicePageData = {
   taxAmount: number;
   total: number;
   depositCredited: number;
+  /** Contractor-recorded payments toward balance (excludes deposit). */
+  amountPaidTotal: number;
   balanceDue: number;
   lineItems: { description: string; amount: number; quantity: number }[];
   contractor: {
@@ -134,6 +136,7 @@ export async function fetchPublicInvoicePageData(
       tax_amount,
       total,
       deposit_credited,
+      amount_paid_total,
       balance_due,
       due_date,
       notes,
@@ -218,8 +221,9 @@ export async function fetchPublicInvoicePageData(
   const taxAmount = Number(row.tax_amount);
   const total = Number(row.total);
   const depositCredited = Number(row.deposit_credited ?? 0);
+  const amountPaidTotal = Number(row.amount_paid_total ?? 0);
   const balanceDue = Number(
-    row.balance_due ?? Math.max(0, total - depositCredited)
+    row.balance_due ?? Math.max(0, total - depositCredited - amountPaidTotal)
   );
 
   const pdfPath = (row.invoice_pdf_path as string | null)?.trim() || null;
@@ -239,6 +243,7 @@ export async function fetchPublicInvoicePageData(
     taxAmount,
     total,
     depositCredited,
+    amountPaidTotal,
     balanceDue,
     lineItems,
     contractor: {

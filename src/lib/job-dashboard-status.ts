@@ -1,12 +1,16 @@
-/** Representative sent/paid/overdue row for billing summary UI (per job). */
+/** Representative sent/paid/overdue/partially_paid row for billing summary UI (per job). */
 export type SentInvoiceDisplay = {
-  /** Representative row for this job’s billing summary (sent / paid / overdue). */
+  /** Representative row for this job’s billing summary. */
   invoice_id: string;
-  status: "sent" | "paid" | "overdue";
+  status: "sent" | "paid" | "overdue" | "partially_paid";
   sent_at: string | null;
   due_date: string | null;
   /** First public invoice page open (customer), Eastern shown in UI */
   viewed_at: string | null;
+  balance_due?: number | null;
+  amount_paid_total?: number | null;
+  paid_at?: string | null;
+  last_payment_at?: string | null;
 };
 
 /** Flags from `getInvoiceDeliverySummaryForJobIds` (invoices + change orders). */

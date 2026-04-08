@@ -664,7 +664,7 @@ export async function sendInvoiceEmail(
   return result;
 }
 
-export type InvoiceReminderKind = "standard" | "overdue";
+export type InvoiceReminderKind = "standard" | "overdue" | "partial_balance";
 /** Internal only — never referenced in email copy. */
 export type InvoiceReminderTone = "soft" | "firm";
 
@@ -704,6 +704,12 @@ function invoiceReminderOpeningParagraph(
   const t = jobTitle.trim() || "your job";
   if (kind === "overdue") {
     return `This is a reminder that your invoice for <strong>${escapeHtml(t)}</strong> is now overdue.`;
+  }
+  if (kind === "partial_balance") {
+    if (tone === "firm") {
+      return `We're following up on the remaining balance for your invoice for <strong>${escapeHtml(t)}</strong>. Thank you for your payment so far — please see the amount still outstanding below.`;
+    }
+    return `Thank you for your recent payment toward your invoice for <strong>${escapeHtml(t)}</strong>. A balance remains; please refer to the summary below when you're ready to pay the rest.`;
   }
   if (tone === "firm") {
     return `We're following up on your invoice for <strong>${escapeHtml(t)}</strong>. Please review the details below when you have a moment.`;
@@ -820,7 +826,9 @@ export async function sendInvoiceReminderEmail(
   const subject =
     options.reminderKind === "overdue"
       ? `Invoice overdue — ${title}`
-      : `Reminder: Invoice for ${title}`;
+      : options.reminderKind === "partial_balance"
+        ? `Reminder: Outstanding balance — ${title}`
+        : `Reminder: Invoice for ${title}`;
   const isProd = process.env.NODE_ENV === "production";
   const html = invoiceReminderEmailHtml(options);
 

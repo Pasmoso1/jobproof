@@ -27,6 +27,17 @@ function safeDecodeURIComponent(s: string): string {
   }
 }
 
+function invoiceStatusLabel(status: string): string {
+  switch (status) {
+    case "partially_paid":
+      return "partially paid";
+    case "draft":
+      return "draft";
+    default:
+      return status;
+  }
+}
+
 export default async function InvoicesPage({
   params,
   searchParams,
@@ -50,7 +61,8 @@ export default async function InvoicesPage({
     rawNotice === "draft" ||
     rawNotice === "failed" ||
     rawNotice === "reminderSent" ||
-    rawNotice === "reminderFailed"
+    rawNotice === "reminderFailed" ||
+    rawNotice === "paymentRecorded"
       ? rawNotice
       : null;
   const rawMsg = firstSearchParam(sp.invMsg)?.trim();
@@ -79,6 +91,12 @@ export default async function InvoicesPage({
             total: Number(inv.total),
             deposit_credited: inv.deposit_credited != null ? Number(inv.deposit_credited) : null,
             balance_due: inv.balance_due != null ? Number(inv.balance_due) : null,
+            amount_paid_total:
+              (inv as { amount_paid_total?: number | null }).amount_paid_total != null
+                ? Number((inv as { amount_paid_total?: number | null }).amount_paid_total)
+                : null,
+            paid_at: (inv as { paid_at?: string | null }).paid_at ?? null,
+            last_payment_at: (inv as { last_payment_at?: string | null }).last_payment_at ?? null,
             due_date: inv.due_date,
             status: inv.status,
           };
@@ -158,15 +176,19 @@ export default async function InvoicesPage({
                 invoice_number: string | null;
                 total: number;
                 balance_due?: number | null;
+                amount_paid_total?: number | null;
                 status: string;
                 created_at: string;
                 sent_at?: string | null;
                 viewed_at?: string | null;
+                paid_at?: string | null;
+                last_payment_at?: string | null;
               }) => {
                 const displayAmount =
                   inv.balance_due != null && inv.balance_due !== undefined
                     ? Number(inv.balance_due)
                     : Number(inv.total);
+                const paidTotal = Number(inv.amount_paid_total ?? 0);
                 const customerViewLine = invoiceCustomerViewSecondaryLine({
                   viewedAt: inv.viewed_at,
                   showNotYetViewed: invoiceStatusesWhereCustomerViewApplies(inv.status),
@@ -195,10 +217,12 @@ export default async function InvoicesPage({
                                 ? "text-amber-700"
                                 : inv.status === "overdue"
                                   ? "text-red-700"
-                                  : "text-zinc-600"
+                                  : inv.status === "partially_paid"
+                                    ? "text-amber-800"
+                                    : "text-zinc-600"
                           }
                         >
-                          {inv.status}
+                          {invoiceStatusLabel(inv.status)}
                         </span>
                       </p>
                       {customerViewLine && (
@@ -209,11 +233,16 @@ export default async function InvoicesPage({
                       <p className="font-medium text-zinc-900">
                         ${displayAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
-                      {inv.balance_due != null &&
-                        inv.balance_due !== undefined &&
-                        Number(inv.balance_due) !== Number(inv.total) && (
-                          <p className="text-xs text-zinc-500">Balance due</p>
-                        )}
+                      <p className="text-xs text-zinc-500">Balance due</p>
+                      {paidTotal > 0.0001 && (
+                        <p className="text-xs text-zinc-500">
+                          Paid to date $
+                          {paidTotal.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );

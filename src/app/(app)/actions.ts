@@ -46,6 +46,7 @@ import { buildInvoicePdf } from "@/lib/invoice-pdf";
 import { generateUUID } from "@/lib/utils/uuid";
 import type { JobOutstandingFlags } from "@/lib/job-dashboard-status";
 import { pickSentInvoiceDisplay } from "@/lib/completed-job-invoice-ui";
+import { isInvoicePaymentMethod } from "@/lib/invoice-payment-method";
 import { buildInvoicePaymentBlocks } from "@/lib/invoice-payment-copy";
 import { resolveContractorContactEmail } from "@/lib/contractor-contact-email";
 import { randomUUID } from "node:crypto";
@@ -2861,7 +2862,9 @@ export async function getInvoiceDeliverySummaryForJobIds(
 
   const { data: rows } = await supabase
     .from("invoices")
-    .select("id, job_id, status, sent_at, due_date, paid_at, viewed_at")
+    .select(
+      "id, job_id, status, sent_at, due_date, paid_at, viewed_at, balance_due, amount_paid_total, last_payment_at"
+    )
     .in("job_id", [...allowed]);
 
   const invRowsByJob = new Map<
@@ -2873,6 +2876,9 @@ export async function getInvoiceDeliverySummaryForJobIds(
       due_date: string | null;
       paid_at: string | null;
       viewed_at: string | null;
+      balance_due: number | null;
+      amount_paid_total: number | null;
+      last_payment_at: string | null;
     }[]
   >();
   for (const id of allowed) {
@@ -2896,7 +2902,8 @@ export async function getInvoiceDeliverySummaryForJobIds(
     if (
       r.status === "sent" ||
       r.status === "paid" ||
-      r.status === "overdue"
+      r.status === "overdue" ||
+      r.status === "partially_paid"
     ) {
       empty[jid].hasSentOrPaidInvoice = true;
     }
@@ -2910,6 +2917,15 @@ export async function getInvoiceDeliverySummaryForJobIds(
       due_date: (r.due_date as string | null) ?? null,
       paid_at: (r.paid_at as string | null) ?? null,
       viewed_at: (r.viewed_at as string | null) ?? null,
+      balance_due:
+        r.balance_due != null && r.balance_due !== undefined
+          ? Number(r.balance_due)
+          : null,
+      amount_paid_total:
+        r.amount_paid_total != null && r.amount_paid_total !== undefined
+          ? Number(r.amount_paid_total)
+          : null,
+      last_payment_at: (r.last_payment_at as string | null) ?? null,
     });
   }
 
@@ -3101,6 +3117,7 @@ export async function createInvoice(
       total,
       deposit_credited: depositCredited,
       balance_due: balanceDue,
+      amount_paid_total: 0,
       due_date: dueDateTrimmed,
       notes: notesTrimmed,
       status: "draft",
@@ -3610,14 +3627,201 @@ export async function resendInvoice(
   }
 
   const sentAt = new Date().toISOString();
+  const currentStatus = String(invRow.status ?? "");
+  const preserveStatus =
+    currentStatus === "paid" || currentStatus === "partially_paid";
   await supabase
     .from("invoices")
-    .update({ status: "sent", sent_at: sentAt })
+    .update(
+      preserveStatus
+        ? { sent_at: sentAt }
+        : { status: "sent", sent_at: sentAt }
+    )
     .eq("id", invRow.id);
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/invoices`);
   return { emailSent: true };
+}
+
+function roundInvoiceMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Contractor-recorded payment toward invoice balance (deposit is not entered here).
+ */
+export async function recordInvoicePayment(
+  invoiceId: string,
+  amount: number,
+  paidOn: string,
+  paymentMethod: string,
+  note?: string
+): Promise<{ success: true } | { success: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  if (!isInvoicePaymentMethod(paymentMethod)) {
+    return { success: false, error: "Invalid payment method." };
+  }
+
+  const paidOnTrim = paidOn?.trim() ?? "";
+  if (!paidOnTrim || !/^\d{4}-\d{2}-\d{2}$/.test(paidOnTrim)) {
+    return { success: false, error: "Payment date must be YYYY-MM-DD." };
+  }
+
+  const amountNum = roundInvoiceMoney(Number(amount));
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    return { success: false, error: "Enter a valid amount greater than zero." };
+  }
+
+  const { data: invRow, error: invErr } = await supabase
+    .from("invoices")
+    .select(
+      "id, job_id, profile_id, status, total, deposit_credited, balance_due, amount_paid_total"
+    )
+    .eq("id", invoiceId)
+    .single();
+
+  if (invErr || !invRow) return { success: false, error: "Invoice not found" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile || invRow.profile_id !== profile.id) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const status = String(invRow.status ?? "");
+  if (status !== "sent" && status !== "overdue" && status !== "partially_paid") {
+    return {
+      success: false,
+      error: "Payments can only be recorded for sent, overdue, or partially paid invoices.",
+    };
+  }
+
+  const total = Number(invRow.total);
+  const depositCredited = Number(invRow.deposit_credited ?? 0);
+  const fallbackBalance = roundInvoiceMoney(
+    Math.max(0, total - depositCredited)
+  );
+  const balanceRow =
+    invRow.balance_due != null && invRow.balance_due !== undefined
+      ? roundInvoiceMoney(Number(invRow.balance_due))
+      : fallbackBalance;
+
+  if (balanceRow <= 0) {
+    return { success: false, error: "This invoice has no remaining balance." };
+  }
+
+  if (amountNum > balanceRow + 0.0001) {
+    return {
+      success: false,
+      error: `Amount cannot exceed the remaining balance ($${balanceRow.toFixed(2)}).`,
+    };
+  }
+
+  const prevPaid = roundInvoiceMoney(Number(invRow.amount_paid_total ?? 0));
+  const newPaidTotal = roundInvoiceMoney(prevPaid + amountNum);
+  const newBalance = roundInvoiceMoney(balanceRow - amountNum);
+  const nowIso = new Date().toISOString();
+  const noteTrimmed = note?.trim() || null;
+
+  const { data: insertedPay, error: payErr } = await supabase
+    .from("invoice_payments")
+    .insert({
+      invoice_id: invoiceId,
+      profile_id: profile.id,
+      amount: amountNum,
+      paid_on: paidOnTrim,
+      payment_method: paymentMethod,
+      note: noteTrimmed,
+    })
+    .select("id")
+    .single();
+
+  if (payErr || !insertedPay?.id) {
+    console.error("[recordInvoicePayment] insert failed:", payErr);
+    return { success: false, error: payErr?.message || "Could not save payment." };
+  }
+
+  const isFullyPaid = newBalance <= 0.0001;
+  const nextStatus = isFullyPaid ? "paid" : "partially_paid";
+
+  const { error: updErr } = await supabase
+    .from("invoices")
+    .update({
+      amount_paid_total: newPaidTotal,
+      balance_due: isFullyPaid ? 0 : newBalance,
+      status: nextStatus,
+      last_payment_at: nowIso,
+      paid_at: isFullyPaid ? nowIso : null,
+    })
+    .eq("id", invoiceId);
+
+  if (updErr) {
+    console.error("[recordInvoicePayment] invoice update failed:", updErr);
+    await supabase.from("invoice_payments").delete().eq("id", insertedPay.id);
+    return { success: false, error: "Payment saved but invoice update failed. Try again." };
+  }
+
+  const jobId = String(invRow.job_id);
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/invoices`);
+  revalidatePath(`/jobs/${jobId}/proof`);
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export type InvoicePaymentListRow = {
+  invoice_id: string;
+  amount: number;
+  paid_on: string;
+  payment_method: string;
+  note: string | null;
+};
+
+/** Contractor-facing payment history rows for proof / detail UIs. */
+export async function getInvoicePaymentsByInvoiceIds(
+  invoiceIds: string[]
+): Promise<InvoicePaymentListRow[]> {
+  if (invoiceIds.length === 0) return [];
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+  if (!profile) return [];
+
+  const { data: invCheck } = await supabase
+    .from("invoices")
+    .select("id")
+    .in("id", invoiceIds)
+    .eq("profile_id", profile.id);
+
+  const allowed = new Set((invCheck ?? []).map((r) => r.id as string));
+  if (allowed.size === 0) return [];
+
+  const { data: rows } = await supabase
+    .from("invoice_payments")
+    .select("invoice_id, amount, paid_on, payment_method, note")
+    .in("invoice_id", [...allowed])
+    .order("paid_on", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  return (rows ?? []) as InvoicePaymentListRow[];
 }
 
 /**
@@ -3641,10 +3845,11 @@ export async function sendInvoiceReminder(
   if (invErr || !invRow) return { success: false, error: "Invoice not found" };
 
   const status = String(invRow.status ?? "");
-  if (status !== "sent" && status !== "overdue") {
+  if (status !== "sent" && status !== "overdue" && status !== "partially_paid") {
     return {
       success: false,
-      error: "Reminders can only be sent for invoices that are sent or overdue.",
+      error:
+        "Reminders can only be sent for invoices that are sent, overdue, or partially paid.",
     };
   }
 
@@ -3748,6 +3953,13 @@ export async function sendInvoiceReminder(
   const depositCredited = Number(invRow.deposit_credited ?? 0);
   const balanceDue = Number(invRow.balance_due ?? Math.max(0, total - depositCredited));
 
+  if (status === "partially_paid" && balanceDue <= 0.0001) {
+    return {
+      success: false,
+      error: "This invoice has no remaining balance — a reminder is not needed.",
+    };
+  }
+
   const invoiceNumberDisplay =
     (invRow.invoice_number as string | null)?.trim() ||
     `Invoice ${String(invRow.id).slice(0, 8)}`;
@@ -3791,9 +4003,17 @@ export async function sendInvoiceReminder(
   const hasViewedSignal =
     typeof viewedAtRaw === "string" && viewedAtRaw.trim().length > 0;
 
-  const reminderKind = status === "overdue" ? ("overdue" as const) : ("standard" as const);
+  const reminderKind =
+    status === "overdue"
+      ? ("overdue" as const)
+      : status === "partially_paid"
+        ? ("partial_balance" as const)
+        : ("standard" as const);
   const reminderTone: "soft" | "firm" =
-    reminderKind === "standard" && hasViewedSignal ? "firm" : "soft";
+    (reminderKind === "standard" || reminderKind === "partial_balance") &&
+    hasViewedSignal
+      ? "firm"
+      : "soft";
 
   const sendResult = await sendInvoiceReminderEmail({
     toEmail: customerEmail,

@@ -9,6 +9,7 @@ export type CompletedJobInvoiceStatusKind =
   | "sent"
   | "paid"
   | "overdue"
+  | "partially_paid"
   | "draft"
   | "not_sent";
 
@@ -19,11 +20,11 @@ export type CompletedJobInvoiceUi = {
   statusBadgeClass: string;
   /** One short line: due date, sent date, or paid + sent (Eastern). */
   billingDetailLine: string | null;
-  /** Customer public-page view (sent / paid / overdue only). */
+  /** Customer public-page view (sent / paid / overdue / partially_paid only). */
   viewedDetailLine: string | null;
   actionLabel: string;
   invoicesHref: string;
-  /** Latest representative invoice for reminders (sent / overdue only). */
+  /** Latest representative invoice for reminders (balance outstanding). */
   reminderInvoiceId: string | null;
 };
 
@@ -34,15 +35,26 @@ type InvoiceRow = {
   due_date: string | null;
   paid_at: string | null;
   viewed_at: string | null;
+  balance_due?: number | null;
+  amount_paid_total?: number | null;
+  last_payment_at?: string | null;
 };
 
+function moneyShort(n: number) {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 /**
- * Picks one invoice to summarize for UI: overdue first (earliest due), else latest sent, else latest paid.
+ * Picks one invoice to summarize for UI: overdue first (earliest due), else latest partially paid,
+ * else latest sent, else latest paid.
  */
 export function pickSentInvoiceDisplay(rows: InvoiceRow[]): SentInvoiceDisplay | null {
   const post = rows.filter(
     (r) =>
-      r.status === "sent" || r.status === "paid" || r.status === "overdue"
+      r.status === "sent" ||
+      r.status === "paid" ||
+      r.status === "overdue" ||
+      r.status === "partially_paid"
   );
   if (post.length === 0) return null;
 
@@ -60,6 +72,28 @@ export function pickSentInvoiceDisplay(rows: InvoiceRow[]): SentInvoiceDisplay |
       sent_at: pick.sent_at,
       due_date: pick.due_date,
       viewed_at: pick.viewed_at ?? null,
+      balance_due: pick.balance_due ?? null,
+      amount_paid_total: pick.amount_paid_total ?? null,
+      paid_at: pick.paid_at ?? null,
+      last_payment_at: pick.last_payment_at ?? null,
+    };
+  }
+
+  const partial = post.filter((r) => r.status === "partially_paid");
+  if (partial.length > 0) {
+    const pick = [...partial].sort(
+      (a, b) => (b.last_payment_at ?? b.sent_at ?? "").localeCompare(a.last_payment_at ?? a.sent_at ?? "")
+    )[0];
+    return {
+      invoice_id: pick.id,
+      status: "partially_paid",
+      sent_at: pick.sent_at,
+      due_date: pick.due_date,
+      viewed_at: pick.viewed_at ?? null,
+      balance_due: pick.balance_due ?? null,
+      amount_paid_total: pick.amount_paid_total ?? null,
+      paid_at: pick.paid_at ?? null,
+      last_payment_at: pick.last_payment_at ?? null,
     };
   }
 
@@ -74,6 +108,10 @@ export function pickSentInvoiceDisplay(rows: InvoiceRow[]): SentInvoiceDisplay |
       sent_at: pick.sent_at,
       due_date: pick.due_date,
       viewed_at: pick.viewed_at ?? null,
+      balance_due: pick.balance_due ?? null,
+      amount_paid_total: pick.amount_paid_total ?? null,
+      paid_at: pick.paid_at ?? null,
+      last_payment_at: pick.last_payment_at ?? null,
     };
   }
 
@@ -87,6 +125,10 @@ export function pickSentInvoiceDisplay(rows: InvoiceRow[]): SentInvoiceDisplay |
     sent_at: pick.sent_at,
     due_date: pick.due_date,
     viewed_at: pick.viewed_at ?? null,
+    balance_due: pick.balance_due ?? null,
+    amount_paid_total: pick.amount_paid_total ?? null,
+    paid_at: pick.paid_at ?? null,
+    last_payment_at: pick.last_payment_at ?? null,
   };
 }
 
@@ -96,24 +138,59 @@ function buildBillingDetailLine(display: SentInvoiceDisplay | null): string | nu
     ? formatLocalDateStringEastern(display.due_date, { dateStyle: "medium" })
     : "";
   const sentStr = display.sent_at ? formatDateTimeEastern(display.sent_at) : "";
+  const paidTotal = display.amount_paid_total != null ? Number(display.amount_paid_total) : 0;
+  const bal =
+    display.balance_due != null && Number.isFinite(Number(display.balance_due))
+      ? Number(display.balance_due)
+      : null;
 
   if (display.status === "overdue") {
     if (dueStr) return `Due ${dueStr}`;
     if (sentStr) return `Sent ${sentStr}`;
     return null;
   }
+
+  if (display.status === "partially_paid") {
+    const parts: string[] = [];
+    if (paidTotal > 0) parts.push(`Paid to date $${moneyShort(paidTotal)}`);
+    if (bal != null && bal > 0.0001) parts.push(`Balance $${moneyShort(bal)}`);
+    const lp = display.last_payment_at?.trim();
+    if (lp) {
+      const ymd = lp.includes("T") ? lp.split("T")[0]! : lp.slice(0, 10);
+      if (ymd) {
+        parts.push(
+          `Last payment ${formatLocalDateStringEastern(ymd, { dateStyle: "medium" })}`
+        );
+      }
+    } else if (dueStr) {
+      parts.push(`Due ${dueStr}`);
+    }
+    return parts.length > 0 ? parts.join(" · ") : dueStr ? `Due ${dueStr}` : null;
+  }
+
   if (display.status === "paid") {
+    const paidAt = display.paid_at?.trim();
+    if (paidAt) {
+      return `Paid in full · ${formatDateTimeEastern(paidAt)}`;
+    }
     if (sentStr) return `Paid · Sent ${sentStr}`;
-    return "Paid";
+    return "Paid in full";
   }
   if (dueStr) return `Due ${dueStr}`;
   if (sentStr) return `Sent ${sentStr}`;
   return null;
 }
 
+function remainingBalanceForReminders(display: SentInvoiceDisplay | null): number {
+  if (!display) return 0;
+  const b = display.balance_due;
+  if (b == null || !Number.isFinite(Number(b))) return 0;
+  return Math.max(0, Number(b));
+}
+
 /**
  * Maps invoice flags to a visible status and primary CTA for completed, signed jobs.
- * Priority: sent/paid/overdue → draft → not sent.
+ * Priority: sent/paid/overdue/partially_paid → draft → not sent.
  */
 export function getCompletedJobInvoiceUi(
   jobId: string,
@@ -128,6 +205,7 @@ export function getCompletedJobInvoiceUi(
       showNotYetViewed: true,
       invoiceStatus: display?.status,
     });
+    const remindBalance = remainingBalanceForReminders(display);
 
     if (display?.status === "overdue") {
       return {
@@ -139,6 +217,19 @@ export function getCompletedJobInvoiceUi(
         actionLabel: "Resend invoice",
         invoicesHref,
         reminderInvoiceId: display.invoice_id,
+      };
+    }
+
+    if (display?.status === "partially_paid") {
+      return {
+        statusKind: "partially_paid",
+        statusLabel: "Partially paid",
+        statusBadgeClass: "bg-amber-50 text-amber-950 ring-1 ring-amber-200",
+        billingDetailLine,
+        viewedDetailLine,
+        actionLabel: "Resend invoice",
+        invoicesHref,
+        reminderInvoiceId: remindBalance > 0.0001 ? display.invoice_id : null,
       };
     }
 

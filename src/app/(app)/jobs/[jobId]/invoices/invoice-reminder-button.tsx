@@ -13,7 +13,7 @@ export function InvoiceReminderButton({
 }: {
   jobId: string;
   invoiceId: string;
-  invoiceStatus: "sent" | "overdue";
+  invoiceStatus: "sent" | "overdue" | "partially_paid";
   disabled?: boolean;
   className?: string;
 }) {
@@ -21,7 +21,11 @@ export function InvoiceReminderButton({
   const [loading, setLoading] = useState(false);
 
   const label =
-    invoiceStatus === "overdue" ? "Send overdue reminder" : "Send reminder";
+    invoiceStatus === "overdue"
+      ? "Send overdue reminder"
+      : invoiceStatus === "partially_paid"
+        ? "Send balance reminder"
+        : "Send reminder";
 
   async function handleClick() {
     setLoading(true);

@@ -5,11 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createInvoice, resendInvoice } from "@/app/(app)/actions";
 import { InvoiceReminderButton } from "./invoice-reminder-button";
+import { RecordPaymentModal } from "./record-payment-modal";
 import {
   invoiceTaxShortLabel,
   taxRateFromPropertyProvince,
 } from "@/lib/invoice-tax";
-import { formatLocalDateStringEastern } from "@/lib/datetime-eastern";
+import {
+  formatDateTimeEastern,
+  formatLocalDateStringEastern,
+} from "@/lib/datetime-eastern";
 
 type Job = {
   id: string;
@@ -28,6 +32,9 @@ export type LatestInvoiceSummary = {
   total: number;
   deposit_credited?: number | null;
   balance_due?: number | null;
+  amount_paid_total?: number | null;
+  paid_at?: string | null;
+  last_payment_at?: string | null;
   due_date: string | null;
   status: string;
 };
@@ -74,6 +81,7 @@ function ResendInvoicePanel({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
 
   const dueDisplay = invoice.due_date?.trim()
     ? formatLocalDateStringEastern(invoice.due_date)
@@ -84,6 +92,13 @@ function ResendInvoicePanel({
     invoice.balance_due != null && invoice.balance_due !== undefined
       ? Number(invoice.balance_due)
       : Number(invoice.total) - deposit;
+  const paidTowardBalance = Number(invoice.amount_paid_total ?? 0);
+  const canRecordPayment =
+    contractSigned &&
+    (invoice.status === "sent" ||
+      invoice.status === "overdue" ||
+      invoice.status === "partially_paid") &&
+    balance > 0.0001;
 
   async function handleResend() {
     setError(null);
@@ -174,10 +189,23 @@ function ResendInvoicePanel({
           <span className="text-zinc-600">Deposit received</span>
           <span className="font-medium tabular-nums text-zinc-900">${money(deposit)}</span>
         </div>
+        {paidTowardBalance > 0.0001 && (
+          <div className="flex justify-between gap-4 border-t border-zinc-200 pt-3">
+            <span className="text-zinc-600">Paid toward balance</span>
+            <span className="font-medium tabular-nums text-zinc-900">
+              ${money(paidTowardBalance)}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between gap-4 border-t border-zinc-200 pt-3">
           <span className="font-semibold text-zinc-900">Balance due</span>
           <span className="font-bold tabular-nums text-[#2436BB]">${money(balance)}</span>
         </div>
+        {invoice.status === "paid" && invoice.paid_at?.trim() && (
+          <p className="border-t border-zinc-200 pt-3 text-sm text-emerald-800">
+            Paid in full on {formatDateTimeEastern(invoice.paid_at)}
+          </p>
+        )}
         <div className="border-t border-zinc-200 pt-3 text-zinc-600">
           <span className="text-zinc-500">Due date</span>
           <p className="mt-0.5 font-medium text-zinc-900">{dueDisplay}</p>
@@ -193,15 +221,41 @@ function ResendInvoicePanel({
         >
           {loading ? "Sending…" : "Resend invoice"}
         </button>
-        {(invoice.status === "sent" || invoice.status === "overdue") && (
+        {canRecordPayment && (
+          <button
+            type="button"
+            onClick={() => setPayOpen(true)}
+            className="rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-50"
+          >
+            Record payment
+          </button>
+        )}
+        {(invoice.status === "sent" ||
+          invoice.status === "overdue" ||
+          invoice.status === "partially_paid") &&
+          balance > 0.0001 && (
           <InvoiceReminderButton
             jobId={jobId}
             invoiceId={invoice.id}
-            invoiceStatus={invoice.status === "overdue" ? "overdue" : "sent"}
+            invoiceStatus={
+              invoice.status === "overdue"
+                ? "overdue"
+                : invoice.status === "partially_paid"
+                  ? "partially_paid"
+                  : "sent"
+            }
             disabled={!contractSigned}
           />
         )}
       </div>
+
+      <RecordPaymentModal
+        jobId={jobId}
+        invoiceId={invoice.id}
+        remainingBalance={balance}
+        open={payOpen}
+        onClose={() => setPayOpen(false)}
+      />
     </div>
   );
 }

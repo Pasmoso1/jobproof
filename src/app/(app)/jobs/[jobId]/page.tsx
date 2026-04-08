@@ -251,11 +251,13 @@ export default async function JobDetailPage({
                     ? "This invoice is past due. Follow up with the customer or resend if they need another copy."
                     : completedInvoiceUi.statusKind === "paid"
                       ? "Payment has been recorded. Use the button below if the customer needs another copy."
-                      : completedInvoiceUi.statusKind === "sent"
-                        ? "This invoice has been sent to the customer. Use the button below if they need another copy."
-                        : completedInvoiceUi.statusKind === "draft"
-                          ? "You have a draft saved — open Invoices to review details and send it when you’re ready."
-                          : "No invoice has been sent yet. Create one from the agreed contract total."}
+                      : completedInvoiceUi.statusKind === "partially_paid"
+                        ? "A partial payment has been recorded. The remaining balance is still outstanding — you can send a polite balance reminder or resend the invoice if needed."
+                        : completedInvoiceUi.statusKind === "sent"
+                          ? "This invoice has been sent to the customer. Use the button below if they need another copy."
+                          : completedInvoiceUi.statusKind === "draft"
+                            ? "You have a draft saved — open Invoices to review details and send it when you’re ready."
+                            : "No invoice has been sent yet. Create one from the agreed contract total."}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link
@@ -267,14 +269,17 @@ export default async function JobDetailPage({
                   </Link>
                   {completedInvoiceUi.reminderInvoiceId &&
                     (completedInvoiceUi.statusKind === "sent" ||
-                      completedInvoiceUi.statusKind === "overdue") && (
+                      completedInvoiceUi.statusKind === "overdue" ||
+                      completedInvoiceUi.statusKind === "partially_paid") && (
                       <InvoiceReminderButton
                         jobId={jobId}
                         invoiceId={completedInvoiceUi.reminderInvoiceId}
                         invoiceStatus={
                           completedInvoiceUi.statusKind === "overdue"
                             ? "overdue"
-                            : "sent"
+                            : completedInvoiceUi.statusKind === "partially_paid"
+                              ? "partially_paid"
+                              : "sent"
                         }
                         className="inline-flex rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-950 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                       />
