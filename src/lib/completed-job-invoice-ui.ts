@@ -4,6 +4,7 @@ import {
 } from "@/lib/datetime-eastern";
 import type { JobOutstandingFlags, SentInvoiceDisplay } from "@/lib/job-dashboard-status";
 import { invoiceCustomerViewSecondaryLine } from "@/lib/invoice-viewed-display";
+import { shouldShowCustomerMayHavePaidWarning } from "@/lib/invoice-reminder-automation";
 
 export type CompletedJobInvoiceStatusKind =
   | "sent"
@@ -26,6 +27,8 @@ export type CompletedJobInvoiceUi = {
   invoicesHref: string;
   /** Latest representative invoice for reminders (balance outstanding). */
   reminderInvoiceId: string | null;
+  /** Subtle nudge when customer opened the invoice recently but no payment recorded. */
+  customerMayHavePaidReminderWarning: boolean;
 };
 
 type InvoiceRow = {
@@ -188,6 +191,16 @@ function remainingBalanceForReminders(display: SentInvoiceDisplay | null): numbe
   return Math.max(0, Number(b));
 }
 
+function customerMayHavePaidWarn(display: SentInvoiceDisplay | null): boolean {
+  if (!display) return false;
+  return shouldShowCustomerMayHavePaidWarning({
+    viewed_at: display.viewed_at,
+    balance_due: display.balance_due ?? null,
+    amount_paid_total: display.amount_paid_total ?? null,
+    status: display.status,
+  });
+}
+
 /**
  * Maps invoice flags to a visible status and primary CTA for completed, signed jobs.
  * Priority: sent/paid/overdue/partially_paid → draft → not sent.
@@ -217,6 +230,7 @@ export function getCompletedJobInvoiceUi(
         actionLabel: "Resend invoice",
         invoicesHref,
         reminderInvoiceId: display.invoice_id,
+        customerMayHavePaidReminderWarning: customerMayHavePaidWarn(display),
       };
     }
 
@@ -230,6 +244,7 @@ export function getCompletedJobInvoiceUi(
         actionLabel: "Resend invoice",
         invoicesHref,
         reminderInvoiceId: remindBalance > 0.0001 ? display.invoice_id : null,
+        customerMayHavePaidReminderWarning: customerMayHavePaidWarn(display),
       };
     }
 
@@ -243,6 +258,7 @@ export function getCompletedJobInvoiceUi(
         actionLabel: "Resend invoice",
         invoicesHref,
         reminderInvoiceId: null,
+        customerMayHavePaidReminderWarning: false,
       };
     }
 
@@ -255,6 +271,7 @@ export function getCompletedJobInvoiceUi(
       actionLabel: "Resend invoice",
       invoicesHref,
       reminderInvoiceId: display?.invoice_id ?? null,
+      customerMayHavePaidReminderWarning: customerMayHavePaidWarn(display),
     };
   }
   if (o.hasDraftInvoice) {
@@ -267,6 +284,7 @@ export function getCompletedJobInvoiceUi(
       actionLabel: "Send invoice",
       invoicesHref,
       reminderInvoiceId: null,
+      customerMayHavePaidReminderWarning: false,
     };
   }
   return {
@@ -278,5 +296,6 @@ export function getCompletedJobInvoiceUi(
     actionLabel: "Create invoice",
     invoicesHref,
     reminderInvoiceId: null,
+    customerMayHavePaidReminderWarning: false,
   };
 }

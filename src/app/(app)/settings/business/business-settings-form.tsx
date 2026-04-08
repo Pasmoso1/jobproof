@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { updateProfileBusinessInfo } from "@/app/(app)/actions";
 import { validateBusinessProfileFields } from "@/lib/validation/business-profile";
-
 type Profile = {
   id: string;
   business_name: string | null;
@@ -21,6 +20,12 @@ type Profile = {
   default_contract_cancellation_note?: string | null;
   e_transfer_email?: string | null;
   business_contact_email?: string | null;
+  invoice_reminders_enabled?: boolean | null;
+  invoice_reminders_automation_paused?: boolean | null;
+  invoice_remind_not_viewed_after_days?: number | null;
+  invoice_remind_viewed_after_days?: number | null;
+  invoice_remind_overdue_after_days?: number | null;
+  invoice_repeat_overdue_every_days?: number | null;
 } | null;
 
 export function BusinessSettingsForm({
@@ -59,6 +64,24 @@ export function BusinessSettingsForm({
     profile?.default_contract_cancellation_note ?? ""
   );
   const [eTransferEmail, setETransferEmail] = useState(profile?.e_transfer_email ?? "");
+  const [invRemEnabled, setInvRemEnabled] = useState(
+    Boolean(profile?.invoice_reminders_enabled)
+  );
+  const [invRemPaused, setInvRemPaused] = useState(
+    Boolean(profile?.invoice_reminders_automation_paused)
+  );
+  const [invNv, setInvNv] = useState(
+    String(profile?.invoice_remind_not_viewed_after_days ?? 3)
+  );
+  const [invVw, setInvVw] = useState(
+    String(profile?.invoice_remind_viewed_after_days ?? 5)
+  );
+  const [invOv, setInvOv] = useState(
+    String(profile?.invoice_remind_overdue_after_days ?? 2)
+  );
+  const [invRep, setInvRep] = useState(
+    String(profile?.invoice_repeat_overdue_every_days ?? 7)
+  );
   const successRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -114,6 +137,12 @@ export function BusinessSettingsForm({
     formData.set("default_contract_warranty_note", defaultWarranty);
     formData.set("default_contract_cancellation_note", defaultCancellation);
     formData.set("e_transfer_email", eTransferEmail.trim());
+    formData.set("invoice_reminders_enabled", invRemEnabled ? "1" : "0");
+    formData.set("invoice_reminders_automation_paused", invRemPaused ? "1" : "0");
+    formData.set("invoice_remind_not_viewed_after_days", invNv.trim() || "3");
+    formData.set("invoice_remind_viewed_after_days", invVw.trim() || "5");
+    formData.set("invoice_remind_overdue_after_days", invOv.trim() || "2");
+    formData.set("invoice_repeat_overdue_every_days", invRep.trim() || "7");
 
     const result = await updateProfileBusinessInfo(formData);
 
@@ -378,6 +407,129 @@ export function BusinessSettingsForm({
                   {fieldErrors.postal_code}
                 </p>
               )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-zinc-200 pt-6">
+        <h3 className="text-sm font-semibold text-zinc-900">Invoice reminder automation</h3>
+        <p className="mt-1 text-sm text-zinc-600">
+          Optional automatic email reminders for unpaid invoices. Timing uses Eastern (Toronto) dates.
+          Reminders never change invoice status and use cautious wording for customers.
+        </p>
+        <div className="mt-4 space-y-4">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={invRemEnabled}
+              onChange={(e) => setInvRemEnabled(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-zinc-300 text-[#2436BB] focus:ring-[#2436BB]"
+            />
+            <span>
+              <span className="block text-sm font-medium text-zinc-900">
+                Enable automatic invoice reminders
+              </span>
+              <span className="mt-0.5 block text-xs text-zinc-500">
+                Off by default. When on, reminders can be sent automatically according to the rules
+                below, if your deployment is set up for it.
+              </span>
+            </span>
+          </label>
+          <label
+            className={`flex cursor-pointer items-start gap-3 ${!invRemEnabled ? "opacity-50" : ""}`}
+          >
+            <input
+              type="checkbox"
+              checked={invRemPaused}
+              disabled={!invRemEnabled}
+              onChange={(e) => setInvRemPaused(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-zinc-300 text-[#2436BB] focus:ring-[#2436BB] disabled:cursor-not-allowed"
+            />
+            <span>
+              <span className="block text-sm font-medium text-zinc-900">
+                Pause automation (keep settings)
+              </span>
+              <span className="mt-0.5 block text-xs text-zinc-500">
+                Stops automated sends until you turn this off. Manual reminders still work.
+              </span>
+            </span>
+          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label
+                htmlFor="invNotViewed"
+                className="block text-sm font-medium text-zinc-700"
+              >
+                Not viewed — remind after (days)
+              </label>
+              <input
+                id="invNotViewed"
+                type="number"
+                min={1}
+                max={365}
+                disabled={!invRemEnabled}
+                value={invNv}
+                onChange={(e) => setInvNv(e.target.value)}
+                className="mt-1 block w-full max-w-[11rem] rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-100"
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                After the invoice is sent, if the customer has not opened the link.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="invViewed" className="block text-sm font-medium text-zinc-700">
+                Viewed, unpaid — remind after (days)
+              </label>
+              <input
+                id="invViewed"
+                type="number"
+                min={1}
+                max={365}
+                disabled={!invRemEnabled}
+                value={invVw}
+                onChange={(e) => setInvVw(e.target.value)}
+                className="mt-1 block w-full max-w-[11rem] rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-100"
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                After the customer opens the invoice page, if a balance remains.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="invOverdue" className="block text-sm font-medium text-zinc-700">
+                Past due — first reminder after (days)
+              </label>
+              <input
+                id="invOverdue"
+                type="number"
+                min={1}
+                max={365}
+                disabled={!invRemEnabled}
+                value={invOv}
+                onChange={(e) => setInvOv(e.target.value)}
+                className="mt-1 block w-full max-w-[11rem] rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-100"
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                Calendar days after the due date, if a balance remains.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="invRepeat" className="block text-sm font-medium text-zinc-700">
+                Still overdue — repeat every (days)
+              </label>
+              <input
+                id="invRepeat"
+                type="number"
+                min={1}
+                max={365}
+                disabled={!invRemEnabled}
+                value={invRep}
+                onChange={(e) => setInvRep(e.target.value)}
+                className="mt-1 block w-full max-w-[11rem] rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-100"
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                After a reminder was sent, minimum days before another (manual or automatic).
+              </p>
             </div>
           </div>
         </div>

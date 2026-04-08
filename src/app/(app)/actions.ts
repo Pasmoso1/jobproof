@@ -100,6 +100,51 @@ export async function getRecentEmailLogs(limit = 25): Promise<EmailLog[]> {
   return (data ?? []) as EmailLog[];
 }
 
+/** Last successful invoice reminder + recent rows for contractor UI (single invoice). */
+export async function getInvoiceReminderSendPreviewForInvoice(invoiceId: string): Promise<{
+  lastSuccessAt: string | null;
+  lastAutomationSuccessAt: string | null;
+} | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+  if (!profile) return null;
+
+  const { data: inv } = await supabase
+    .from("invoices")
+    .select("id")
+    .eq("id", invoiceId)
+    .eq("profile_id", profile.id)
+    .maybeSingle();
+  if (!inv) return null;
+
+  const { data: rows } = await supabase
+    .from("invoice_reminder_sends")
+    .select("created_at, email_status, source")
+    .eq("invoice_id", invoiceId)
+    .order("created_at", { ascending: false })
+    .limit(40);
+
+  const list = rows ?? [];
+  const lastSuccess = list.find((r) => r.email_status === "success");
+  const lastAutoSuccess = list.find(
+    (r) => r.email_status === "success" && r.source === "automation"
+  );
+
+  return {
+    lastSuccessAt: lastSuccess?.created_at ?? null,
+    lastAutomationSuccessAt: lastAutoSuccess?.created_at ?? null,
+  };
+}
+
 export async function updateProfileBusinessInfo(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -171,6 +216,37 @@ export async function updateProfileBusinessInfo(formData: FormData) {
     };
   }
 
+  const parseDayField = (name: string, fallback: number) => {
+    const raw = String(formData.get(name) ?? "").trim();
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 1 || n > 365) return fallback;
+    return n;
+  };
+
+  const invoiceRemindersEnabled =
+    formData.get("invoice_reminders_enabled") === "1" ||
+    formData.get("invoice_reminders_enabled") === "on";
+  const invoiceRemindersAutomationPaused =
+    formData.get("invoice_reminders_automation_paused") === "1" ||
+    formData.get("invoice_reminders_automation_paused") === "on";
+
+  const invoiceRemindNotViewedAfterDays = parseDayField(
+    "invoice_remind_not_viewed_after_days",
+    3
+  );
+  const invoiceRemindViewedAfterDays = parseDayField(
+    "invoice_remind_viewed_after_days",
+    5
+  );
+  const invoiceRemindOverdueAfterDays = parseDayField(
+    "invoice_remind_overdue_after_days",
+    2
+  );
+  const invoiceRepeatOverdueEveryDays = parseDayField(
+    "invoice_repeat_overdue_every_days",
+    7
+  );
+
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -188,6 +264,12 @@ export async function updateProfileBusinessInfo(formData: FormData) {
       default_contract_terms_and_conditions: defaultTermsAndConditions,
       default_contract_warranty_note: defaultWarranty,
       default_contract_cancellation_note: defaultCancellation,
+      invoice_reminders_enabled: invoiceRemindersEnabled,
+      invoice_reminders_automation_paused: invoiceRemindersAutomationPaused,
+      invoice_remind_not_viewed_after_days: invoiceRemindNotViewedAfterDays,
+      invoice_remind_viewed_after_days: invoiceRemindViewedAfterDays,
+      invoice_remind_overdue_after_days: invoiceRemindOverdueAfterDays,
+      invoice_repeat_overdue_every_days: invoiceRepeatOverdueEveryDays,
       updated_at: new Date().toISOString(),
     })
     .eq("id", profile.id);
@@ -4024,6 +4106,7 @@ export async function sendInvoiceReminder(
     publicInvoiceUrl,
     reminderKind,
     reminderTone,
+    customerFacingMode: "default",
     contractor: {
       businessName: bizName,
       contactName: profile.contractor_name?.trim() || null,
@@ -4056,6 +4139,18 @@ export async function sendInvoiceReminder(
       relatedEntityId: String(invRow.id),
     },
   });
+
+  const { error: remLogErr } = await supabase.from("invoice_reminder_sends").insert({
+    invoice_id: String(invRow.id),
+    profile_id: profile.id,
+    source: "manual",
+    reminder_kind: reminderKind,
+    email_status: sendResult.success ? "success" : "failed",
+    error_message: sendResult.success ? null : sendResult.error ?? null,
+  });
+  if (remLogErr) {
+    console.error("[sendInvoiceReminder] invoice_reminder_sends insert:", remLogErr.message);
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/invoices`);

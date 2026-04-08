@@ -246,6 +246,11 @@ export default async function JobDetailPage({
                     {completedInvoiceUi.viewedDetailLine}
                   </p>
                 )}
+                {completedInvoiceUi.customerMayHavePaidReminderWarning && (
+                  <p className="mt-1.5 text-xs text-amber-800">
+                    Customer may have paid — confirm before sending a reminder.
+                  </p>
+                )}
                 <p className="mt-2 text-zinc-600">
                   {completedInvoiceUi.statusKind === "overdue"
                     ? "This invoice is past due. Follow up with the customer or resend if they need another copy."

@@ -14,6 +14,7 @@ import {
   formatDateTimeEastern,
   formatLocalDateStringEastern,
 } from "@/lib/datetime-eastern";
+import { shouldShowCustomerMayHavePaidWarning } from "@/lib/invoice-reminder-automation";
 
 type Job = {
   id: string;
@@ -37,6 +38,14 @@ export type LatestInvoiceSummary = {
   last_payment_at?: string | null;
   due_date: string | null;
   status: string;
+  viewed_at?: string | null;
+};
+
+export type InvoiceReminderHints = {
+  automationEnabled: boolean;
+  automationPaused: boolean;
+  lastSuccessAt: string | null;
+  lastAutomationSuccessAt: string | null;
 };
 
 function money(n: number) {
@@ -48,11 +57,13 @@ export function InvoiceBuilderForm({
   job,
   contractSigned,
   latestInvoice,
+  invoiceReminderHints,
 }: {
   jobId: string;
   job: Job;
   contractSigned: boolean;
   latestInvoice: LatestInvoiceSummary | null;
+  invoiceReminderHints?: InvoiceReminderHints | null;
 }) {
   if (latestInvoice) {
     return (
@@ -60,6 +71,7 @@ export function InvoiceBuilderForm({
         jobId={jobId}
         contractSigned={contractSigned}
         invoice={latestInvoice}
+        invoiceReminderHints={invoiceReminderHints ?? null}
       />
     );
   }
@@ -73,10 +85,12 @@ function ResendInvoicePanel({
   jobId,
   contractSigned,
   invoice,
+  invoiceReminderHints,
 }: {
   jobId: string;
   contractSigned: boolean;
   invoice: LatestInvoiceSummary;
+  invoiceReminderHints: InvoiceReminderHints | null;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +113,13 @@ function ResendInvoicePanel({
       invoice.status === "overdue" ||
       invoice.status === "partially_paid") &&
     balance > 0.0001;
+
+  const customerMayHavePaidWarning = shouldShowCustomerMayHavePaidWarning({
+    viewed_at: invoice.viewed_at,
+    balance_due: invoice.balance_due ?? null,
+    amount_paid_total: invoice.amount_paid_total ?? null,
+    status: invoice.status,
+  });
 
   async function handleResend() {
     setError(null);
@@ -150,6 +171,42 @@ function ResendInvoicePanel({
         Email the latest invoice again with the same amounts and due date. To change totals or due
         date, contact support — invoices are locked to agreed contract values.
       </p>
+
+      {invoiceReminderHints?.automationEnabled && !invoiceReminderHints.automationPaused && (
+        <p className="mt-3 text-xs text-zinc-500">
+          Automatic invoice reminders are enabled for your business (see{" "}
+          <Link href="/settings/business" className="font-medium text-[#2436BB] underline">
+            Business settings
+          </Link>
+          ).
+        </p>
+      )}
+      {invoiceReminderHints?.automationEnabled && invoiceReminderHints.automationPaused && (
+        <p className="mt-3 text-xs text-zinc-500">
+          Automatic invoice reminders are paused — manual reminders still work.
+        </p>
+      )}
+      {invoiceReminderHints?.lastSuccessAt && (
+        <p className="mt-1 text-xs text-zinc-500">
+          Last reminder sent {formatDateTimeEastern(invoiceReminderHints.lastSuccessAt)}
+          {invoiceReminderHints.lastAutomationSuccessAt ? (
+            <>
+              {" "}
+              · Last automatic{" "}
+              {formatDateTimeEastern(invoiceReminderHints.lastAutomationSuccessAt)}
+            </>
+          ) : null}
+        </p>
+      )}
+      {customerMayHavePaidWarning && (
+        <p
+          className="mt-3 rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs text-amber-950"
+          role="status"
+        >
+          Customer may have paid — confirm before sending a reminder. (They opened the invoice
+          recently and no payment is recorded in JobProof yet.)
+        </p>
+      )}
 
       {!contractSigned && (
         <div

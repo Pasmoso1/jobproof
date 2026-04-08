@@ -32,6 +32,14 @@ export interface Profile {
   business_contact_email?: string | null;
   /** Interac e-Transfer receiving address for invoices */
   e_transfer_email?: string | null;
+  /** When true, scheduled/cron jobs may send automated invoice reminders. */
+  invoice_reminders_enabled?: boolean;
+  /** Pauses automation while keeping settings (default false). */
+  invoice_reminders_automation_paused?: boolean;
+  invoice_remind_not_viewed_after_days?: number;
+  invoice_remind_viewed_after_days?: number;
+  invoice_remind_overdue_after_days?: number;
+  invoice_repeat_overdue_every_days?: number;
   phone: string | null;
   address_line_1: string | null;
   address_line_2: string | null;

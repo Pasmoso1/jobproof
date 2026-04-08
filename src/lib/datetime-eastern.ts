@@ -1,6 +1,40 @@
 /** User-facing dates/times for contractors and customers (Ontario / Eastern). */
 export const APP_USER_TIMEZONE = "America/Toronto";
 
+/** Today's calendar date as `YYYY-MM-DD` in Eastern time. */
+export function getTodayYmdEastern(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_USER_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+/** Calendar `YYYY-MM-DD` in Eastern for an instant (ISO string or Date). */
+export function isoToYmdEastern(input: string | Date): string {
+  const d = typeof input === "string" ? new Date(input) : input;
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_USER_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+/** Whole-day difference `endYmd - startYmd` (non-negative when end >= start). */
+export function diffCalendarDaysYmd(startYmd: string, endYmd: string): number {
+  const a = startYmd.trim();
+  const b = endYmd.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b)) return 0;
+  const [y1, m1, d1] = a.split("-").map(Number);
+  const [y2, m2, d2] = b.split("-").map(Number);
+  const u1 = Date.UTC(y1, m1 - 1, d1);
+  const u2 = Date.UTC(y2, m2 - 1, d2);
+  return Math.max(0, Math.round((u2 - u1) / 86400000));
+}
+
 /**
  * Format an instant (ISO string or Date) as a calendar date in Eastern time.
  * Use for DB timestamps (`created_at`, `signed_at`, etc.).

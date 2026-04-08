@@ -247,6 +247,11 @@ export default async function DashboardPage() {
                     {invoiceUi.viewedDetailLine}
                   </p>
                 )}
+                {invoiceUi?.customerMayHavePaidReminderWarning && (
+                  <p className="px-1 text-xs leading-snug text-amber-800">
+                    Customer may have paid — confirm before sending a reminder.
+                  </p>
+                )}
               </div>
             );
             })

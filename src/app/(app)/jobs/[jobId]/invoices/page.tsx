@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getJob, getInvoices, getProfile, getContractForJob } from "@/app/(app)/actions";
+import {
+  getJob,
+  getInvoices,
+  getProfile,
+  getContractForJob,
+  getInvoiceReminderSendPreviewForInvoice,
+} from "@/app/(app)/actions";
 import { formatDateEastern, formatDateTimeEastern } from "@/lib/datetime-eastern";
 import {
   invoiceCustomerViewSecondaryLine,
@@ -97,10 +103,25 @@ export default async function InvoicesPage({
                 : null,
             paid_at: (inv as { paid_at?: string | null }).paid_at ?? null,
             last_payment_at: (inv as { last_payment_at?: string | null }).last_payment_at ?? null,
+            viewed_at: (inv as { viewed_at?: string | null }).viewed_at ?? null,
             due_date: inv.due_date,
             status: inv.status,
           };
         })()
+      : null;
+
+  const reminderPreview = latestInvoice
+    ? await getInvoiceReminderSendPreviewForInvoice(latestInvoice.id)
+    : null;
+
+  const invoiceReminderHints =
+    profile && latestInvoice
+      ? {
+          automationEnabled: Boolean(profile.invoice_reminders_enabled),
+          automationPaused: Boolean(profile.invoice_reminders_automation_paused),
+          lastSuccessAt: reminderPreview?.lastSuccessAt ?? null,
+          lastAutomationSuccessAt: reminderPreview?.lastAutomationSuccessAt ?? null,
+        }
       : null;
 
   const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
@@ -158,6 +179,7 @@ export default async function InvoicesPage({
         job={job}
         contractSigned={contractSigned}
         latestInvoice={latestInvoice}
+        invoiceReminderHints={invoiceReminderHints}
       />
 
       <div className="mt-8 rounded-xl border border-zinc-200 bg-white">

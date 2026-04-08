@@ -4,7 +4,11 @@
  */
 
 import { Resend } from "resend";
-import { insertEmailLog, type EmailLogEntityType } from "@/lib/email-log";
+import {
+  insertEmailLog,
+  insertEmailLogWithServiceRole,
+  type EmailLogEntityType,
+} from "@/lib/email-log";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 
 /** When set, every send attempt is recorded in `email_logs` (success or failure). */
@@ -12,6 +16,8 @@ export interface EmailDeliveryAuditLog {
   profileId: string;
   type: EmailLogEntityType;
   relatedEntityId: string | null;
+  /** When true, write `email_logs` with the service role (cron / automation). */
+  useServiceRoleLog?: boolean;
 }
 
 export interface SendSigningLinkOptions {
@@ -694,14 +700,35 @@ export interface SendInvoiceReminderOptions {
   paymentContactLines: string[];
   notes: string | null;
   deliveryLog?: EmailDeliveryAuditLog;
+  /**
+   * Automated reminders use cautious copy and a payment disclaimer.
+   * Manual sends use `default` unless you opt in elsewhere.
+   */
+  customerFacingMode?: "default" | "safe_automation";
 }
 
 function invoiceReminderOpeningParagraph(
   jobTitle: string,
   kind: InvoiceReminderKind,
-  tone: InvoiceReminderTone
+  tone: InvoiceReminderTone,
+  mode: "default" | "safe_automation"
 ): string {
   const t = jobTitle.trim() || "your job";
+  if (mode === "safe_automation") {
+    if (kind === "overdue") {
+      return `Your invoice for <strong>${escapeHtml(t)}</strong> may be past its due date.`;
+    }
+    if (kind === "partial_balance") {
+      if (tone === "firm") {
+        return `We're following up on your invoice for <strong>${escapeHtml(t)}</strong>.`;
+      }
+      return `A quick note about your invoice for <strong>${escapeHtml(t)}</strong>.`;
+    }
+    if (tone === "firm") {
+      return `We're reaching out about your invoice for <strong>${escapeHtml(t)}</strong>.`;
+    }
+    return `Just a brief note about your invoice for <strong>${escapeHtml(t)}</strong>.`;
+  }
   if (kind === "overdue") {
     return `This is a reminder that your invoice for <strong>${escapeHtml(t)}</strong> is now overdue.`;
   }
@@ -718,6 +745,7 @@ function invoiceReminderOpeningParagraph(
 }
 
 export function invoiceReminderEmailHtml(opts: SendInvoiceReminderOptions): string {
+  const mode = opts.customerFacingMode ?? "default";
   const c = opts.contractor;
   const cu = opts.customer;
   const contractorBody = [
@@ -764,12 +792,28 @@ export function invoiceReminderEmailHtml(opts: SendInvoiceReminderOptions): stri
         </div>`
       : "";
 
+  const safeBalanceBlock =
+    mode === "safe_automation"
+      ? `<div style="margin-top:16px;padding:14px 16px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
+          <p style="margin:0;font-size:14px;color:#166534;line-height:1.55;">
+            Our records show a remaining balance of <strong>$${moneyHtml(opts.balanceDue)}</strong>.
+          </p>
+          <p style="margin:12px 0 0;font-size:14px;color:#166534;line-height:1.55;">
+            If you&apos;ve already made a payment, please disregard this reminder or contact the contractor.
+          </p>
+        </div>`
+      : "";
+
+  const balanceRowLabel =
+    mode === "safe_automation" ? "Remaining balance" : "Balance due";
+
   return `
     <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.55; max-width: 600px; color: #111827;">
       <p style="font-size:16px;">Hi ${escapeHtml(opts.toName || "there")},</p>
       <p style="font-size:15px;">
-        ${invoiceReminderOpeningParagraph(opts.jobTitle, opts.reminderKind, opts.reminderTone)}
+        ${invoiceReminderOpeningParagraph(opts.jobTitle, opts.reminderKind, opts.reminderTone, mode)}
       </p>
+      ${safeBalanceBlock}
       ${viewOnlineBlock}
 
       <div style="margin-top:22px;padding:14px 16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
@@ -794,7 +838,7 @@ export function invoiceReminderEmailHtml(opts: SendInvoiceReminderOptions): stri
           <tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Tax (${escapeHtml(opts.taxRateLabel)})</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.taxAmount)}</td></tr>
           <tr><td style="padding:6px 12px 6px 0;font-weight:600;">Total</td><td style="padding:6px 0;text-align:right;font-weight:600;">$${moneyHtml(opts.total)}</td></tr>
           <tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Deposit received</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.depositReceived)}</td></tr>
-          <tr><td style="padding:8px 12px 6px 0;font-weight:700;color:#2436BB;">Balance due</td><td style="padding:8px 0;text-align:right;font-weight:700;color:#2436BB;">$${moneyHtml(opts.balanceDue)}</td></tr>
+          <tr><td style="padding:8px 12px 6px 0;font-weight:700;color:#2436BB;">${escapeHtml(balanceRowLabel)}</td><td style="padding:8px 0;text-align:right;font-weight:700;color:#2436BB;">$${moneyHtml(opts.balanceDue)}</td></tr>
         </table>
       </div>
 
@@ -823,12 +867,19 @@ export async function sendInvoiceReminderEmail(
     options.businessDisplayName ?? options.contractor.businessName ?? null
   );
   const title = options.jobTitle.trim() || "Job";
+  const mode = options.customerFacingMode ?? "default";
   const subject =
-    options.reminderKind === "overdue"
-      ? `Invoice overdue — ${title}`
-      : options.reminderKind === "partial_balance"
-        ? `Reminder: Outstanding balance — ${title}`
-        : `Reminder: Invoice for ${title}`;
+    mode === "safe_automation"
+      ? options.reminderKind === "overdue"
+        ? `Reminder: Invoice may be past due — ${title}`
+        : options.reminderKind === "partial_balance"
+          ? `Reminder: Invoice balance — ${title}`
+          : `Reminder: Invoice for ${title}`
+      : options.reminderKind === "overdue"
+        ? `Invoice overdue — ${title}`
+        : options.reminderKind === "partial_balance"
+          ? `Reminder: Outstanding balance — ${title}`
+          : `Reminder: Invoice for ${title}`;
   const isProd = process.env.NODE_ENV === "production";
   const html = invoiceReminderEmailHtml(options);
 
@@ -880,14 +931,20 @@ export async function sendInvoiceReminderEmail(
   }
 
   if (options.deliveryLog) {
-    await insertEmailLog({
+    const logStatus = result.success ? ("success" as const) : ("failed" as const);
+    const payload = {
       profileId: options.deliveryLog.profileId,
       type: options.deliveryLog.type,
       recipientEmail: options.toEmail,
-      status: result.success ? "success" : "failed",
+      status: logStatus,
       errorMessage: result.success ? null : result.error ?? null,
       relatedEntityId: options.deliveryLog.relatedEntityId,
-    });
+    };
+    if (options.deliveryLog.useServiceRoleLog) {
+      await insertEmailLogWithServiceRole(payload);
+    } else {
+      await insertEmailLog(payload);
+    }
   }
 
   return result;

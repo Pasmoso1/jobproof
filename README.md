@@ -40,3 +40,13 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Automated invoice reminders (operators)
+
+Contractors enable timing in **Settings → Business**. For sends to run on a schedule, configure your host to call the automation entry point:
+
+- **Route:** `POST /api/cron/invoice-reminders`
+- **Auth:** header `Authorization: Bearer <value>` where the value matches env **`CRON_SECRET`**
+- **Also required:** `SUPABASE_SERVICE_ROLE_KEY`, Resend (`RESEND_API_KEY`), and applied DB migrations (including invoice reminder automation).
+
+Implementation: `src/app/api/cron/invoice-reminders/route.ts` and `src/lib/invoice-reminder-cron.ts`.
