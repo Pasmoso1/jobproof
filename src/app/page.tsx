@@ -57,7 +57,7 @@ export default function Home() {
           <a href="/">
             <img
               src="/jobproof-logo.png"
-              alt="Job Proof"
+              alt="JobProof"
               className="h-10 w-auto"
             />
           </a>
@@ -71,63 +71,192 @@ export default function Home() {
       </header>
       <main>
         {/* Hero */}
-        <section className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-20 sm:px-8 sm:py-28">
+        <section className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-16 sm:px-8 sm:py-24">
           <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl lg:text-5xl">
-              <span className="text-[#2436BB]">Protect</span> Every Job. Get Paid. Stay Protected.
+            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl lg:text-[2.65rem] lg:leading-tight">
+              When a customer says &lsquo;I never agreed to that&rsquo;&hellip; will you have proof?
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-zinc-600 sm:text-xl">
-              Job Proof helps Ontario contractors create clear contracts,
-              document every job properly, and generate professional dispute
-              documentation — so you stay protected when problems happen.
+              JobProof helps contractors document every job, track approvals, and get paid &mdash;
+              with clear contracts, photos, and dispute-ready records.
             </p>
-            <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <a
-                href="#early-access"
-                className="w-full rounded-lg bg-[#2436BB] px-6 py-3.5 text-center font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
-              >
-                Request Early Access
-              </a>
+            <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-zinc-500">
+              Most contractors only realize they need this after a dispute. By then, it&apos;s too
+              late.
+            </p>
+            <div className="mt-10 flex flex-col items-center justify-center gap-6 sm:flex-row sm:items-start sm:gap-8">
+              <div className="flex w-full flex-col items-center sm:w-auto sm:items-start">
+                <a
+                  href="#early-access"
+                  className="w-full rounded-lg bg-[#2436BB] px-6 py-3.5 text-center font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
+                >
+                  Request Early Access
+                </a>
+                <p className="mt-2 max-w-[16rem] text-center text-xs leading-snug text-zinc-500 sm:text-left">
+                  Free. No commitment. Early users get discounted launch pricing.
+                </p>
+                <p className="mt-1 max-w-[16rem] text-center text-xs leading-snug text-zinc-500 sm:text-left">
+                  Takes 10 seconds. No spam.
+                </p>
+              </div>
               <a
                 href="#how-it-works"
-                className="w-full rounded-lg border-2 border-[#2436BB] bg-white px-6 py-3.5 text-center font-medium text-[#2436BB] transition-colors hover:bg-[#2436BB]/5 focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
+                className="w-full rounded-lg border-2 border-[#2436BB] bg-white px-6 py-3.5 text-center font-medium text-[#2436BB] transition-colors hover:bg-[#2436BB]/5 focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:mt-0 sm:w-auto sm:self-center"
               >
                 See How It Works
               </a>
             </div>
+            <p className="mt-8 text-sm text-zinc-500">
+              Built for contractors across Ontario.
+            </p>
+            <p className="mt-2 text-xs text-zinc-400">
+              Built with feedback from Ontario contractors
+            </p>
+          </div>
+        </section>
+
+        {/* Problem — bullet cards */}
+        <section
+          id="heard-before"
+          className="scroll-mt-20 border-b border-zinc-200 px-6 py-14 sm:px-8 sm:py-16"
+        >
+          <div className="mx-auto max-w-4xl">
+            <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+              You&apos;ve probably dealt with this before:
+            </h2>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              {[
+                "I never agreed to that",
+                "That damage was already there",
+                "The job wasn't done properly",
+                "Payment gets delayed or ignored",
+              ].map((line) => (
+                <div
+                  key={line}
+                  className="rounded-xl border border-zinc-200 bg-zinc-50/80 px-4 py-3 text-left text-sm font-medium text-zinc-800 shadow-sm"
+                >
+                  <span className="mr-2 text-[#2436BB]">•</span>
+                  {line}
+                </div>
+              ))}
+            </div>
+            <p className="mt-10 text-center text-base font-semibold text-zinc-900 sm:text-lg">
+              Most jobs go smoothly. But one bad job can cost you thousands.
+            </p>
+            <p className="mt-4 text-center text-sm font-medium text-zinc-700">
+              And when it happens, it usually comes down to one thing: proof.
+            </p>
+          </div>
+        </section>
+
+        {/* Product UI mock — visual focal point */}
+        <section
+          id="protected-job-preview"
+          className="scroll-mt-20 border-b-2 border-b-[#4DBACC]/25 bg-gradient-to-b from-zinc-50 to-white px-6 py-16 sm:px-8 sm:py-24"
+          aria-labelledby="mock-heading"
+        >
+          <div className="mx-auto max-w-lg">
+            <h2
+              id="mock-heading"
+              className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl"
+            >
+              Here&apos;s what a protected job looks like in JobProof
+            </h2>
+            <p className="mx-auto mt-4 max-w-md text-center text-sm text-zinc-600">
+              This is what you&apos;ll have on every job:
+            </p>
+
+            <div
+              className="mt-6 overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] ring-1 ring-zinc-100"
+              role="img"
+              aria-label="Example JobProof job summary card"
+            >
+              <div className="border-b border-zinc-100 bg-zinc-50/90 px-4 py-3 sm:px-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Job</p>
+                    <p className="text-lg font-semibold text-zinc-900">Deck Building</p>
+                    <p className="mt-0.5 text-sm text-zinc-600">Joan Wilson</p>
+                  </div>
+                  <span className="shrink-0 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200/80">
+                    Active
+                  </span>
+                </div>
+                <p className="mt-3 text-2xl font-bold tabular-nums text-[#2436BB]">$5,600</p>
+              </div>
+
+              <div className="space-y-0 divide-y divide-zinc-100 px-4 py-2 sm:px-5">
+                {[
+                  "Contract sent for signature",
+                  "Before photos uploaded",
+                  "Scope clearly defined",
+                  "Change orders tracked",
+                  "Job updates documented",
+                  "Invoice sent",
+                ].map((label) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-3 py-2.5 text-sm text-zinc-700"
+                  >
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700"
+                      aria-hidden
+                    >
+                      ✓
+                    </span>
+                    {label}
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-zinc-100 bg-zinc-50/80 px-4 py-3 sm:px-5">
+                <p className="text-xs font-medium text-zinc-500">Status</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-200/80">
+                    Awaiting signed contract
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80">
+                    Proof on file
+                  </span>
+                </div>
+              </div>
+            </div>
+            <p className="mt-6 text-center text-sm text-zinc-600">
+              If a dispute happens, everything you need is already documented.
+            </p>
           </div>
         </section>
 
         {/* Who it's for */}
         <section
           id="who-its-for"
-          className="scroll-mt-20 border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20"
+          className="scroll-mt-20 border-b border-zinc-200 px-6 py-14 sm:px-8 sm:py-16"
         >
           <div className="mx-auto max-w-4xl">
             <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              Who Job Proof Is Built For
+              Who JobProof Is Built For
             </h2>
 
             <p className="mt-6 text-center text-zinc-600 leading-relaxed">
-              Job Proof is designed for contractors who want to protect their work,
-              document jobs properly, and reduce disputes with clear contracts and
-              professional records.
+              Built for contractors who want to protect their work, avoid misunderstandings, and
+              have clear records when customers question what was agreed.
             </p>
 
             <div className="mt-12 grid gap-8 sm:grid-cols-2">
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">Great for</h3>
+                <h3 className="font-semibold text-zinc-900">Best for</h3>
                 <ul className="mt-3 space-y-2 text-sm text-zinc-600">
                   <li>Independent contractors</li>
-                  <li>Small contractor teams</li>
+                  <li>Small teams</li>
+                  <li>Painters</li>
                   <li>Plumbers</li>
-                  <li>HVAC technicians</li>
+                  <li>Renovators</li>
+                  <li>HVAC</li>
                   <li>Electricians</li>
                   <li>Flooring installers</li>
-                  <li>Painters</li>
                   <li>Roofers</li>
                   <li>Landscapers</li>
-                  <li>Renovation contractors</li>
+                  <li>General contracting</li>
                 </ul>
               </div>
 
@@ -143,85 +272,48 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Problem */}
-        <section
-          id="problem"
-          className="scroll-mt-20 border-b-2 border-b-[#4DBACC]/20 px-6 py-16 sm:px-8 sm:py-20"
-        >
-          <div className="mx-auto max-w-3xl">
-            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              Disputes Don&apos;t Happen Often — Until They Do.
-            </h2>
-            <p className="mt-6 text-zinc-600 leading-relaxed">
-              Most jobs go smoothly. But when a client claims damage was already
-              there, scope was unclear, or payment gets withheld, you need proof.
-              Unclear contracts, unsigned change orders, and missing documentation
-              can cost you money, time, and reputation. Job Proof gives you the
-              structure and evidence to protect yourself before disputes happen.
-            </p>
-          </div>
-        </section>
-
-        {/* Benefits */}
+        {/* How JobProof protects you */}
         <section
           id="benefits"
-          className="scroll-mt-20 border-b border-zinc-200 bg-zinc-50/50 px-6 py-16 sm:px-8 sm:py-20"
+          className="scroll-mt-20 border-b border-zinc-200 bg-zinc-50/50 px-6 py-14 sm:px-8 sm:py-16"
         >
           <div className="mx-auto max-w-4xl">
             <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              Why Contractors Use Job Proof
+              How JobProof Protects You
             </h2>
             <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
                 <h3 className="font-semibold text-zinc-900">Clear contracts</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  Structured, professional contracts that define scope and
-                  expectations from the start.
+                  No more unclear scope or verbal agreements.
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Before / During / After documentation
-                </h3>
+                <h3 className="font-semibold text-zinc-900">Before / During / After photos</h3>
+                <p className="mt-2 text-sm text-zinc-600">Timestamped proof of the job.</p>
+              </div>
+              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
+                <h3 className="font-semibold text-zinc-900">Change order tracking</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  Document the job at every stage with photos and notes — so you
-                  have proof when it matters.
+                  No more &lsquo;I didn&apos;t approve that&rsquo;.
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Change order protection
-                </h3>
+                <h3 className="font-semibold text-zinc-900">Dispute-ready documentation</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  Track and sign off on changes properly. No more &quot;I never
-                  agreed to that.&quot;
+                  Everything organized if something goes wrong.
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Professional dispute documentation
-                </h3>
+                <h3 className="font-semibold text-zinc-900">Invoices + records</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  Generate clear, organized documentation for disputes, liens, or
-                  small claims.
+                  Clear payment history and job completion proof.
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  AI clarity and risk scanning
-                </h3>
+                <h3 className="font-semibold text-zinc-900">Professional workflow</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  Get AI-assisted clarity on contracts and early warnings on
-                  potential risks.
-                </p>
-              </div>
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  More professional workflow
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  One place for contracts, photos, and documentation. Look more
-                  professional, work with less stress.
+                  Look more professional, reduce stress.
                 </p>
               </div>
             </div>
@@ -231,106 +323,40 @@ export default function Home() {
         {/* How it works */}
         <section
           id="how-it-works"
-          className="scroll-mt-20 border-b-2 border-b-[#4DBACC]/20 px-6 py-16 sm:px-8 sm:py-20"
+          className="scroll-mt-20 border-b-2 border-b-[#4DBACC]/20 px-6 py-14 sm:px-8 sm:py-16"
         >
           <div className="mx-auto max-w-4xl">
             <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              Built for Real Contractor Workflows
+              How it works
             </h2>
             <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
               <div className="text-center">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#2436BB] text-lg font-bold text-white">
                   1
                 </div>
-                <h3 className="mt-4 font-semibold text-zinc-900">
-                  Create a job
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  Set up the job with client details and scope.
-                </p>
+                <h3 className="mt-4 font-semibold text-zinc-900">Create the job</h3>
+                <p className="mt-2 text-sm text-zinc-600">Set up customer + scope.</p>
               </div>
               <div className="text-center">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#2436BB] text-lg font-bold text-white">
                   2
                 </div>
-                <h3 className="mt-4 font-semibold text-zinc-900">
-                  Generate a structured contract
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  Get a clear contract ready for client signature.
-                </p>
+                <h3 className="mt-4 font-semibold text-zinc-900">Send a clear contract</h3>
+                <p className="mt-2 text-sm text-zinc-600">Client signs before work begins.</p>
               </div>
               <div className="text-center">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#2436BB] text-lg font-bold text-white">
                   3
                 </div>
-                <h3 className="mt-4 font-semibold text-zinc-900">
-                  Document the work
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  Capture before, during, and after photos and notes.
-                </p>
+                <h3 className="mt-4 font-semibold text-zinc-900">Document the job</h3>
+                <p className="mt-2 text-sm text-zinc-600">Add photos, notes, updates.</p>
               </div>
               <div className="text-center">
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#2436BB] text-lg font-bold text-white">
                   4
                 </div>
-                <h3 className="mt-4 font-semibold text-zinc-900">
-                  Generate documentation instantly
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  Produce professional dispute or lien documentation if required.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Feature section */}
-        <section
-          id="features"
-          className="scroll-mt-20 border-b-2 border-b-[#4DBACC]/20 bg-zinc-50/50 px-6 py-16 sm:px-8 sm:py-20"
-        >
-          <div className="mx-auto max-w-4xl">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              Everything You Need To Protect Your Work
-            </h2>
-            <div className="mt-12 grid gap-6 sm:grid-cols-2">
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Contracts that protect you
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  Generate structured contracts with clear scope and capture
-                  client signatures directly on the agreement.
-                </p>
-              </div>
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Before / During / After job documentation
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  Capture timestamped photos and notes that prove the condition
-                  of the property before, during, and after work.
-                </p>
-              </div>
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Invoices and job completion records
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  Generate invoices when work is complete and maintain a clear
-                  record of job completion and payments.
-                </p>
-              </div>
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Dispute-ready documentation
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  Instantly generate organized documentation if a customer
-                  dispute or payment issue occurs.
-                </p>
+                <h3 className="mt-4 font-semibold text-zinc-900">Get paid with proof</h3>
+                <p className="mt-2 text-sm text-zinc-600">Invoices + records protect you.</p>
               </div>
             </div>
           </div>
@@ -339,116 +365,46 @@ export default function Home() {
         {/* When things go wrong */}
         <section
           id="when-things-go-wrong"
-          className="scroll-mt-20 border-b-2 border-b-[#4DBACC]/20 px-6 py-16 sm:px-8 sm:py-20"
+          className="scroll-mt-20 border-b border-zinc-200 bg-zinc-50/50 px-6 py-14 sm:px-8 sm:py-16"
         >
           <div className="mx-auto max-w-4xl">
             <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              When Things Go Wrong, Job Proof Has You Covered
+              When things go wrong
             </h2>
             <div className="mt-12 grid gap-6 sm:grid-cols-2">
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
                 <h3 className="font-semibold text-zinc-900">
-                  Customer says the damage was already there
+                  Customer says damage was already there
                 </h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  Before photos show the condition of the property before work
-                  started.
+                  <span className="font-semibold text-[#2436BB]">→</span> Your before photos prove
+                  otherwise.
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Scope of work becomes unclear
-                </h3>
+                <h3 className="font-semibold text-zinc-900">Scope becomes unclear</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  Your structured contract clearly documents the agreed scope.
+                  <span className="font-semibold text-[#2436BB]">→</span> Your contract defines
+                  exactly what was agreed.
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Customer claims work wasn&apos;t completed properly
-                </h3>
+                <h3 className="font-semibold text-zinc-900">Customer claims poor work</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  Before, during, and after documentation shows exactly what
-                  happened.
+                  <span className="font-semibold text-[#2436BB]">→</span> Your documentation shows
+                  the full process.
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Payment is delayed or disputed
-                </h3>
+                <h3 className="font-semibold text-zinc-900">Payment is delayed</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  Organized job records, signatures, and invoices support your
+                  <span className="font-semibold text-[#2436BB]">→</span> Your records support your
                   case.
                 </p>
               </div>
             </div>
             <p className="mt-10 text-center text-sm font-semibold text-zinc-700">
-              Designed specifically for contractors working in the real world —
-              not office software.
-            </p>
-          </div>
-        </section>
-
-        {/* Trades section */}
-        <section
-          id="trades"
-          className="scroll-mt-20 border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20"
-        >
-          <div className="mx-auto max-w-4xl">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              Built for Contractors Across Multiple Trades
-            </h2>
-            <p className="mt-6 text-center text-zinc-600 leading-relaxed">
-              Job Proof helps contractors protect their work, document jobs
-              properly, and maintain professional records.
-            </p>
-            <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center text-sm font-medium text-zinc-900">
-                Plumbing
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center text-sm font-medium text-zinc-900">
-                HVAC
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center text-sm font-medium text-zinc-900">
-                Electrical
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center text-sm font-medium text-zinc-900">
-                Flooring
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center text-sm font-medium text-zinc-900">
-                Renovations
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center text-sm font-medium text-zinc-900">
-                Landscaping
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center text-sm font-medium text-zinc-900">
-                Roofing
-              </div>
-              <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3 text-center text-sm font-medium text-zinc-900">
-                General Contracting
-              </div>
-            </div>
-            <p className="mt-6 text-center text-sm font-semibold text-zinc-700">
-              And many other contractor trades.
-            </p>
-          </div>
-        </section>
-
-        {/* Value */}
-        <section
-          id="value"
-          className="scroll-mt-20 border-b border-zinc-200 bg-zinc-50/50 px-6 py-16 sm:px-8 sm:py-20"
-        >
-          <div className="mx-auto max-w-3xl">
-            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              One Unpaid Job Can Cost More Than Years of Job Proof
-            </h2>
-            <p className="mt-6 text-zinc-600 leading-relaxed">
-              A single disputed job can mean thousands in lost revenue, legal
-              fees, and damaged reputation. Job Proof costs a fraction of that
-              — and helps you avoid the dispute in the first place. Clear
-              contracts and proper documentation reduce risk and give you
-              confidence on every job.
+              Built for real contractor jobs &mdash; not office software.
             </p>
           </div>
         </section>
@@ -456,25 +412,25 @@ export default function Home() {
         {/* Pricing preview */}
         <section
           id="pricing"
-          className="scroll-mt-20 border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20"
+          className="scroll-mt-20 border-b border-zinc-200 px-6 py-14 sm:px-8 sm:py-16"
         >
           <div className="mx-auto max-w-2xl">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+            <p className="text-center text-lg font-medium leading-relaxed text-zinc-800">
+              One disputed job can cost thousands in lost revenue or legal fees. JobProof costs less
+              than a single mistake.
+            </p>
+            <h2 className="mt-10 text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
               Simple, Transparent Pricing
             </h2>
             <div className="mt-12 grid gap-6 sm:grid-cols-2">
               <div className="rounded-xl border border-zinc-200 bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Essential Protection
-                </h3>
+                <h3 className="font-semibold text-zinc-900">Essential Protection</h3>
                 <p className="mt-2 text-2xl font-bold text-zinc-900">$39</p>
                 <p className="text-sm text-zinc-500">per month</p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Built for solo contractors
-                </p>
+                <p className="mt-1 text-xs text-zinc-500">Built for solo contractors</p>
                 <p className="mt-4 text-sm text-zinc-600">
-                  Core contracts, job documentation, and dispute-ready records
-                  designed for solo contractors.
+                  Core contracts, job documentation, and dispute-ready records designed for solo
+                  contractors.
                 </p>
                 <p className="mt-2 text-xs text-zinc-500">
                   Less than the cost of fixing one mistake on a job.
@@ -493,12 +449,10 @@ export default function Home() {
                   Built for growing contractors and small teams
                 </p>
                 <p className="mt-4 text-sm text-zinc-300">
-                  Everything in Essential, plus advanced features, AI risk
-                  scanning, and priority support.
+                  Everything in Essential, plus advanced features, AI risk scanning, and priority
+                  support.
                 </p>
-                <p className="mt-2 text-xs text-zinc-400">
-                  Less than the cost of one service call.
-                </p>
+                <p className="mt-2 text-xs text-zinc-400">Less than the cost of one service call.</p>
               </div>
             </div>
           </div>
@@ -507,25 +461,22 @@ export default function Home() {
         {/* Early access + form */}
         <section
           id="early-access"
-          className="scroll-mt-20 px-6 py-16 sm:px-8 sm:py-20"
+          className="scroll-mt-20 bg-zinc-50/50 px-6 py-14 sm:px-8 sm:py-16"
         >
           <div className="mx-auto max-w-2xl">
             <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              Join the Founding Members List
+              Start protecting your jobs before problems happen
             </h2>
             <p className="mt-6 text-center text-zinc-600 leading-relaxed">
-              Ontario contractors can request early access and help shape Job
-              Proof before launch. We&apos;re building this with real contractors
-              — your feedback matters.
+              We&apos;re opening early access to a small number of contractors first. Join now and
+              help shape JobProof before launch.
             </p>
 
             <form
               className="mt-12 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8"
               onSubmit={handleSubmit}
             >
-              <h3 className="text-lg font-semibold text-zinc-900">
-                Request Early Access
-              </h3>
+              <h3 className="text-lg font-semibold text-zinc-900">Request Early Access</h3>
               <p className="mt-1 text-sm text-zinc-500">
                 Be the first to know when we launch.
               </p>
