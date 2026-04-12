@@ -93,7 +93,7 @@ export default function Home() {
                   Request Early Access
                 </a>
                 <p className="mt-2 max-w-[16rem] text-center text-xs leading-snug text-zinc-500 sm:text-left">
-                  Free. No commitment. Early users get discounted launch pricing.
+                  Free. No commitment. Founding members lock in lower pricing before launch.
                 </p>
                 <p className="mt-1 max-w-[16rem] text-center text-xs leading-snug text-zinc-500 sm:text-left">
                   Takes 10 seconds. No spam.
@@ -419,6 +419,9 @@ export default function Home() {
               One disputed job can cost thousands in lost revenue or legal fees. JobProof costs less
               than a single mistake.
             </p>
+            <p className="mt-4 text-center text-sm text-zinc-600">
+              Founding members lock in early access pricing before public launch.
+            </p>
             <h2 className="mt-10 text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
               Simple, Transparent Pricing
             </h2>
@@ -427,7 +430,7 @@ export default function Home() {
                 <h3 className="font-semibold text-zinc-900">Essential Protection</h3>
                 <p className="mt-2 text-2xl font-bold text-zinc-900">$39</p>
                 <p className="text-sm text-zinc-500">per month</p>
-                <p className="mt-1 text-xs text-zinc-500">Built for solo contractors</p>
+                <p className="mt-1 text-xs text-zinc-500">For solo contractors (1 user)</p>
                 <p className="mt-4 text-sm text-zinc-600">
                   Core contracts, job documentation, and dispute-ready records designed for solo
                   contractors.
@@ -446,15 +449,18 @@ export default function Home() {
                 <p className="mt-2 text-2xl font-bold">$59</p>
                 <p className="text-sm text-zinc-300">per month</p>
                 <p className="mt-1 text-xs text-zinc-400">
-                  Built for growing contractors and small teams
+                  For teams of 2–5 contractors (each member gets access)
                 </p>
                 <p className="mt-4 text-sm text-zinc-300">
-                  Everything in Essential, plus advanced features, AI risk scanning, and priority
-                  support.
+                  Everything in Essential, plus multi-user access, advanced features, AI risk
+                  scanning, and priority support.
                 </p>
                 <p className="mt-2 text-xs text-zinc-400">Less than the cost of one service call.</p>
               </div>
             </div>
+            <p className="mt-8 text-center text-xs text-zinc-500">
+              Join early and keep this pricing as a founding member.
+            </p>
           </div>
         </section>
 
@@ -468,8 +474,8 @@ export default function Home() {
               Start protecting your jobs before problems happen
             </h2>
             <p className="mt-6 text-center text-zinc-600 leading-relaxed">
-              We&apos;re opening early access to a small number of contractors first. Join now and
-              help shape JobProof before launch.
+              We&apos;re opening early access to a small number of contractors. Founding members
+              lock in lower pricing and help shape JobProof before launch.
             </p>
 
             <form
