@@ -21,10 +21,8 @@ import {
 } from "@/lib/validation/job-create";
 import { computeContractPricingBreakdown, formatContractMoney } from "@/lib/contract-tax-pricing";
 import { resolvePublicAppOrigin } from "@/lib/app-origin";
-import {
-  invoiceTaxShortLabel,
-  taxRateFromPropertyProvince,
-} from "@/lib/invoice-tax";
+import { invoiceTaxShortLabelFromAppliedAmounts } from "@/lib/invoice-tax";
+import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 import {
   formatDateEastern,
   formatLocalDateStringEastern,
@@ -473,7 +471,7 @@ export async function createJob(formData: FormData) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, active_job_limit")
+    .select("id, active_job_limit, province")
     .eq("user_id", user.id)
     .single();
 
@@ -503,7 +501,16 @@ export async function createJob(formData: FormData) {
   const depositAmountRaw = formData.get("deposit_amount");
   const depositAmount = depositAmountRaw ? parseFloat(String(depositAmountRaw)) : null;
   const taxRateRaw = formData.get("tax_rate");
-  const taxRate = taxRateRaw ? parseFloat(String(taxRateRaw)) : 0;
+  const taxRateParsed =
+    taxRateRaw != null && String(taxRateRaw).trim() !== ""
+      ? parseFloat(String(taxRateRaw))
+      : NaN;
+  const fallbackJobTax = defaultTaxRateForNewFinancials(
+    profile.province,
+    propertyProvince
+  ).taxRate;
+  const taxRate =
+    Number.isFinite(taxRateParsed) && taxRateParsed >= 0 ? taxRateParsed : fallbackJobTax;
   const startDate = String(formData.get("start_date") ?? "").trim();
   const estimatedCompletionDate = String(formData.get("estimated_completion_date") ?? "").trim();
   const originalContractPriceRaw = formData.get("original_contract_price");
@@ -1257,11 +1264,14 @@ export async function createOrUpdateContract(
     return { error: "Unauthorized" };
   }
 
-  const jobTaxRate = taxRateFromPropertyProvince(job.property_province);
+  const defaultContractTax = defaultTaxRateForNewFinancials(
+    profile.province,
+    job.property_province
+  ).taxRate;
 
   const { data: existingEditable } = await supabase
     .from("contracts")
-    .select("id, version_number, status")
+    .select("id, version_number, status, tax_rate")
     .eq("job_id", jobId)
     .in("status", ["draft", "pending"])
     .order("version_number", { ascending: false })
@@ -1358,6 +1368,25 @@ export async function createOrUpdateContract(
     nextStatus = "pending";
   }
 
+  const structuredTaxRaw = structured?.taxRate;
+  const structuredTax =
+    structuredTaxRaw != null &&
+    Number.isFinite(Number(structuredTaxRaw)) &&
+    Number(structuredTaxRaw) >= 0
+      ? Number(structuredTaxRaw)
+      : null;
+
+  let resolvedContractTaxRate: number;
+  if (structuredTax != null) {
+    resolvedContractTaxRate = structuredTax;
+  } else if (existing) {
+    const er = existing.tax_rate;
+    resolvedContractTaxRate =
+      er != null && Number.isFinite(Number(er)) ? Number(er) : defaultContractTax;
+  } else {
+    resolvedContractTaxRate = defaultContractTax;
+  }
+
   const payload = {
     contract_data: contractData,
     status: nextStatus,
@@ -1376,7 +1405,7 @@ export async function createOrUpdateContract(
     deposit_amount: structured?.depositAmount ?? (contractData.deposit as number) ?? null,
     payment_terms: structured?.paymentTerms ?? (contractData.paymentTerms as string) ?? null,
     tax_included: structured?.taxIncluded ?? false,
-    tax_rate: jobTaxRate,
+    tax_rate: resolvedContractTaxRate,
     warranty_note: structured?.warrantyNote ?? null,
     cancellation_change_note: structured?.cancellationChangeNote ?? null,
   };
@@ -1609,6 +1638,7 @@ function buildSignedContractSummaryRows(contract: {
   contract_data: unknown;
   deposit_amount: number | null;
   payment_terms: string | null;
+  tax_rate?: number | null;
   jobs?: { property_province?: string | null } | { property_province?: string | null }[] | null;
 }): { label: string; value: string }[] {
   const cd = (contract.contract_data as Record<string, unknown>) ?? {};
@@ -1619,7 +1649,10 @@ function buildSignedContractSummaryRows(contract: {
   const breakdown = computeContractPricingBreakdown(
     contract.price,
     contract.deposit_amount,
-    province
+    province,
+    contract.tax_rate != null && Number.isFinite(Number(contract.tax_rate))
+      ? Number(contract.tax_rate)
+      : null
   );
   const pricingRows: { label: string; value: string }[] = breakdown
     ? [
@@ -2033,7 +2066,7 @@ export async function sendRemoteContractSigningLink(params: {
 
   const { data: pricingRow } = await supabase
     .from("contracts")
-    .select("price, deposit_amount, jobs(property_province)")
+    .select("price, deposit_amount, tax_rate, jobs(property_province)")
     .eq("id", params.contractId)
     .single();
 
@@ -2042,7 +2075,10 @@ export async function sendRemoteContractSigningLink(params: {
     pricingRow?.deposit_amount ?? null,
     jobProvinceFromContractEmbed(
       pricingRow as Parameters<typeof jobProvinceFromContractEmbed>[0]
-    )
+    ),
+    pricingRow?.tax_rate != null && Number.isFinite(Number(pricingRow.tax_rate))
+      ? Number(pricingRow.tax_rate)
+      : null
   );
   const contractPricing = remoteBreakdown
     ? {
@@ -3074,7 +3110,8 @@ function formatJobServiceAddressLines(job: {
 
 /**
  * Create invoice from signed job totals only (contract + signed change orders on the job).
- * Tax rate is derived from the job’s property province (server-side). Status is `draft` until
+ * Tax rate defaults from the contractor’s business province when set, otherwise the job site
+ * province. Status is `draft` until
  * the customer notification email succeeds, then updated to `sent` with `sent_at`.
  */
 export async function createInvoice(
@@ -3165,9 +3202,13 @@ export async function createInvoice(
     };
   }
 
-  const province =
+  const propertyProvince =
     (job as { property_province?: string | null }).property_province ?? null;
-  const rate = taxRateFromPropertyProvince(province);
+  const invoiceTaxDefaults = defaultTaxRateForNewFinancials(
+    profile.province,
+    propertyProvince
+  );
+  const rate = invoiceTaxDefaults.taxRate;
   const depositRaw = Number(job.deposit_amount ?? 0);
   const depositOnFile = Number.isFinite(depositRaw) && depositRaw > 0 ? depositRaw : 0;
 
@@ -3255,7 +3296,7 @@ export async function createInvoice(
   const dueDateFormatted = formatLocalDateStringEastern(dueDateTrimmed);
   const issueDateFormatted = formatDateEastern(invoice.created_at);
 
-  const taxRateLabel = invoiceTaxShortLabel(province);
+  const taxRateLabel = invoiceTaxDefaults.shortLabel;
 
   const contractorAddressLines = formatProfileAddressLines(profile);
   const serviceAddressLines = formatJobServiceAddressLines(
@@ -3537,12 +3578,9 @@ export async function resendInvoice(
     };
   }
 
-  const province =
-    (job as { property_province?: string | null }).property_province ?? null;
-  const taxRateLabel = invoiceTaxShortLabel(province);
-
   const subtotal = Number(invRow.subtotal);
   const taxAmount = Number(invRow.tax_amount);
+  const taxRateLabel = invoiceTaxShortLabelFromAppliedAmounts(subtotal, taxAmount);
   const total = Number(invRow.total);
   const depositCredited = Number(invRow.deposit_credited ?? 0);
   const balanceDue = Number(invRow.balance_due ?? Math.max(0, total - depositCredited));
@@ -4328,12 +4366,9 @@ export async function sendInvoiceReminder(
     };
   }
 
-  const province =
-    (job as { property_province?: string | null }).property_province ?? null;
-  const taxRateLabel = invoiceTaxShortLabel(province);
-
   const subtotal = Number(invRow.subtotal);
   const taxAmount = Number(invRow.tax_amount);
+  const taxRateLabel = invoiceTaxShortLabelFromAppliedAmounts(subtotal, taxAmount);
   const total = Number(invRow.total);
   const depositCredited = Number(invRow.deposit_credited ?? 0);
   const balanceDue = Number(invRow.balance_due ?? Math.max(0, total - depositCredited));

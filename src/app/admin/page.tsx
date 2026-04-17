@@ -48,6 +48,7 @@ type WaitlistSignup = {
   email: string | null;
   trade: string | null;
   city: string | null;
+  province: string | null;
   team_size: string | null;
   plan_interest: string | null;
   source: string | null;
@@ -79,6 +80,7 @@ async function getWaitlistSignups(): Promise<WaitlistSignup[]> {
     email: (row.email as string) ?? null,
     trade: (row.trade as string) ?? null,
     city: (row.city as string) ?? null,
+    province: (row.province as string) ?? null,
     team_size: (row.team_size as string) ?? null,
     plan_interest: (row.plan_interest as string) ?? null,
     source: (row.source as string) ?? null,
@@ -237,6 +239,7 @@ export default async function AdminPage({
                 <th className="px-4 py-3 font-medium text-zinc-700">email</th>
                 <th className="px-4 py-3 font-medium text-zinc-700">trade</th>
                 <th className="px-4 py-3 font-medium text-zinc-700">city</th>
+                <th className="px-4 py-3 font-medium text-zinc-700">province</th>
                 <th className="px-4 py-3 font-medium text-zinc-700">team_size</th>
                 <th className="px-4 py-3 font-medium text-zinc-700">plan_interest</th>
                 <th className="px-4 py-3 font-medium text-zinc-700">source</th>
@@ -254,6 +257,7 @@ export default async function AdminPage({
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{row.trade ?? "—"}</td>
                   <td className="px-4 py-3 text-zinc-600">{row.city ?? "—"}</td>
+                  <td className="px-4 py-3 text-zinc-600">{row.province ?? "—"}</td>
                   <td className="px-4 py-3 text-zinc-600">
                     {row.team_size ?? "—"}
                   </td>
@@ -267,7 +271,7 @@ export default async function AdminPage({
               {signups.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="px-4 py-8 text-center text-zinc-500"
                   >
                     No signups yet

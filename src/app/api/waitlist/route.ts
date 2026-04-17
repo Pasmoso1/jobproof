@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     const supabase = createClient(url, serviceRoleKey);
 
     const body = await request.json();
-    const { email, trade, city, source, website } = body;
+    const { email, trade, city, province, source, website } = body;
 
     if (website && String(website).trim()) {
       return NextResponse.json({ ok: true }, { status: 200 });
@@ -31,6 +31,15 @@ export async function POST(request: Request) {
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return NextResponse.json(
         { ok: false, error: "Valid email is required" },
+        { status: 400 }
+      );
+    }
+
+    const provinceStr =
+      typeof province === "string" ? province.trim() : String(province ?? "").trim();
+    if (!provinceStr) {
+      return NextResponse.json(
+        { ok: false, error: "Province is required" },
         { status: 400 }
       );
     }
@@ -44,6 +53,7 @@ export async function POST(request: Request) {
           email: normalizedEmail,
           trade: trade?.trim() ?? null,
           city: city?.trim() ?? null,
+          province: provinceStr,
           source: source?.trim() ?? null,
         },
       ]);

@@ -24,7 +24,14 @@ type Customer = {
   postal_code?: string | null;
 };
 
-export function CreateJobForm({ customers }: { customers: Customer[] }) {
+export function CreateJobForm({
+  customers,
+  initialTaxRate,
+}: {
+  customers: Customer[];
+  /** Decimal rate string from contractor province (e.g. "0.13") */
+  initialTaxRate?: string;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,7 +55,7 @@ export function CreateJobForm({ customers }: { customers: Customer[] }) {
   const [propertyProvince, setPropertyProvince] = useState("");
   const [propertyPostalCode, setPropertyPostalCode] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
-  const [taxRate, setTaxRate] = useState("");
+  const [taxRate, setTaxRate] = useState(() => initialTaxRate?.trim() || "");
   const [startDate, setStartDate] = useState("");
   const [estimatedCompletionDate, setEstimatedCompletionDate] = useState("");
   const [originalContractPrice, setOriginalContractPrice] = useState("");

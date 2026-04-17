@@ -16,12 +16,13 @@ export type ContractPricingBreakdown = {
 
 /**
  * Contract `price` in the database is the pre-tax subtotal (same basis as invoice subtotal).
- * Tax uses the job property province, matching invoice creation.
+ * Tax uses `taxRateOverride` when set (e.g. builder form); otherwise job property province.
  */
 export function computeContractPricingBreakdown(
   subtotalPreTax: number | null | undefined,
   depositAmount: number | null | undefined,
-  propertyProvince: string | null | undefined
+  propertyProvince: string | null | undefined,
+  taxRateOverride?: number | null
 ): ContractPricingBreakdown | null {
   const sub =
     subtotalPreTax != null &&
@@ -31,7 +32,12 @@ export function computeContractPricingBreakdown(
       : null;
   if (sub == null) return null;
 
-  const rate = taxRateFromPropertyProvince(propertyProvince);
+  const rate =
+    taxRateOverride != null &&
+    Number.isFinite(Number(taxRateOverride)) &&
+    Number(taxRateOverride) >= 0
+      ? Number(taxRateOverride)
+      : taxRateFromPropertyProvince(propertyProvince);
   const taxAmount = roundMoney(sub * rate);
   const totalIncludingTax = roundMoney(sub + taxAmount);
   const depRaw =
@@ -45,10 +51,22 @@ export function computeContractPricingBreakdown(
     Math.max(0, totalIncludingTax - depositApplied)
   );
 
+  const pct = rate * 100;
+  const pctStr =
+    Math.abs(pct - Math.round(pct)) < 1e-9
+      ? String(Math.round(pct))
+      : pct.toFixed(3).replace(/\.?0+$/, "");
+  const taxShortLabel =
+    taxRateOverride != null &&
+    Number.isFinite(Number(taxRateOverride)) &&
+    Number(taxRateOverride) >= 0
+      ? `${pctStr}%`
+      : invoiceTaxShortLabel(propertyProvince);
+
   return {
     subtotalPreTax: sub,
     taxRate: rate,
-    taxShortLabel: invoiceTaxShortLabel(propertyProvince),
+    taxShortLabel,
     taxAmount,
     totalIncludingTax,
     depositApplied,

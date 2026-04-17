@@ -204,7 +204,10 @@ export async function buildSignedContractPdfBytes(
   const pdfPricing = computeContractPricingBreakdown(
     input.price,
     input.depositAmount,
-    input.propertyProvince
+    input.propertyProvince,
+    input.taxRate != null && Number.isFinite(Number(input.taxRate))
+      ? Number(input.taxRate)
+      : null
   );
   if (pdfPricing) {
     labeledParagraph(

@@ -187,6 +187,7 @@ export default async function InvoicesPage({
         latestInvoice={latestInvoice}
         invoiceReminderHints={invoiceReminderHints}
         invoicePaymentDetails={invoicePaymentDetails ?? []}
+        contractorProvince={profile?.province ?? null}
       />
 
       <div className="mt-8 rounded-xl border border-zinc-200 bg-white">

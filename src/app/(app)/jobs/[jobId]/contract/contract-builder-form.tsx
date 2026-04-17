@@ -17,10 +17,7 @@ import {
   validateCustomerEmailForRemote,
   validateCustomerPhone,
 } from "@/lib/validation/job-create";
-import {
-  invoiceTaxRateDisplayLabel,
-  taxRateFromPropertyProvince,
-} from "@/lib/invoice-tax";
+import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 import { computeContractPricingBreakdown, formatContractMoney } from "@/lib/contract-tax-pricing";
 import { ContractPreview } from "./contract-preview";
 import type { Contract, Profile } from "@/types/database";
@@ -133,7 +130,13 @@ function buildContractFormState(
       completionDate: normalizeDateInput(
         (cd.completionDate as string) ?? job.estimated_completion_date ?? undefined
       ),
-      taxRate: String(taxRateFromPropertyProvince(job.property_province)),
+      taxRate:
+        existingContract.tax_rate != null &&
+        Number.isFinite(Number(existingContract.tax_rate))
+          ? String(existingContract.tax_rate)
+          : String(
+              defaultTaxRateForNewFinancials(profile?.province, job.property_province).taxRate
+            ),
       companyName: existingContract.company_name ?? profile?.business_name ?? "",
       contractorName: existingContract.contractor_name ?? profile?.contractor_name ?? "",
       contractorEmail: existingContract.contractor_email ?? userEmail ?? "",
@@ -170,7 +173,9 @@ function buildContractFormState(
         : "",
     startDate: normalizeDateInput(job.start_date),
     completionDate: normalizeDateInput(job.estimated_completion_date),
-    taxRate: String(taxRateFromPropertyProvince(job.property_province)),
+    taxRate: String(
+      defaultTaxRateForNewFinancials(profile?.province, job.property_province).taxRate
+    ),
     companyName: profile?.business_name ?? "",
     contractorName: profile?.contractor_name ?? "",
     contractorEmail: userEmail ?? "",
@@ -228,10 +233,14 @@ export function ContractBuilderForm({
   const depositNum = parseFloat(form.depositAmount);
   const depositForBalance =
     !Number.isNaN(depositNum) && depositNum >= 0 ? depositNum : 0;
+  const formTaxNum = parseFloat(form.taxRate);
+  const taxRateOverride =
+    Number.isFinite(formTaxNum) && formTaxNum >= 0 ? formTaxNum : null;
   const pricingSummary = computeContractPricingBreakdown(
     hasValidPrice ? priceNum : null,
     depositForBalance > 0 ? depositForBalance : null,
-    job.property_province
+    job.property_province,
+    taxRateOverride
   );
   const propertyAddressDisplay = form.jobAddress.trim() || "—";
   const remoteSigningEmailReady = isValidCustomerEmail(form.customerEmail);
@@ -285,7 +294,10 @@ export function ContractBuilderForm({
       depositAmount:
         !Number.isNaN(depositNum) && depositNum >= 0 ? depositNum : undefined,
       paymentTerms: form.paymentTerms.trim() || undefined,
-      taxRate: taxRateFromPropertyProvince(job.property_province),
+      taxRate: (() => {
+        const tr = parseFloat(form.taxRate);
+        return Number.isFinite(tr) && tr >= 0 ? tr : undefined;
+      })(),
       warrantyNote: form.warrantyNote.trim() || undefined,
       cancellationChangeNote: form.cancellationNote.trim() || undefined,
     };
@@ -566,9 +578,9 @@ export function ContractBuilderForm({
             </dd>
           </div>
           <div>
-            <dt className="text-zinc-500">Sales tax (from property province)</dt>
+            <dt className="text-zinc-500">Sales tax rate</dt>
             <dd className="font-medium text-zinc-900">
-              {invoiceTaxRateDisplayLabel(job.property_province)}
+              {pricingSummary?.taxShortLabel ?? "—"}
             </dd>
           </div>
           <div className="sm:col-span-2">
@@ -751,8 +763,9 @@ export function ContractBuilderForm({
         <div className="space-y-4 border-b border-zinc-100 pb-6">
           <h3 className="text-sm font-semibold text-zinc-900">Financial</h3>
           <p className="text-xs text-zinc-600">
-            Contract amount is the subtotal before tax. Sales tax matches your invoice and is based on
-            the job property province ({invoiceTaxRateDisplayLabel(job.property_province)}).
+            Contract amount is the subtotal before tax. The default rate uses your business province
+            (Settings → Business) when set; otherwise it follows the job site province. You can edit
+            the decimal rate below.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -976,6 +989,7 @@ export function ContractBuilderForm({
               contractorPhone={form.contractorPhone.trim() || null}
               contractorAddress={form.contractorAddress.trim() || null}
               propertyProvince={job.property_province ?? null}
+              taxRateOverride={taxRateOverride}
               warrantyNote={form.warrantyNote.trim() || null}
               cancellationNote={form.cancellationNote.trim() || null}
             />

@@ -24,6 +24,8 @@ type ContractPreviewProps = {
   contractorAddress?: string | null;
   /** Job work location — sales tax rate matches invoices. */
   propertyProvince?: string | null;
+  /** When set, pricing uses this rate instead of deriving from property province. */
+  taxRateOverride?: number | null;
   warrantyNote?: string | null;
   cancellationNote?: string | null;
 };
@@ -46,13 +48,15 @@ export function ContractPreview({
   contractorPhone,
   contractorAddress,
   propertyProvince,
+  taxRateOverride,
   warrantyNote,
   cancellationNote,
 }: ContractPreviewProps) {
   const pricing = computeContractPricingBreakdown(
     contractPrice,
     depositAmount,
-    propertyProvince
+    propertyProvince,
+    taxRateOverride
   );
 
   return (

@@ -8,10 +8,7 @@ import { InvoiceReminderButton } from "./invoice-reminder-button";
 import { RecordPaymentModal } from "./record-payment-modal";
 import { InvoicePaymentsPanel } from "./invoice-payments-panel";
 import type { InvoicePaymentDetailRow } from "@/app/(app)/actions";
-import {
-  invoiceTaxShortLabel,
-  taxRateFromPropertyProvince,
-} from "@/lib/invoice-tax";
+import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 import {
   formatDateTimeEastern,
   formatLocalDateStringEastern,
@@ -62,6 +59,7 @@ export function InvoiceBuilderForm({
   latestInvoice,
   invoiceReminderHints,
   invoicePaymentDetails,
+  contractorProvince,
 }: {
   jobId: string;
   job: Job;
@@ -69,6 +67,7 @@ export function InvoiceBuilderForm({
   latestInvoice: LatestInvoiceSummary | null;
   invoiceReminderHints?: InvoiceReminderHints | null;
   invoicePaymentDetails?: InvoicePaymentDetailRow[] | null;
+  contractorProvince?: string | null;
 }) {
   if (latestInvoice) {
     return (
@@ -83,7 +82,12 @@ export function InvoiceBuilderForm({
   }
 
   return (
-    <CreateInvoicePanel jobId={jobId} job={job} contractSigned={contractSigned} />
+    <CreateInvoicePanel
+      jobId={jobId}
+      job={job}
+      contractSigned={contractSigned}
+      contractorProvince={contractorProvince}
+    />
   );
 }
 
@@ -335,10 +339,12 @@ function CreateInvoicePanel({
   jobId,
   job,
   contractSigned,
+  contractorProvince,
 }: {
   jobId: string;
   job: Job;
   contractSigned: boolean;
+  contractorProvince?: string | null;
 }) {
   const router = useRouter();
   const [dueDate, setDueDate] = useState("");
@@ -354,8 +360,12 @@ function CreateInvoicePanel({
     Number.isFinite(Number(job.deposit_amount)) ? Number(job.deposit_amount) : 0
   );
 
-  const taxRate = taxRateFromPropertyProvince(job.property_province ?? null);
-  const taxShort = invoiceTaxShortLabel(job.property_province ?? null);
+  const taxDefaults = defaultTaxRateForNewFinancials(
+    contractorProvince ?? null,
+    job.property_province ?? null
+  );
+  const taxRate = taxDefaults.taxRate;
+  const taxShort = taxDefaults.shortLabel;
 
   const preview = useMemo(() => {
     const sub = agreedSubtotal;

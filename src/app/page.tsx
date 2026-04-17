@@ -6,6 +6,7 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [trade, setTrade] = useState("");
   const [city, setCity] = useState("");
+  const [province, setProvince] = useState("");
   const [website, setWebsite] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
     "idle"
@@ -25,6 +26,7 @@ export default function Home() {
           email,
           trade: trade || undefined,
           city: city || undefined,
+          province: province || undefined,
           source: "jobproof.ca",
           website,
         }),
@@ -38,6 +40,7 @@ export default function Home() {
         } else {
           setMessage("You're in. We'll email you with early access details.");
           setEmail("");
+          setProvince("");
         }
         setStatus("success");
       } else {
@@ -77,8 +80,9 @@ export default function Home() {
               When a customer says &lsquo;I never agreed to that&rsquo;&hellip; will you have proof?
             </h1>
             <p className="mt-6 text-lg leading-relaxed text-zinc-600 sm:text-xl">
-              JobProof helps contractors document every job, track approvals, and get paid &mdash;
-              with clear contracts, photos, and dispute-ready records.
+              JobProof helps contractors document every job, track approvals, send invoices, and get
+              paid &mdash; with clear contracts, photos, and dispute-ready records &mdash; built for
+              real contractor jobs across Canada.
             </p>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-zinc-500">
               Most contractors only realize they need this after a dispute. By then, it&apos;s too
@@ -107,10 +111,11 @@ export default function Home() {
               </a>
             </div>
             <p className="mt-8 text-sm text-zinc-500">
-              Built for contractors across Ontario.
+              Built for contractors across Ontario &mdash; and expanding across Canada.
             </p>
+            <p className="mt-2 text-center text-xs text-zinc-400">Works anywhere in Canada.</p>
             <p className="mt-2 text-xs text-zinc-400">
-              Built with feedback from Ontario contractors
+              Built with feedback from Ontario contractors &mdash; expanding across Canada
             </p>
           </div>
         </section>
@@ -193,6 +198,7 @@ export default function Home() {
                   "Change orders tracked",
                   "Job updates documented",
                   "Invoice sent",
+                  "Payment status tracked",
                 ].map((label) => (
                   <div
                     key={label}
@@ -218,10 +224,16 @@ export default function Home() {
                   <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200/80">
                     Proof on file
                   </span>
+                  <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200/80">
+                    Unpaid
+                  </span>
                 </div>
               </div>
             </div>
-            <p className="mt-6 text-center text-sm text-zinc-600">
+            <p className="mx-auto mt-6 max-w-xl text-center text-sm text-zinc-600">
+              Customers are more likely to pay when everything is clearly documented.
+            </p>
+            <p className="mt-4 text-center text-sm text-zinc-600">
               If a dispute happens, everything you need is already documented.
             </p>
           </div>
@@ -305,9 +317,9 @@ export default function Home() {
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">Invoices + records</h3>
+                <h3 className="font-semibold text-zinc-900">Invoices and payments</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  Clear payment history and job completion proof.
+                  Send invoices, accept payments, and keep a clear record of every job.
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
@@ -355,8 +367,10 @@ export default function Home() {
                 <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#2436BB] text-lg font-bold text-white">
                   4
                 </div>
-                <h3 className="mt-4 font-semibold text-zinc-900">Get paid with proof</h3>
-                <p className="mt-2 text-sm text-zinc-600">Invoices + records protect you.</p>
+                <h3 className="mt-4 font-semibold text-zinc-900">Send invoices and get paid with proof</h3>
+                <p className="mt-2 text-sm text-zinc-600">
+                  Payments backed by contracts and job documentation.
+                </p>
               </div>
             </div>
           </div>
@@ -398,8 +412,8 @@ export default function Home() {
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
                 <h3 className="font-semibold text-zinc-900">Payment is delayed</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  <span className="font-semibold text-[#2436BB]">→</span> Your records support your
-                  case.
+                  <span className="font-semibold text-[#2436BB]">→</span> Your documentation and
+                  invoice history support your case.
                 </p>
               </div>
             </div>
@@ -421,6 +435,9 @@ export default function Home() {
             </p>
             <p className="mt-4 text-center text-sm text-zinc-600">
               Founding members lock in early access pricing before public launch.
+            </p>
+            <p className="mt-2 text-center text-sm text-zinc-600">
+              Invoices and payments are part of the JobProof workflow.
             </p>
             <h2 className="mt-10 text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
               Simple, Transparent Pricing
@@ -475,7 +492,8 @@ export default function Home() {
             </h2>
             <p className="mt-6 text-center text-zinc-600 leading-relaxed">
               We&apos;re opening early access to a small number of contractors. Founding members
-              lock in lower pricing and help shape JobProof before launch.
+              lock in lower pricing and help shape JobProof before launch. Currently focused on
+              Ontario, but available across Canada.
             </p>
 
             <form
@@ -564,6 +582,37 @@ export default function Home() {
                     placeholder="e.g. London, ON"
                     className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                   />
+                </div>
+
+                <div>
+                  <label htmlFor="province" className="block text-sm font-medium text-zinc-700">
+                    Province <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="province"
+                    name="province"
+                    required
+                    value={province}
+                    onChange={(e) => setProvince(e.target.value)}
+                    className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  >
+                    <option value="" disabled>
+                      Select province
+                    </option>
+                    <option value="Ontario">Ontario</option>
+                    <option value="Alberta">Alberta</option>
+                    <option value="British Columbia">British Columbia</option>
+                    <option value="Quebec">Quebec</option>
+                    <option value="Manitoba">Manitoba</option>
+                    <option value="Saskatchewan">Saskatchewan</option>
+                    <option value="Nova Scotia">Nova Scotia</option>
+                    <option value="New Brunswick">New Brunswick</option>
+                    <option value="Newfoundland and Labrador">Newfoundland and Labrador</option>
+                    <option value="Prince Edward Island">Prince Edward Island</option>
+                    <option value="Northwest Territories">Northwest Territories</option>
+                    <option value="Yukon">Yukon</option>
+                    <option value="Nunavut">Nunavut</option>
+                  </select>
                 </div>
               </div>
 

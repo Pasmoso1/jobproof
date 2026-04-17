@@ -1,9 +1,13 @@
 import Link from "next/link";
-import { getCustomers } from "../../actions";
+import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
+import { getCustomers, getProfile } from "../../actions";
 import { CreateJobForm } from "./create-job-form";
 
 export default async function CreateJobPage() {
-  const customers = await getCustomers();
+  const [customers, profile] = await Promise.all([getCustomers(), getProfile()]);
+  const initialTaxRate = String(
+    defaultTaxRateForNewFinancials(profile?.province ?? null, null).taxRate
+  );
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -20,7 +24,7 @@ export default async function CreateJobPage() {
         </p>
       </div>
 
-      <CreateJobForm customers={customers} />
+      <CreateJobForm customers={customers} initialTaxRate={initialTaxRate} />
     </div>
   );
 }

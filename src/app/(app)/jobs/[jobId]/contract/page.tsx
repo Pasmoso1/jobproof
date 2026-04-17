@@ -57,7 +57,10 @@ export default async function ContractBuilderPage({
     const signedBreakdown = computeContractPricingBreakdown(
       signedPrice,
       signedDeposit,
-      job.property_province
+      job.property_province,
+      displayContract.tax_rate != null && Number.isFinite(Number(displayContract.tax_rate))
+        ? Number(displayContract.tax_rate)
+        : null
     );
 
     return (
