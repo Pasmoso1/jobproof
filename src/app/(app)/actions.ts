@@ -4502,5 +4502,6 @@ export async function sendInvoiceReminder(
     };
   }
 
+  revalidatePath("/dashboard");
   return { success: true };
 }

@@ -9,6 +9,8 @@ import {
   getJobs,
   getInvoiceDeliverySummaryForJobIds,
 } from "../actions";
+import { getReceivablesDashboardData } from "@/lib/receivables-dashboard-server";
+import { MoneyOverviewSection } from "./money-overview-section";
 import { DashboardAlerts } from "./dashboard-alerts";
 import { getCompletedJobInvoiceUi } from "@/lib/completed-job-invoice-ui";
 import {
@@ -25,11 +27,12 @@ function formatStorage(bytes: number): string {
 }
 
 export default async function DashboardPage() {
-  const [profile, activeCount, storageBytes, jobs, supabase] = await Promise.all([
+  const [profile, activeCount, storageBytes, jobs, receivables, supabase] = await Promise.all([
     getProfile(),
     getActiveJobsCount(),
     getStorageUsage(),
     getJobs(),
+    getReceivablesDashboardData(),
     createClient(),
   ]);
   const {
@@ -101,6 +104,8 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      <MoneyOverviewSection data={receivables} />
+
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
@@ -133,7 +138,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Job list */}
-      <div className="rounded-xl border border-zinc-200 bg-white">
+      <div id="dashboard-job-list" className="rounded-xl border border-zinc-200 bg-white">
         <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 sm:px-6">
           <h2 className="font-semibold text-zinc-900">Recent jobs</h2>
           <Link

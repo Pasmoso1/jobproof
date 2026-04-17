@@ -77,3 +77,25 @@ export function formatLocalDateStringEastern(
   if (Number.isNaN(d.getTime())) return trimmed;
   return formatDateEastern(d, options);
 }
+
+/**
+ * First and last calendar day (`YYYY-MM-DD`) of the month that contains `now` in Eastern time.
+ * Used for grouping payment rows by contractor-facing month (Ontario).
+ */
+export function getEasternMonthYmdRange(now: Date = new Date()): {
+  startYmd: string;
+  endYmd: string;
+} {
+  const today = getTodayYmdEastern(now);
+  const [yStr, mStr] = today.split("-");
+  const y = Number(yStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) {
+    return { startYmd: today, endYmd: today };
+  }
+  const startYmd = `${yStr}-${mStr}-01`;
+  const monthIndex = m - 1;
+  const lastDay = new Date(y, monthIndex + 1, 0).getDate();
+  const endYmd = `${yStr}-${mStr}-${String(lastDay).padStart(2, "0")}`;
+  return { startYmd, endYmd };
+}
