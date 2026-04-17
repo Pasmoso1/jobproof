@@ -27,7 +27,7 @@ export type CompletedJobInvoiceUi = {
   invoicesHref: string;
   /** Latest representative invoice for reminders (balance outstanding). */
   reminderInvoiceId: string | null;
-  /** Subtle nudge when customer opened the invoice recently but no payment recorded. */
+  /** Subtle nudge when the invoice was viewed recently but no payment recorded. */
   customerMayHavePaidReminderWarning: boolean;
 };
 

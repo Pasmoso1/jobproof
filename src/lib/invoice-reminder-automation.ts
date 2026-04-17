@@ -109,7 +109,7 @@ function isCalendarOverdue(dueYmd: string | null | undefined, todayYmd: string):
 }
 
 /**
- * Contractor-facing: customer opened public invoice recently, no payment recorded, balance remains.
+ * Contractor-facing: invoice viewed on public page recently, no payment recorded, balance remains.
  * Rule: viewed_at within last 48h, balance > 0, amount_paid_total ≈ 0 (contractor has not recorded payments).
  */
 export function shouldShowCustomerMayHavePaidWarning(opts: {

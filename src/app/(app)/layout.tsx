@@ -28,12 +28,18 @@ export default async function AppLayout({
               className="h-8 w-auto"
             />
           </Link>
-          <nav className="flex items-center gap-4">
+          <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
             <Link
               href="/dashboard"
               className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
             >
               Dashboard
+            </Link>
+            <Link
+              href="/collections"
+              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
+            >
+              Collections
             </Link>
             <Link
               href="/jobs/create"

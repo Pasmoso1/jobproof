@@ -215,7 +215,7 @@ function ResendInvoicePanel({
           className="mt-3 rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs text-amber-950"
           role="status"
         >
-          Customer may have paid — confirm before sending a reminder. (They opened the invoice
+          Customer may have paid — confirm before sending a reminder. (The invoice was viewed
           recently and no payment is recorded in JobProof yet.)
         </p>
       )}

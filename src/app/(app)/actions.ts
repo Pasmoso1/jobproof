@@ -3960,6 +3960,7 @@ export async function recordInvoicePayment(
   revalidatePath(`/jobs/${jobId}/invoices`);
   revalidatePath(`/jobs/${jobId}/proof`);
   revalidatePath("/dashboard");
+  revalidatePath("/collections");
   return { success: true };
 }
 
@@ -4037,6 +4038,7 @@ export async function deleteLastInvoicePayment(
   revalidatePath(`/jobs/${jobId}/invoices`);
   revalidatePath(`/jobs/${jobId}/proof`);
   revalidatePath("/dashboard");
+  revalidatePath("/collections");
   return { success: true };
 }
 
@@ -4161,6 +4163,7 @@ export async function updateLastInvoicePayment(
   revalidatePath(`/jobs/${jobId}/invoices`);
   revalidatePath(`/jobs/${jobId}/proof`);
   revalidatePath("/dashboard");
+  revalidatePath("/collections");
   return { success: true };
 }
 
@@ -4503,5 +4506,6 @@ export async function sendInvoiceReminder(
   }
 
   revalidatePath("/dashboard");
+  revalidatePath("/collections");
   return { success: true };
 }

@@ -474,7 +474,7 @@ export function BusinessSettingsForm({
                 className="mt-1 block w-full max-w-[11rem] rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900 disabled:cursor-not-allowed disabled:bg-zinc-100"
               />
               <p className="mt-1 text-xs text-zinc-500">
-                After the invoice is sent, if the customer has not opened the link.
+                After the invoice is sent, if the invoice has not yet been viewed.
               </p>
             </div>
             <div>

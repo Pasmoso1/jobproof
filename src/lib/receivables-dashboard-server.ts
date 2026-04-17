@@ -8,29 +8,7 @@ import {
 
 export type ReceivablesDashboardData = ReceivablesDashboardComputed;
 
-/**
- * Loads all invoices for the signed-in contractor plus payment totals for the current Eastern month.
- */
-export async function getReceivablesDashboardData(): Promise<ReceivablesDashboardData> {
-  const empty = computeReceivablesDashboard([], 0);
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return empty;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
-
-  if (!profile) return empty;
-
-  const { data: invData, error: invErr } = await supabase
-    .from("invoices")
-    .select(
-      `
+const CONTRACTOR_INVOICES_WITH_JOBS_SELECT = `
       id,
       job_id,
       status,
@@ -48,22 +26,60 @@ export async function getReceivablesDashboardData(): Promise<ReceivablesDashboar
           full_name
         )
       )
-    `
-    )
+    `;
+
+/** Shared invoice list for dashboard receivables and collections (same RLS). */
+export async function fetchContractorReceivableInvoiceInputs(): Promise<{
+  profileId: string;
+  rows: ReceivableInvoiceInput[];
+} | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile) return null;
+
+  const { data: invData, error: invErr } = await supabase
+    .from("invoices")
+    .select(CONTRACTOR_INVOICES_WITH_JOBS_SELECT)
     .eq("profile_id", profile.id)
     .order("created_at", { ascending: false });
 
   if (invErr) {
-    console.error("[getReceivablesDashboardData] invoices:", invErr.message);
-    return empty;
+    console.error("[fetchContractorReceivableInvoiceInputs] invoices:", invErr.message);
+    return null;
   }
+
+  return {
+    profileId: profile.id,
+    rows: (invData ?? []) as unknown as ReceivableInvoiceInput[],
+  };
+}
+
+/**
+ * Loads all invoices for the signed-in contractor plus payment totals for the current Eastern month.
+ */
+export async function getReceivablesDashboardData(): Promise<ReceivablesDashboardData> {
+  const empty = computeReceivablesDashboard([], 0);
+  const pack = await fetchContractorReceivableInvoiceInputs();
+  if (!pack) return empty;
+
+  const supabase = await createClient();
 
   const { startYmd, endYmd } = getEasternMonthYmdRange();
 
   const { data: payData, error: payErr } = await supabase
     .from("invoice_payments")
     .select("amount, paid_on")
-    .eq("profile_id", profile.id)
+    .eq("profile_id", pack.profileId)
     .gte("paid_on", startYmd)
     .lte("paid_on", endYmd);
 
@@ -78,6 +94,5 @@ export async function getReceivablesDashboardData(): Promise<ReceivablesDashboar
     if (Number.isFinite(a) && a > 0) paidThisMonth += a;
   }
 
-  const rows = (invData ?? []) as unknown as ReceivableInvoiceInput[];
-  return computeReceivablesDashboard(rows, paidThisMonth);
+  return computeReceivablesDashboard(pack.rows, paidThisMonth);
 }
