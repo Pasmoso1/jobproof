@@ -59,7 +59,7 @@ export interface Profile {
 export interface EmailLog {
   id: string;
   profile_id: string;
-  type: "contract" | "change_order" | "invoice";
+  type: "contract" | "change_order" | "invoice" | "estimate";
   recipient_email: string;
   status: "success" | "failed";
   error_message: string | null;
@@ -79,6 +79,40 @@ export interface Customer {
   province: string | null;
   postal_code: string | null;
   notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EstimateStatus = "draft" | "sent" | "viewed" | "accepted" | "declined";
+
+export interface Estimate {
+  id: string;
+  profile_id: string;
+  customer_id: string | null;
+  job_id: string | null;
+  estimate_number: string;
+  title: string;
+  scope_of_work: string | null;
+  property_address_line_1: string | null;
+  property_address_line_2: string | null;
+  property_city: string | null;
+  property_province: string | null;
+  property_postal_code: string | null;
+  subtotal: number;
+  tax_rate: number;
+  tax_amount: number;
+  total: number;
+  deposit_amount: number | null;
+  expiry_date: string | null;
+  notes: string | null;
+  status: EstimateStatus;
+  public_token: string | null;
+  sent_at: string | null;
+  viewed_at: string | null;
+  responded_at: string | null;
+  accepted_at: string | null;
+  declined_at: string | null;
+  estimate_pdf_path: string | null;
   created_at: string;
   updated_at: string;
 }

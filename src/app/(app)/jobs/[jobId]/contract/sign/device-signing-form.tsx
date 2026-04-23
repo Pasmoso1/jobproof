@@ -21,6 +21,7 @@ export function DeviceSigningForm({
   contractorPhone,
   contractorAddress,
   propertyProvince,
+  taxRateOverride,
 }: {
   contractId: string;
   jobId: string;
@@ -31,6 +32,7 @@ export function DeviceSigningForm({
   customerPhone: string | null;
   propertyAddress: string;
   propertyProvince: string | null;
+  taxRateOverride?: number | null;
   businessName?: string | null;
   contractorEmail?: string | null;
   contractorPhone?: string | null;
@@ -117,6 +119,7 @@ export function DeviceSigningForm({
             contractorPhone={contractorPhone ?? null}
             contractorAddress={contractorAddress ?? null}
             propertyProvince={propertyProvince}
+            taxRateOverride={taxRateOverride ?? null}
             warrantyNote={String(contractData.warranty_note ?? "") || null}
             cancellationNote={String(contractData.cancellation_change_note ?? "") || null}
           />

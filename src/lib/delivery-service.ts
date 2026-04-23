@@ -670,6 +670,192 @@ export async function sendInvoiceEmail(
   return result;
 }
 
+export interface SendEstimateEmailOptions {
+  toEmail: string;
+  toName: string;
+  estimateTitle: string;
+  estimateNumber: string;
+  businessDisplayName?: string | null;
+  replyToEmail?: string | null;
+  /** Customer-facing page (no login), e.g. https://…/estimate/{public_token} */
+  publicEstimateUrl: string;
+  contractor: InvoiceEmailPartyBlock;
+  issueDate: string;
+  expiryDate: string | null;
+  subtotal: number;
+  taxAmount: number;
+  taxRateLabel: string;
+  total: number;
+  suggestedDeposit: number | null;
+  notes: string | null;
+  pdfAttachment?: { filename: string; contentBase64: string };
+  deliveryLog?: EmailDeliveryAuditLog;
+}
+
+function estimateEmailHtml(opts: SendEstimateEmailOptions): string {
+  const c = opts.contractor;
+  const contractorBody = [
+    c.businessName,
+    c.contactName ? `Contact: ${c.contactName}` : null,
+    c.phone ? `Phone: ${c.phone}` : null,
+    c.email ? `Email: ${c.email}` : null,
+    ...c.addressLines,
+  ]
+    .filter(Boolean)
+    .map((s) => String(s));
+
+  const notesBlock =
+    opts.notes && opts.notes.trim()
+      ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;">
+          <p style="margin:0 0 6px;font-weight:600;">Notes</p>
+          <div style="font-size:14px;color:#374151;">${escapeHtml(opts.notes).replace(/\n/g, "<br/>")}</div>
+        </div>`
+      : "";
+
+  const pdfNote = opts.pdfAttachment
+    ? `<p style="margin-top:14px;font-size:14px;color:#374151;">A PDF copy of this estimate is attached for your records.</p>`
+    : "";
+
+  const depositRow =
+    opts.suggestedDeposit != null && opts.suggestedDeposit > 0.0001
+      ? `<tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Suggested deposit</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.suggestedDeposit)}</td></tr>`
+      : "";
+
+  return `
+    <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.55; max-width: 600px; color: #111827;">
+      <p style="font-size:16px;">Hi ${escapeHtml(opts.toName || "there")},</p>
+      <p style="font-size:15px;">
+        You have received an <strong>estimate (quote)</strong> from <strong>${escapeHtml(c.businessName)}</strong>
+        for <strong>${escapeHtml(opts.estimateTitle)}</strong>. This is not a contract — please review the amounts
+        and details, then accept or decline on the secure link below when you are ready.
+      </p>
+      ${pdfNote}
+      <div style="margin-top:20px;padding:16px 18px;background:#eef2ff;border-radius:10px;border:1px solid #c7d2fe;">
+        <p style="margin:0 0 8px;font-size:14px;font-weight:700;color:#2436BB;">View estimate</p>
+        <p style="margin:0 0 12px;font-size:14px;color:#1e293b;">Open your estimate in the browser — no sign-in required.</p>
+        <a href="${escapeHtml(opts.publicEstimateUrl.trim())}" style="display:inline-block;padding:10px 18px;background:#2436BB;color:#ffffff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">View estimate</a>
+      </div>
+      <p style="margin-top:14px;font-size:13px;color:#6b7280;">Or copy this link:<br /><span style="word-break:break-all;">${escapeHtml(opts.publicEstimateUrl.trim())}</span></p>
+
+      <div style="margin-top:22px;padding:14px 16px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;">
+        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2436BB;text-transform:uppercase;letter-spacing:0.04em;">Contractor</p>
+        ${contractorBody.map((l) => `<div style="font-size:14px;">${escapeHtml(l)}</div>`).join("")}
+      </div>
+
+      <div style="margin-top:20px;">
+        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#2436BB;text-transform:uppercase;letter-spacing:0.04em;">Summary</p>
+        <table style="border-collapse:collapse;width:100%;max-width:440px;font-size:14px;">
+          <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Estimate #</td><td style="padding:4px 0;text-align:right;font-weight:600;">${escapeHtml(opts.estimateNumber)}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Date</td><td style="padding:4px 0;text-align:right;">${escapeHtml(opts.issueDate)}</td></tr>
+          <tr><td style="padding:4px 12px 4px 0;color:#6b7280;">Valid until</td><td style="padding:4px 0;text-align:right;">${opts.expiryDate ? escapeHtml(opts.expiryDate) : "—"}</td></tr>
+        </table>
+        <table style="border-collapse:collapse;margin-top:14px;width:100%;max-width:440px;font-size:14px;">
+          <tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Subtotal (before tax)</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.subtotal)}</td></tr>
+          <tr><td style="padding:6px 12px 6px 0;color:#6b7280;">Tax (${escapeHtml(opts.taxRateLabel)})</td><td style="padding:6px 0;text-align:right;">$${moneyHtml(opts.taxAmount)}</td></tr>
+          <tr><td style="padding:6px 12px 6px 0;font-weight:600;">Total (including tax)</td><td style="padding:6px 0;text-align:right;font-weight:600;">$${moneyHtml(opts.total)}</td></tr>
+          ${depositRow}
+        </table>
+        <p style="margin-top:12px;font-size:13px;color:#4b5563;line-height:1.55;">
+          The <strong>total</strong> includes sales tax (subtotal plus tax). Your contractor will use the same basis in your written contract when you move forward.
+        </p>
+      </div>
+
+      ${notesBlock}
+
+      <p style="margin-top:22px;font-size:13px;color:#6b7280;">
+        Questions? Reply to this email or contact the contractor using the details above.
+      </p>
+      <p style="font-size:12px;color:#9ca3af;">— JobProof</p>
+    </div>
+  `;
+}
+
+/**
+ * Sends estimate / quote notification (not contract language).
+ */
+export async function sendEstimateEmail(
+  options: SendEstimateEmailOptions
+): Promise<DeliveryResult> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = buildResendFromHeader(
+    options.businessDisplayName ?? options.contractor.businessName ?? null
+  );
+  const title = options.estimateTitle.trim() || "Project";
+  const subject = `Estimate: ${options.estimateNumber} — ${title}`;
+  const isProd = process.env.NODE_ENV === "production";
+  const html = estimateEmailHtml(options);
+
+  let result: DeliveryResult;
+
+  if (!apiKey) {
+    console.warn("[sendEstimateEmail] RESEND_API_KEY missing", {
+      to: options.toEmail,
+      production: isProd,
+    });
+    result = isProd
+      ? { success: false, error: "Email service not configured" }
+      : { success: true };
+    if (!isProd) {
+      console.warn(
+        "[sendEstimateEmail] Development: no API key — treating send as success for local testing."
+      );
+    }
+  } else {
+    try {
+      const resend = new Resend(apiKey);
+      const attachments = options.pdfAttachment
+        ? [
+            {
+              filename: options.pdfAttachment.filename,
+              content: options.pdfAttachment.contentBase64,
+            },
+          ]
+        : undefined;
+
+      const { data, error } = await resend.emails.send({
+        from,
+        to: options.toEmail.trim(),
+        subject,
+        html,
+        ...(attachments ? { attachments } : {}),
+        ...(options.replyToEmail?.trim()
+          ? { replyTo: options.replyToEmail.trim() }
+          : {}),
+      });
+
+      if (error) {
+        console.error("[DeliveryService] Resend error (estimate):", error);
+        result = {
+          success: false,
+          error:
+            typeof error === "object" && error && "message" in error
+              ? String((error as { message: string }).message)
+              : "Failed to send email",
+        };
+      } else {
+        result = { success: true, resendMessageId: data?.id };
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to send email";
+      console.error("[DeliveryService] sendEstimateEmail:", e);
+      result = { success: false, error: msg };
+    }
+  }
+
+  if (options.deliveryLog) {
+    await insertEmailLog({
+      profileId: options.deliveryLog.profileId,
+      type: options.deliveryLog.type,
+      recipientEmail: options.toEmail,
+      status: result.success ? "success" : "failed",
+      errorMessage: result.success ? null : result.error ?? null,
+      relatedEntityId: options.deliveryLog.relatedEntityId,
+    });
+  }
+
+  return result;
+}
+
 export type InvoiceReminderKind = "standard" | "overdue" | "partial_balance";
 /** Internal only — never referenced in email copy. */
 export type InvoiceReminderTone = "soft" | "firm";

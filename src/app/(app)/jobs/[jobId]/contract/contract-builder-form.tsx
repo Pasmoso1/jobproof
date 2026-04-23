@@ -19,6 +19,7 @@ import {
 } from "@/lib/validation/job-create";
 import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 import { computeContractPricingBreakdown, formatContractMoney } from "@/lib/contract-tax-pricing";
+import { CONTRACT_PRICING_TOTALS_CLARITY_LINE } from "@/lib/contract-pricing-display-copy";
 import { ContractPreview } from "./contract-preview";
 import type { Contract, Profile } from "@/types/database";
 
@@ -546,7 +547,9 @@ export function ContractBuilderForm({
             </dd>
           </div>
           <div>
-            <dt className="text-zinc-500">Tax</dt>
+            <dt className="text-zinc-500">
+              {pricingSummary ? `Tax (${pricingSummary.taxShortLabel})` : "Tax"}
+            </dt>
             <dd className="font-medium text-zinc-900">
               {pricingSummary ? formatContractMoney(pricingSummary.taxAmount) : "—"}
             </dd>
@@ -590,6 +593,9 @@ export function ContractBuilderForm({
             </dd>
           </div>
         </dl>
+        <p className="mt-3 rounded-lg border border-blue-100 bg-blue-50/90 px-3 py-2 text-xs leading-relaxed text-blue-950 sm:text-sm">
+          {CONTRACT_PRICING_TOTALS_CLARITY_LINE}
+        </p>
       </div>
 
       <form

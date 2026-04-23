@@ -23,6 +23,11 @@ import {
   formatDateTimeEastern,
   formatLocalDateStringEastern,
 } from "@/lib/datetime-eastern";
+import {
+  computeContractPricingBreakdown,
+  formatContractMoney,
+} from "@/lib/contract-tax-pricing";
+import { ESTIMATE_TO_JOB_PRICING_CONTINUITY_LINE } from "@/lib/contract-pricing-display-copy";
 import { InvoiceReminderButton } from "./invoices/invoice-reminder-button";
 import { MarkJobCompleteButton } from "./mark-job-complete-button";
 import { UpdateTimelinePhotos } from "./update-timeline-photos";
@@ -42,6 +47,12 @@ export default async function JobDetailPage({
     contractSentFlag === "true" ||
     (Array.isArray(contractSentFlag) &&
       (contractSentFlag[0] === "1" || contractSentFlag[0] === "true"));
+  const convertedFromEst = sp.convertedFromEstimate;
+  const convertedFromEstimate =
+    convertedFromEst === "1" ||
+    convertedFromEst === "true" ||
+    (Array.isArray(convertedFromEst) &&
+      (convertedFromEst[0] === "1" || convertedFromEst[0] === "true"));
   const rawEmail = sp.contractEmail;
   const contractEmailParam =
     typeof rawEmail === "string"
@@ -95,8 +106,24 @@ export default async function JobDetailPage({
       ? getCompletedJobInvoiceUi(jobId, invFlags)
       : null;
 
+  const jobPricingBreakdown = computeContractPricingBreakdown(
+    job.current_contract_total ?? job.original_contract_price,
+    job.deposit_amount,
+    job.property_province,
+    job.tax_rate
+  );
+
   return (
     <div className="space-y-6">
+      {convertedFromEstimate && (
+        <div
+          className="rounded-lg border border-blue-200 bg-blue-50/90 px-4 py-3 text-sm text-blue-950"
+          role="status"
+        >
+          <p className="font-medium text-blue-950">Job created from estimate</p>
+          <p className="mt-1 text-blue-900">{ESTIMATE_TO_JOB_PRICING_CONTINUITY_LINE}</p>
+        </div>
+      )}
       {contractSent && (
         <div
           className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-950"
@@ -166,11 +193,17 @@ export default async function JobDetailPage({
                   ))}
                 </ul>
               )}
-              {(job.current_contract_total ?? job.original_contract_price) != null && (
-                <span className="text-sm font-medium text-zinc-700">
-                  ${Number(job.current_contract_total ?? job.original_contract_price).toLocaleString()}
+              {jobPricingBreakdown ? (
+                <span className="max-w-full text-sm text-zinc-700">
+                  <span className="font-semibold tabular-nums text-zinc-900">
+                    Total incl. tax: {formatContractMoney(jobPricingBreakdown.totalIncludingTax)}
+                  </span>
+                  <span className="mt-0.5 block text-xs font-normal text-zinc-500 sm:mt-0 sm:ml-2 sm:inline">
+                    ({formatContractMoney(jobPricingBreakdown.subtotalPreTax)} subtotal +{" "}
+                    {jobPricingBreakdown.taxShortLabel} tax)
+                  </span>
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">

@@ -9,6 +9,7 @@ import {
   getJobs,
   getInvoiceDeliverySummaryForJobIds,
 } from "../actions";
+import { getEstimateAwaitingResponseCount } from "@/app/(app)/estimates/estimate-actions";
 import { getReceivablesDashboardData } from "@/lib/receivables-dashboard-server";
 import { MoneyOverviewSection } from "./money-overview-section";
 import { DashboardAlerts } from "./dashboard-alerts";
@@ -60,7 +61,10 @@ export default async function DashboardPage() {
     (activeCount ?? 0) >= (profile?.active_job_limit ?? 10);
 
   const jobIds = jobs.map((j: { id: string }) => j.id);
-  const invByJob = await getInvoiceDeliverySummaryForJobIds(jobIds);
+  const [invByJob, estimatesAwaiting] = await Promise.all([
+    getInvoiceDeliverySummaryForJobIds(jobIds),
+    getEstimateAwaitingResponseCount(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -105,6 +109,16 @@ export default async function DashboardPage() {
       )}
 
       <MoneyOverviewSection data={receivables} />
+
+      {estimatesAwaiting > 0 && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50/90 px-4 py-3 text-sm text-indigo-950">
+          <span className="font-medium">{estimatesAwaiting}</span>{" "}
+          {estimatesAwaiting === 1 ? "estimate is" : "estimates are"} awaiting a customer response.{" "}
+          <Link href="/estimates" className="font-medium underline hover:no-underline">
+            View estimates
+          </Link>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

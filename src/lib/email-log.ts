@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-export type EmailLogEntityType = "contract" | "change_order" | "invoice";
+export type EmailLogEntityType = "contract" | "change_order" | "invoice" | "estimate";
 
 export type EmailLogInsert = {
   profileId: string;

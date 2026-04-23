@@ -5,10 +5,10 @@ import {
 } from "@/lib/supabase/middleware";
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
 
-const PROTECTED_PATHS = ["/dashboard", "/jobs", "/settings", "/onboarding"];
+const PROTECTED_PATHS = ["/dashboard", "/jobs", "/estimates", "/settings", "/onboarding"];
 const AUTH_PATHS = ["/login", "/signup"];
 const ONBOARDING_PATH = "/onboarding/business-profile";
-const PATHS_REQUIRING_ONBOARDING = ["/dashboard", "/jobs", "/settings"];
+const PATHS_REQUIRING_ONBOARDING = ["/dashboard", "/jobs", "/estimates", "/settings"];
 
 function isProtected(pathname: string): boolean {
   return PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

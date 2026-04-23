@@ -117,6 +117,11 @@ export default async function RemoteSigningPage({
               cancellationNote={
                 cd.cancellation_change_note?.trim() ? cd.cancellation_change_note : null
               }
+              taxRateOverride={
+                cd.tax_rate != null && Number.isFinite(Number(cd.tax_rate))
+                  ? Number(cd.tax_rate)
+                  : null
+              }
             />
           </div>
 

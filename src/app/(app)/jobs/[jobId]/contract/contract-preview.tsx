@@ -2,6 +2,7 @@ import {
   computeContractPricingBreakdown,
   formatContractMoney,
 } from "@/lib/contract-tax-pricing";
+import { CONTRACT_PRICING_TOTALS_CLARITY_LINE } from "@/lib/contract-pricing-display-copy";
 import { formatDateEastern, formatLocalDateStringEastern } from "@/lib/datetime-eastern";
 
 type ContractPreviewProps = {
@@ -175,9 +176,18 @@ export function ContractPreview({
                     complete).
                   </p>
                 </div>
+                <p className="mt-3 text-xs leading-relaxed text-zinc-600 sm:text-sm">
+                  {CONTRACT_PRICING_TOTALS_CLARITY_LINE}
+                </p>
               </>
             ) : (
-              <p className="text-sm text-zinc-500">—</p>
+              <div className="text-sm text-zinc-600">
+                <p className="text-zinc-500">Enter a contract subtotal (before tax) to see tax, total
+                  including tax, deposit, and balance due.</p>
+                <p className="mt-2 text-xs leading-relaxed text-zinc-500 sm:text-sm">
+                  {CONTRACT_PRICING_TOTALS_CLARITY_LINE}
+                </p>
+              </div>
             )}
           </div>
         </section>
