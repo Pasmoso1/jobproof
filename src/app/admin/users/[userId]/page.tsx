@@ -23,6 +23,20 @@ function formatMoney(n: number | null | undefined): string {
   return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(Number(n));
 }
 
+/** Street + city/province/postal; omits empty parts. No country column on profiles today. */
+function formatBusinessAddress(profile: Record<string, unknown>): string {
+  const line1 = toMaybeString(profile.address_line_1);
+  const line2 = toMaybeString(profile.address_line_2);
+  const city = toMaybeString(profile.city);
+  const prov = toMaybeString(profile.province);
+  const postal = toMaybeString(profile.postal_code);
+  const cityProv = [city, prov].filter(Boolean).join(", ");
+  const cityLine = [cityProv, postal].filter(Boolean).join(" ").trim();
+  const lines = [line1, line2, cityLine].filter(Boolean);
+  if (lines.length === 0) return "—";
+  return lines.join("\n");
+}
+
 function maxIso(a: string | null, b: string | null): string | null {
   if (!a) return b;
   if (!b) return a;
@@ -104,6 +118,14 @@ export default async function AdminUserDetailPage({
       id,
       user_id,
       business_name,
+      contractor_name,
+      business_contact_email,
+      phone,
+      address_line_1,
+      address_line_2,
+      city,
+      province,
+      postal_code,
       created_at,
       signup_utm_source,
       signup_utm_medium,
@@ -379,23 +401,42 @@ export default async function AdminUserDetailPage({
 
         <section className="rounded-lg border border-zinc-200 bg-white p-4 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-zinc-900">{email}</h2>
-              <p className="mt-1 text-sm text-zinc-600">
-                <span className="text-zinc-500">Business:</span>{" "}
-                {toMaybeString(profile.business_name) ?? "—"}
-              </p>
-              <p className="mt-1 text-sm text-zinc-600">
-                <span className="text-zinc-500">Account created:</span>{" "}
-                {formatDate(toMaybeString(profile.created_at))}
-              </p>
-              <p className="mt-1 text-sm text-zinc-600">
-                <span className="text-zinc-500">Last activity:</span> {formatDate(lastActivity)}
-              </p>
-              <p className="mt-1 text-sm text-zinc-600">
-                <span className="text-zinc-500">Source / campaign / heard about:</span> {sourceLine}
-              </p>
-            </div>
+            <dl className="space-y-2 text-sm">
+              <div>
+                <dt className="text-zinc-500">Login email</dt>
+                <dd className="font-medium text-zinc-900">{email}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Business name</dt>
+                <dd className="font-medium text-zinc-800">{toMaybeString(profile.business_name) ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Contact name</dt>
+                <dd className="font-medium text-zinc-800">{toMaybeString(profile.contractor_name) ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Business contact email</dt>
+                <dd className="font-medium text-zinc-800">{toMaybeString(profile.business_contact_email) ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Phone</dt>
+                <dd className="font-medium text-zinc-800">{toMaybeString(profile.phone) ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Address</dt>
+                <dd className="whitespace-pre-line font-medium text-zinc-800">
+                  {formatBusinessAddress(profile)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Account created</dt>
+                <dd className="text-zinc-800">{formatDate(toMaybeString(profile.created_at))}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Last activity</dt>
+                <dd className="text-zinc-800">{formatDate(lastActivity)}</dd>
+              </div>
+            </dl>
             {testHint && (
               <p className="rounded-md bg-zinc-100 px-3 py-2 text-sm text-zinc-700">
                 Email pattern suggests a possible test account.
@@ -407,6 +448,7 @@ export default async function AdminUserDetailPage({
         <Section title="Attribution">
           <DefList
             rows={[
+              { label: "Channel summary", value: sourceLine },
               { label: "signup_utm_source", value: toMaybeString(profile.signup_utm_source) ?? "" },
               { label: "signup_utm_medium", value: toMaybeString(profile.signup_utm_medium) ?? "" },
               { label: "signup_utm_campaign", value: toMaybeString(profile.signup_utm_campaign) ?? "" },
