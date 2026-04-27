@@ -51,6 +51,17 @@ export interface Profile {
   default_contract_terms_and_conditions?: string | null;
   default_contract_warranty_note?: string | null;
   default_contract_cancellation_note?: string | null;
+  /** First-touch acquisition metadata captured before account creation. */
+  signup_utm_source?: string | null;
+  signup_utm_medium?: string | null;
+  signup_utm_campaign?: string | null;
+  signup_utm_content?: string | null;
+  signup_utm_term?: string | null;
+  signup_referrer?: string | null;
+  signup_landing_page?: string | null;
+  signup_first_seen_at?: string | null;
+  /** Optional self-reported channel from signup/early-access forms. */
+  heard_about_source?: string | null;
   created_at: string;
   updated_at: string;
 }

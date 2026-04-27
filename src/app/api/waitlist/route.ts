@@ -1,6 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import {
+  readFirstTouchFromCookieHeader,
+  type FirstTouchAttribution,
+} from "@/lib/attribution-first-touch";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -22,7 +26,23 @@ export async function POST(request: Request) {
     const supabase = createClient(url, serviceRoleKey);
 
     const body = await request.json();
-    const { email, trade, city, province, source, website } = body;
+    const {
+      email,
+      trade,
+      city,
+      province,
+      source,
+      website,
+      heard_about_source,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      utm_content,
+      utm_term,
+      referrer,
+      landing_page,
+      first_seen_at,
+    } = body;
 
     if (website && String(website).trim()) {
       return NextResponse.json({ ok: true }, { status: 200 });
@@ -45,6 +65,40 @@ export async function POST(request: Request) {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const cookieAttribution = readFirstTouchFromCookieHeader(request.headers.get("cookie"));
+    const payloadAttribution: Partial<FirstTouchAttribution> = {
+      utm_source: typeof utm_source === "string" ? utm_source : null,
+      utm_medium: typeof utm_medium === "string" ? utm_medium : null,
+      utm_campaign: typeof utm_campaign === "string" ? utm_campaign : null,
+      utm_content: typeof utm_content === "string" ? utm_content : null,
+      utm_term: typeof utm_term === "string" ? utm_term : null,
+      referrer: typeof referrer === "string" ? referrer : null,
+      landing_page: typeof landing_page === "string" ? landing_page : null,
+      first_seen_at: typeof first_seen_at === "string" ? first_seen_at : undefined,
+      heard_about_source:
+        typeof heard_about_source === "string" ? heard_about_source : null,
+    };
+
+    const mergedAttribution = {
+      utm_source:
+        payloadAttribution.utm_source ?? cookieAttribution?.utm_source ?? null,
+      utm_medium:
+        payloadAttribution.utm_medium ?? cookieAttribution?.utm_medium ?? null,
+      utm_campaign:
+        payloadAttribution.utm_campaign ?? cookieAttribution?.utm_campaign ?? null,
+      utm_content:
+        payloadAttribution.utm_content ?? cookieAttribution?.utm_content ?? null,
+      utm_term: payloadAttribution.utm_term ?? cookieAttribution?.utm_term ?? null,
+      referrer: payloadAttribution.referrer ?? cookieAttribution?.referrer ?? null,
+      landing_page:
+        payloadAttribution.landing_page ?? cookieAttribution?.landing_page ?? null,
+      first_seen_at:
+        payloadAttribution.first_seen_at ?? cookieAttribution?.first_seen_at ?? null,
+      heard_about_source:
+        payloadAttribution.heard_about_source ??
+        cookieAttribution?.heard_about_source ??
+        null,
+    };
 
     const { error } = await supabase
       .from("waitlist_signups")
@@ -55,6 +109,15 @@ export async function POST(request: Request) {
           city: city?.trim() ?? null,
           province: provinceStr,
           source: source?.trim() ?? null,
+          heard_about_source: mergedAttribution.heard_about_source,
+          utm_source: mergedAttribution.utm_source,
+          utm_medium: mergedAttribution.utm_medium,
+          utm_campaign: mergedAttribution.utm_campaign,
+          utm_content: mergedAttribution.utm_content,
+          utm_term: mergedAttribution.utm_term,
+          referrer: mergedAttribution.referrer,
+          landing_page: mergedAttribution.landing_page,
+          first_seen_at: mergedAttribution.first_seen_at,
         },
       ]);
 

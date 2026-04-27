@@ -50,3 +50,17 @@ Contractors enable timing in **Settings → Business**. For sends to run on a sc
 - **Also required:** `SUPABASE_SERVICE_ROLE_KEY`, Resend (`RESEND_API_KEY`), and applied DB migrations (including invoice reminder automation).
 
 Implementation: `src/app/api/cron/invoice-reminders/route.ts` and `src/lib/invoice-reminder-cron.ts`.
+
+## Admin dashboard access
+
+`/admin` now uses normal JobProof login + an email allowlist.
+
+Required env var:
+
+```bash
+ADMIN_EMAILS=your@email.com,anotheradmin@email.com
+```
+
+- Emails are compared case-insensitively and trimmed.
+- A user must be logged in and their email must be listed in `ADMIN_EMAILS`.
+- Access is device/browser session based (Supabase auth session behavior).

@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import {
+  HEARD_ABOUT_SOURCE_OPTIONS,
+  captureFirstTouchIfMissing,
+  readFirstTouchClient,
+} from "@/lib/attribution-first-touch";
 
 export default function Home() {
   const [email, setEmail] = useState("");
   const [trade, setTrade] = useState("");
   const [city, setCity] = useState("");
   const [province, setProvince] = useState("");
+  const [heardAboutSource, setHeardAboutSource] = useState("");
   const [website, setWebsite] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
     "idle"
@@ -19,6 +25,11 @@ export default function Home() {
     setMessage("");
 
     try {
+      const firstTouch =
+        readFirstTouchClient() ??
+        captureFirstTouchIfMissing(
+          `${window.location.pathname}${window.location.search || ""}`
+        );
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -28,6 +39,15 @@ export default function Home() {
           city: city || undefined,
           province: province || undefined,
           source: "jobproof.ca",
+          heard_about_source: heardAboutSource || undefined,
+          utm_source: firstTouch.utm_source ?? undefined,
+          utm_medium: firstTouch.utm_medium ?? undefined,
+          utm_campaign: firstTouch.utm_campaign ?? undefined,
+          utm_content: firstTouch.utm_content ?? undefined,
+          utm_term: firstTouch.utm_term ?? undefined,
+          referrer: firstTouch.referrer ?? undefined,
+          landing_page: firstTouch.landing_page ?? undefined,
+          first_seen_at: firstTouch.first_seen_at ?? undefined,
           website,
         }),
       });
@@ -612,6 +632,29 @@ export default function Home() {
                     <option value="Northwest Territories">Northwest Territories</option>
                     <option value="Yukon">Yukon</option>
                     <option value="Nunavut">Nunavut</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="heardAboutSource"
+                    className="block text-sm font-medium text-zinc-700"
+                  >
+                    How did you hear about JobProof?{" "}
+                    <span className="text-zinc-400">(optional)</span>
+                  </label>
+                  <select
+                    id="heardAboutSource"
+                    value={heardAboutSource}
+                    onChange={(e) => setHeardAboutSource(e.target.value)}
+                    className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                  >
+                    <option value="">Select one</option>
+                    {HEARD_ABOUT_SOURCE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

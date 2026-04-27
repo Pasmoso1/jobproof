@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
+import { FirstTouchAttributionCapture } from "@/components/first-touch-attribution-capture";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,8 +41,10 @@ export default function RootLayout({
             gtag('config', 'G-74H8WQ0KQ4');
           `}
         </Script>
+        <FirstTouchAttributionCapture />
         {children}
       </body>
     </html>
   );
 }
+

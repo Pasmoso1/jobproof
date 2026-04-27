@@ -4,6 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import {
+  HEARD_ABOUT_SOURCE_OPTIONS,
+  captureFirstTouchIfMissing,
+  persistHeardAboutSourceClient,
+} from "@/lib/attribution-first-touch";
 
 type PostSubmitView =
   | null
@@ -52,6 +57,7 @@ export default function SignupPage() {
   const [postSubmitView, setPostSubmitView] = useState<PostSubmitView>(null);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [heardAboutSource, setHeardAboutSource] = useState("");
   const router = useRouter();
 
   async function branchExistingEmail(
@@ -118,6 +124,10 @@ export default function SignupPage() {
       return;
     }
     setLoading(true);
+    captureFirstTouchIfMissing(
+      `${window.location.pathname}${window.location.search || ""}`
+    );
+    persistHeardAboutSourceClient(heardAboutSource);
 
     const supabase = createClient();
     const { data, error: signUpError } = await supabase.auth.signUp({
@@ -445,6 +455,29 @@ export default function SignupPage() {
                 autoComplete="email"
                 className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
               />
+            </div>
+
+            <div>
+              <label
+                htmlFor="heardAboutSource"
+                className="block text-sm font-medium text-zinc-700"
+              >
+                How did you hear about JobProof?{" "}
+                <span className="text-zinc-400">(optional)</span>
+              </label>
+              <select
+                id="heardAboutSource"
+                value={heardAboutSource}
+                onChange={(e) => setHeardAboutSource(e.target.value)}
+                className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+              >
+                <option value="">Select one</option>
+                {HEARD_ABOUT_SOURCE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
