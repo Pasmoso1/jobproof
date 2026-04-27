@@ -3,6 +3,8 @@ import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 import { getCustomers, getProfile } from "../../actions";
 import { CreateJobForm } from "./create-job-form";
 
+export const dynamic = "force-dynamic";
+
 export default async function CreateJobPage() {
   const [customers, profile] = await Promise.all([getCustomers(), getProfile()]);
   const initialTaxRate = String(

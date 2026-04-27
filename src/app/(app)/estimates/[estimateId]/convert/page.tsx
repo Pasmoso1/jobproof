@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getEstimateById } from "@/app/(app)/estimates/estimate-actions";
 import { ConvertToJobForm } from "@/app/(app)/estimates/[estimateId]/convert-to-job-form";
 
+export const dynamic = "force-dynamic";
+
 export default async function ConvertEstimatePage({
   params,
 }: {

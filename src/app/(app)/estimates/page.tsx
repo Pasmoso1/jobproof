@@ -2,6 +2,8 @@ import Link from "next/link";
 import { formatDateEastern } from "@/lib/datetime-eastern";
 import { getEstimatesList, type EstimateListRow } from "@/app/(app)/estimates/estimate-actions";
 
+export const dynamic = "force-dynamic";
+
 function bucket(e: EstimateListRow): string {
   const d = e.displayStatus;
   if (d === "draft") return "draft";

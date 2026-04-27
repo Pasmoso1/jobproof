@@ -13,6 +13,8 @@ import {
 } from "@/app/(app)/estimates/estimate-send-buttons";
 import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 
+export const dynamic = "force-dynamic";
+
 function money(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

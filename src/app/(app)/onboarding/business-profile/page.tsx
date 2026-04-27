@@ -4,6 +4,8 @@ import { getProfile } from "@/app/(app)/actions";
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
 import { OnboardingBusinessForm } from "./onboarding-business-form";
 
+export const dynamic = "force-dynamic";
+
 export default async function OnboardingBusinessProfilePage({
   searchParams,
 }: {
