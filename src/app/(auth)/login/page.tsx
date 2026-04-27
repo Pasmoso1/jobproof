@@ -16,17 +16,29 @@ function LoginForm() {
   const [resendSuccess, setResendSuccess] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
+  const redirectParam = searchParams.get("redirect");
+  const redirectTo = redirectParam ?? "/dashboard";
+  const isAdminLogin = redirectParam === "/admin";
   const [authError, setAuthError] = useState(false);
+  const [resetLinkError, setResetLinkError] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("error") === "auth") {
       setAuthError(true);
       router.replace("/login", { scroll: false });
     }
+    if (searchParams.get("error") === "reset_link") {
+      setResetLinkError(true);
+      router.replace("/login", { scroll: false });
+    }
     if (searchParams.get("confirmed") === "true") {
       setConfirmed(true);
+      router.replace("/login", { scroll: false });
+    }
+    if (searchParams.get("passwordUpdated") === "true") {
+      setPasswordUpdated(true);
       router.replace("/login", { scroll: false });
     }
   }, [searchParams, router]);
@@ -35,7 +47,9 @@ function LoginForm() {
     e.preventDefault();
     setError(null);
     setAuthError(false);
+    setResetLinkError(false);
     setConfirmed(false);
+    setPasswordUpdated(false);
     setUnconfirmedEmail(null);
     setResendSuccess(false);
     setLoading(true);
@@ -63,7 +77,9 @@ function LoginForm() {
         msg.toLowerCase().includes("invalid_credentials")
       ) {
         setError(
-          "We couldn't sign you in. Check your email and password, or create an account if you're new to JobProof."
+          isAdminLogin
+            ? "We couldn't sign you in. Use the email and password for an approved admin account, or reset your password."
+            : "We couldn't sign you in. Check your email and password, or create an account if you're new to JobProof."
         );
       } else {
         setError(msg);
@@ -109,15 +125,29 @@ function LoginForm() {
           />
         </Link>
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-semibold text-zinc-900">Sign in</h1>
+          <h1 className="text-xl font-semibold text-zinc-900">
+            {isAdminLogin ? "Admin sign in" : "Sign in"}
+          </h1>
           <p className="mt-1 text-sm text-zinc-500">
-            Enter your email and password to continue.
+            {isAdminLogin
+              ? "Sign in with an approved admin account."
+              : "Enter your email and password to continue."}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {confirmed && (
               <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800" role="status">
                 Your email has been confirmed. You can now sign in.
+              </div>
+            )}
+            {passwordUpdated && (
+              <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800" role="status">
+                Your password was updated. Sign in with your new password.
+              </div>
+            )}
+            {resetLinkError && (
+              <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                This link is no longer valid. Please request a new password reset email.
               </div>
             )}
             {authError && (
@@ -206,19 +236,25 @@ function LoginForm() {
               <Link href="/forgot-password" className="font-medium text-[#2436BB] hover:underline">
                 Forgot password?
               </Link>
-              {" · "}
-              <Link href="/signup" className="font-medium text-[#2436BB] hover:underline">
-                Create account
-              </Link>
+              {!isAdminLogin && (
+                <>
+                  {" · "}
+                  <Link href="/signup" className="font-medium text-[#2436BB] hover:underline">
+                    Create account
+                  </Link>
+                </>
+              )}
             </p>
           </form>
 
-          <p className="mt-6 text-center text-sm text-zinc-600">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="font-medium text-[#2436BB] hover:underline">
-              Sign up
-            </Link>
-          </p>
+          {!isAdminLogin && (
+            <p className="mt-6 text-center text-sm text-zinc-600">
+              Don&apos;t have an account?{" "}
+              <Link href="/signup" className="font-medium text-[#2436BB] hover:underline">
+                Sign up
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </div>

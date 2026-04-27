@@ -10,7 +10,6 @@ export default function UpdatePasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [ready, setReady] = useState(false);
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [invalidLink, setInvalidLink] = useState(false);
@@ -18,13 +17,20 @@ export default function UpdatePasswordPage() {
 
   useEffect(() => {
     const supabase = createClient();
+    let cancelled = false;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    async function checkUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (user) {
         setRecoveryMode(true);
         setReady(true);
       }
-    });
+    }
+
+    void checkUser();
 
     const {
       data: { subscription },
@@ -32,19 +38,22 @@ export default function UpdatePasswordPage() {
       if (event === "PASSWORD_RECOVERY") {
         setRecoveryMode(true);
       }
-      if (session) {
+      if (session?.user) {
         setReady(true);
       }
     });
 
     const timer = setTimeout(() => {
+      if (cancelled) return;
       setReady(true);
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session) setInvalidLink(true);
+      void supabase.auth.getUser().then(({ data: { user } }) => {
+        if (cancelled) return;
+        if (!user) setInvalidLink(true);
       });
-    }, 1500);
+    }, 2000);
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
       clearTimeout(timer);
     };
@@ -67,6 +76,16 @@ export default function UpdatePasswordPage() {
     setLoading(true);
 
     const supabase = createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      setLoading(false);
+      setError("Your session expired. Please open the reset link from your email again.");
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password });
 
     setLoading(false);
@@ -76,7 +95,8 @@ export default function UpdatePasswordPage() {
       return;
     }
 
-    setSuccess(true);
+    router.replace("/login?passwordUpdated=true");
+    router.refresh();
   }
 
   if (!ready) {
@@ -121,35 +141,6 @@ export default function UpdatePasswordPage() {
               className="mt-3 block w-full text-center text-sm font-medium text-[#2436BB] hover:underline"
             >
               Back to sign in
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (success) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4">
-        <div className="w-full max-w-sm">
-          <Link href="/" className="mb-8 block text-center">
-            <img
-              src="/jobproof-logo.png"
-              alt="Job Proof"
-              className="mx-auto h-10 w-auto"
-            />
-          </Link>
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-            <h1 className="text-xl font-semibold text-zinc-900">Password updated</h1>
-            <p className="mt-3 text-sm text-zinc-600">
-              Your password has been reset. You can now sign in with your new password.
-            </p>
-
-            <Link
-              href="/login"
-              className="mt-6 block w-full rounded-lg bg-[#2436BB] px-4 py-3 text-center text-sm font-medium text-white hover:bg-[#1c2a96]"
-            >
-              Sign in
             </Link>
           </div>
         </div>
