@@ -57,6 +57,10 @@ import {
 import { randomUUID } from "node:crypto";
 import { getSubscriptionAccess } from "@/lib/subscription-access";
 
+export type ActionResult<T = unknown> =
+  | { success: true; data?: T; message?: string }
+  | { success: false; error: string };
+
 async function getCurrentUserProfileForAccessGate(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string
@@ -1474,7 +1478,9 @@ export async function createOrUpdateContract(
   return { contractId: data.id };
 }
 
-export async function sendContractForSigning(contractId: string) {
+export async function sendContractForSigning(
+  contractId: string
+): Promise<ActionResult | { error: string }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -2025,7 +2031,7 @@ export async function sendRemoteContractSigningLink(params: {
   jobTitle: string;
   /** From the browser, e.g. `window.location.origin`, so the email contains a working absolute URL */
   publicOrigin?: string;
-}): Promise<{ success?: true; error?: string }> {
+}): Promise<ActionResult | { error: string }> {
   const remoteEmailErr = validateCustomerEmailForRemote(params.toEmail);
   if (remoteEmailErr) {
     return { error: remoteEmailErr };
@@ -2077,7 +2083,7 @@ export async function sendRemoteContractSigningLink(params: {
   const wasAlreadyAwaitingSignature = contract.status === "pending";
 
   const sendResult = await sendContractForSigning(params.contractId);
-  if (sendResult?.error) {
+  if ("error" in sendResult && sendResult.error) {
     return { error: sendResult.error };
   }
 

@@ -477,7 +477,7 @@ export function ContractBuilderForm({
         publicOrigin,
       });
 
-      if (remoteResult?.error) {
+      if (remoteResult && "error" in remoteResult && remoteResult.error) {
         setError(remoteResult.error);
         return;
       }

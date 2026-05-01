@@ -18,6 +18,22 @@ function toIso(ts?: number | null): string | null {
   return new Date(ts * 1000).toISOString();
 }
 
+/**
+ * Webhook payloads follow the dashboard API version (2025-05-28.basil): `current_period_end` on the subscription object.
+ * stripe-node’s TS types may reflect a newer API shape, so we read this field explicitly.
+ */
+function subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub: Stripe.Subscription): number | null {
+  const end = (sub as Stripe.Subscription & { current_period_end?: number }).current_period_end;
+  return typeof end === "number" ? end : null;
+}
+
+/** Basil invoice objects expose `subscription` on the root; newer typings may model it only under `parent`. */
+function subscriptionIdFromBasilInvoice(inv: Stripe.Invoice): string {
+  const root = (inv as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }).subscription;
+  if (root == null) return "";
+  return typeof root === "string" ? root : root.id;
+}
+
 async function findProfileByCustomerOrMetadata(input: {
   admin: ReturnType<typeof createServiceRoleClient>;
   customerId?: string | null;
@@ -94,7 +110,9 @@ export async function POST(req: Request) {
                   session.metadata?.pricing_version ??
                   profile.pricing_version,
                 subscription_status: sub?.status ?? profile.subscription_status,
-                subscription_current_period_end: toIso(sub?.current_period_end),
+                subscription_current_period_end: toIso(
+                  sub ? subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub) : null
+                ),
                 trial_ends_at: toIso(sub?.trial_end),
               })
               .eq("id", profile.id);
@@ -195,7 +213,7 @@ export async function POST(req: Request) {
                 sub.metadata?.pricing_version ??
                 profile.pricing_version,
               subscription_status: sub.status,
-              subscription_current_period_end: toIso(sub.current_period_end),
+              subscription_current_period_end: toIso(subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub)),
               trial_ends_at: toIso(sub.trial_end),
             })
             .eq("id", profile.id);
@@ -215,7 +233,7 @@ export async function POST(req: Request) {
             .from("profiles")
             .update({
               subscription_status: "canceled",
-              subscription_current_period_end: toIso(sub.current_period_end),
+              subscription_current_period_end: toIso(subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub)),
             })
             .eq("id", profile.id);
         }
@@ -224,7 +242,7 @@ export async function POST(req: Request) {
 
       case "invoice.paid": {
         const inv = event.data.object as Stripe.Invoice;
-        const subscriptionId = String(inv.subscription ?? "");
+        const subscriptionId = subscriptionIdFromBasilInvoice(inv);
         if (subscriptionId) {
           await admin
             .from("profiles")
@@ -239,7 +257,7 @@ export async function POST(req: Request) {
 
       case "invoice.payment_failed": {
         const inv = event.data.object as Stripe.Invoice;
-        const subscriptionId = String(inv.subscription ?? "");
+        const subscriptionId = subscriptionIdFromBasilInvoice(inv);
         if (subscriptionId) {
           const { data: profile } = await admin
             .from("profiles")

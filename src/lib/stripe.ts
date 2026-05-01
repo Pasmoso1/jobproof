@@ -58,7 +58,9 @@ let stripeSingleton: Stripe | null = null;
 export function getStripe(): Stripe {
   if (!stripeSingleton) {
     stripeSingleton = new Stripe(getStripeSecretKey(), {
-      apiVersion: "2025-03-31.basil",
+      // Dashboard webhooks use 2025-05-28.basil; stripe-node types default to the SDK’s pinned version.
+      // @ts-expect-error — intentional runtime API version for webhook parity
+      apiVersion: "2025-05-28.basil",
       typescript: true,
     });
   }
