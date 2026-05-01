@@ -55,6 +55,21 @@ import {
   roundInvoiceMoney,
 } from "@/lib/invoice-payment-recalc";
 import { randomUUID } from "node:crypto";
+import { getSubscriptionAccess } from "@/lib/subscription-access";
+
+async function getCurrentUserProfileForAccessGate(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, subscription_status, grace_period_ends_at")
+    .eq("user_id", userId)
+    .single();
+  if (!profile) return null;
+  const access = getSubscriptionAccess(profile);
+  return { profile, access };
+}
 
 export async function getProfile() {
   const supabase = await createClient();
@@ -1244,6 +1259,12 @@ export async function createOrUpdateContract(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { error: "Unauthorized" };
+  if (!gate.access.canCreateContracts) {
+    return { error: gate.access.reason };
+  }
+
   const { data: job } = await supabase
     .from("jobs")
     .select("id, profile_id, property_province")
@@ -1459,6 +1480,12 @@ export async function sendContractForSigning(contractId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { success: false, error: "Unauthorized" };
+  if (!gate.access.canSendContracts) {
+    return { success: false, error: gate.access.reason };
+  }
 
   const { data: contract } = await supabase
     .from("contracts")
@@ -1942,6 +1969,11 @@ export async function createSigningToken(contractId: string, expiresInDays = 7) 
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { error: "Unauthorized" };
+  if (!gate.access.canSendContracts) {
+    return { error: gate.access.reason };
+  }
 
   const { data: contract } = await supabase
     .from("contracts")
@@ -2004,6 +2036,11 @@ export async function sendRemoteContractSigningLink(params: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { success: false, error: "Unauthorized" };
+  if (!gate.access.canSendContracts) {
+    return { success: false, error: gate.access.reason };
+  }
 
   const { data: job } = await supabase
     .from("jobs")
@@ -3128,6 +3165,12 @@ export async function createInvoice(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { error: "Unauthorized" };
+  if (!gate.access.canCreateInvoices) {
+    return { error: gate.access.reason };
+  }
+
   const contract = await getContractForJob(jobId);
   if (!contract || contract.status !== "signed") {
     return {
@@ -3483,6 +3526,12 @@ export async function resendInvoice(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { error: "Unauthorized" };
+  if (!gate.access.canSendInvoices) {
+    return { error: gate.access.reason };
+  }
 
   const { data: invRow, error: invErr } = await supabase
     .from("invoices")

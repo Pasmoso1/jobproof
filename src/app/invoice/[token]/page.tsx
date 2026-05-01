@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { PublicInvoiceToolbar } from "@/components/public-invoice-toolbar";
+import { PublicInvoicePayOnlineButton } from "@/components/public-invoice-pay-online-button";
 import {
   fetchPublicInvoicePageData,
   isValidPublicInvoiceToken,
@@ -47,10 +48,13 @@ export async function generateMetadata({
 
 export default async function PublicInvoicePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { token } = await params;
+  const sp = await searchParams;
   if (!isValidPublicInvoiceToken(token)) {
     return <NotFoundMessage />;
   }
@@ -232,6 +236,9 @@ export default async function PublicInvoicePage({
             <div className="mt-3 whitespace-pre-wrap text-sm text-amber-950">
               {data.paymentInstructions}
             </div>
+            {data.stripeOnlinePaymentAvailable ? (
+              <PublicInvoicePayOnlineButton token={token} />
+            ) : null}
             {paymentContactLines.length > 0 ? (
               <div className="mt-3 text-sm text-amber-950">
                 <p className="font-semibold">Payment contact</p>
@@ -245,6 +252,16 @@ export default async function PublicInvoicePage({
             <p className="mt-4 text-xs text-amber-900/90">
               Please contact the contractor to arrange payment if you are unsure how to proceed.
             </p>
+            {sp.payment === "success" ? (
+              <p className="mt-2 text-xs font-medium text-green-800">
+                Thank you. Your card payment was submitted successfully.
+              </p>
+            ) : null}
+            {sp.payment === "cancelled" ? (
+              <p className="mt-2 text-xs font-medium text-zinc-700">
+                Card payment was cancelled. You can try again anytime.
+              </p>
+            ) : null}
           </section>
         </div>
 

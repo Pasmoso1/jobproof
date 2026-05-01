@@ -135,7 +135,21 @@ export default async function AdminUserDetailPage({
       signup_referrer,
       signup_landing_page,
       signup_first_seen_at,
-      heard_about_source
+      heard_about_source,
+      stripe_customer_id,
+      stripe_subscription_id,
+      stripe_price_id,
+      plan_tier,
+      pricing_version,
+      subscription_status,
+      subscription_current_period_end,
+      trial_ends_at,
+      grace_period_ends_at,
+      stripe_connect_account_id,
+      stripe_connect_onboarding_complete,
+      stripe_connect_charges_enabled,
+      stripe_connect_payouts_enabled,
+      stripe_connect_details_submitted
     `
     )
     .eq("id", userId)
@@ -458,6 +472,48 @@ export default async function AdminUserDetailPage({
               { label: "signup_landing_page", value: toMaybeString(profile.signup_landing_page) ?? "" },
               { label: "signup_first_seen_at", value: formatDate(toMaybeString(profile.signup_first_seen_at)) },
               { label: "heard_about_source", value: toMaybeString(profile.heard_about_source) ?? "" },
+            ]}
+          />
+        </Section>
+
+        <Section title="Stripe billing / connect">
+          <DefList
+            rows={[
+              { label: "subscription_status", value: toMaybeString(profile.subscription_status) ?? "" },
+              { label: "plan_tier", value: toMaybeString(profile.plan_tier) ?? "" },
+              { label: "pricing_version", value: toMaybeString(profile.pricing_version) ?? "" },
+              { label: "stripe_customer_id", value: toMaybeString(profile.stripe_customer_id) ?? "" },
+              { label: "stripe_subscription_id", value: toMaybeString(profile.stripe_subscription_id) ?? "" },
+              { label: "stripe_price_id", value: toMaybeString(profile.stripe_price_id) ?? "" },
+              {
+                label: "subscription_current_period_end",
+                value: formatDate(toMaybeString(profile.subscription_current_period_end)),
+              },
+              { label: "trial_ends_at", value: formatDate(toMaybeString(profile.trial_ends_at)) },
+              {
+                label: "grace_period_ends_at",
+                value: formatDate(toMaybeString(profile.grace_period_ends_at)),
+              },
+              {
+                label: "stripe_connect_account_id",
+                value: toMaybeString(profile.stripe_connect_account_id) ?? "",
+              },
+              {
+                label: "connect_onboarding_complete",
+                value: String(profile.stripe_connect_onboarding_complete ?? false),
+              },
+              {
+                label: "connect_charges_enabled",
+                value: String(profile.stripe_connect_charges_enabled ?? false),
+              },
+              {
+                label: "connect_payouts_enabled",
+                value: String(profile.stripe_connect_payouts_enabled ?? false),
+              },
+              {
+                label: "connect_details_submitted",
+                value: String(profile.stripe_connect_details_submitted ?? false),
+              },
             ]}
           />
         </Section>

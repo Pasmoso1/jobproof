@@ -20,6 +20,8 @@ import {
   getJobPrimaryLifecycleStatus,
   outstandingIndicatorLinkClassName,
 } from "@/lib/job-dashboard-status";
+import { getSubscriptionAccess } from "@/lib/subscription-access";
+import { formatDateEastern } from "@/lib/datetime-eastern";
 
 function formatStorage(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -59,6 +61,7 @@ export default async function DashboardPage() {
   const isStorageNearLimit = storagePercent >= 80;
   const isJobLimitReached =
     (activeCount ?? 0) >= (profile?.active_job_limit ?? 10);
+  const access = getSubscriptionAccess(profile ?? {});
 
   const jobIds = jobs.map((j: { id: string }) => j.id);
   const [invByJob, estimatesAwaiting] = await Promise.all([
@@ -86,6 +89,23 @@ export default async function DashboardPage() {
           Complete your business profile to send contracts and invoices.{" "}
           <Link href="/settings/business" className="font-medium underline hover:no-underline">
             Add business details →
+          </Link>
+        </div>
+      )}
+      {profile?.subscription_status === "past_due" && profile.grace_period_ends_at && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Billing is past due. Grace period ends{" "}
+          {formatDateEastern(profile.grace_period_ends_at, { dateStyle: "medium" })}.{" "}
+          <Link href="/settings/billing" className="font-medium underline hover:no-underline">
+            Update billing →
+          </Link>
+        </div>
+      )}
+      {!access.canCreateContracts && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          Read-only mode is active: {access.reason}{" "}
+          <Link href="/settings/billing" className="font-medium underline hover:no-underline">
+            Open billing →
           </Link>
         </div>
       )}

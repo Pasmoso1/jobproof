@@ -1,22 +1,132 @@
 "use client";
 
 import { useState } from "react";
-import {
-  HEARD_ABOUT_SOURCE_OPTIONS,
-  captureFirstTouchIfMissing,
-  readFirstTouchClient,
-} from "@/lib/attribution-first-touch";
+import { captureFirstTouchIfMissing, readFirstTouchClient } from "@/lib/attribution-first-touch";
+import { trackEvent } from "@/lib/metaPixel";
+
+function WaitlistForm({
+  email,
+  setEmail,
+  province,
+  setProvince,
+  website,
+  setWebsite,
+  status,
+  message,
+  onSubmit,
+  compact,
+}: {
+  email: string;
+  setEmail: (v: string) => void;
+  province: string;
+  setProvince: (v: string) => void;
+  website: string;
+  setWebsite: (v: string) => void;
+  status: "idle" | "loading" | "success" | "error";
+  message: string;
+  onSubmit: (e: React.FormEvent) => void | Promise<void>;
+  compact?: boolean;
+}) {
+  return (
+    <form
+      className={`rounded-xl border border-zinc-200 bg-white shadow-sm ${
+        compact ? "p-4 sm:p-5" : "p-6 sm:p-8"
+      }`}
+      onSubmit={onSubmit}
+    >
+      <h3 className={`font-semibold text-zinc-900 ${compact ? "text-base" : "text-lg"}`}>
+        Get Early Access (Free)
+      </h3>
+      <p className={`text-zinc-500 ${compact ? "mt-0.5 text-xs" : "mt-1 text-sm"}`}>
+        We&apos;ll email you when early access opens.
+      </p>
+
+      {(status === "success" || status === "error") && message && (
+        <p
+          className={`mt-3 rounded-lg px-4 py-3 text-sm ${
+            status === "success" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
+          }`}
+        >
+          {message}
+        </p>
+      )}
+
+      <div className="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden>
+        <input
+          type="text"
+          name="website"
+          tabIndex={-1}
+          autoComplete="off"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+        />
+      </div>
+
+      <div className={compact ? "mt-4 space-y-3" : "mt-6 space-y-4"}>
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-zinc-700">
+            Email <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="province" className="block text-sm font-medium text-zinc-700">
+            Province <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="province"
+            name="province"
+            required
+            value={province}
+            onChange={(e) => setProvince(e.target.value)}
+            className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          >
+            <option value="" disabled>
+              Select province
+            </option>
+            <option value="Ontario">Ontario</option>
+            <option value="Alberta">Alberta</option>
+            <option value="British Columbia">British Columbia</option>
+            <option value="Quebec">Quebec</option>
+            <option value="Manitoba">Manitoba</option>
+            <option value="Saskatchewan">Saskatchewan</option>
+            <option value="Nova Scotia">Nova Scotia</option>
+            <option value="New Brunswick">New Brunswick</option>
+            <option value="Newfoundland and Labrador">Newfoundland and Labrador</option>
+            <option value="Prince Edward Island">Prince Edward Island</option>
+            <option value="Northwest Territories">Northwest Territories</option>
+            <option value="Yukon">Yukon</option>
+            <option value="Nunavut">Nunavut</option>
+          </select>
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={status === "loading"}
+        className="mt-4 w-full rounded-lg bg-[#2436BB] px-4 py-3 font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto sm:px-8"
+      >
+        {status === "loading" ? "Submitting..." : "Get Early Access (Free)"}
+      </button>
+      <p className="mt-2 text-xs text-zinc-500">No spam. No calls. Just early access.</p>
+    </form>
+  );
+}
 
 export default function Home() {
   const [email, setEmail] = useState("");
-  const [trade, setTrade] = useState("");
-  const [city, setCity] = useState("");
   const [province, setProvince] = useState("");
-  const [heardAboutSource, setHeardAboutSource] = useState("");
   const [website, setWebsite] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
-    "idle"
-  );
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
@@ -27,19 +137,14 @@ export default function Home() {
     try {
       const firstTouch =
         readFirstTouchClient() ??
-        captureFirstTouchIfMissing(
-          `${window.location.pathname}${window.location.search || ""}`
-        );
+        captureFirstTouchIfMissing(`${window.location.pathname}${window.location.search || ""}`);
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
-          trade: trade || undefined,
-          city: city || undefined,
           province: province || undefined,
           source: "jobproof.ca",
-          heard_about_source: heardAboutSource || undefined,
           utm_source: firstTouch.utm_source ?? undefined,
           utm_medium: firstTouch.utm_medium ?? undefined,
           utm_campaign: firstTouch.utm_campaign ?? undefined,
@@ -55,6 +160,10 @@ export default function Home() {
       const data = await res.json();
 
       if (data.ok) {
+        trackEvent("Lead", {
+          content_name: "JobProof Early Access",
+          status: "submitted",
+        });
         if (data.duplicate) {
           setMessage("You're already on the list — we'll be in touch.");
         } else {
@@ -78,11 +187,7 @@ export default function Home() {
       <header className="border-b border-zinc-200 bg-white px-6 py-4 sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <a href="/">
-            <img
-              src="/jobproof-logo.png"
-              alt="JobProof"
-              className="h-10 w-auto"
-            />
+            <img src="/jobproof-logo.png" alt="JobProof" className="h-10 w-auto" />
           </a>
           <a
             href="/login"
@@ -93,63 +198,113 @@ export default function Home() {
         </div>
       </header>
       <main>
-        {/* Hero */}
-        <section className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-16 sm:px-8 sm:py-24">
+        {/* 1. Hero */}
+        <section className="border-b border-zinc-200 bg-zinc-50/50 px-6 py-8 sm:px-8 sm:py-14">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-3xl font-bold tracking-tight text-zinc-900 sm:text-4xl lg:text-[2.65rem] lg:leading-tight">
-              When a customer says &lsquo;I never agreed to that&rsquo;&hellip; will you have proof?
+              The job is done. The client won&apos;t pay.
+              <br />
+              Without proof, you don&apos;t get paid.
             </h1>
-            <p className="mt-6 text-lg leading-relaxed text-zinc-600 sm:text-xl">
-              JobProof helps contractors document every job, track approvals, send invoices, and get
-              paid &mdash; with clear contracts, photos, and dispute-ready records &mdash; built for
-              real contractor jobs across Canada.
+            <p className="mt-4 text-lg leading-relaxed text-zinc-600 sm:mt-5 sm:text-xl">
+              One missing message, photo, or approval can cost you thousands.
+              <br className="hidden sm:block" />{" "}
+              <span className="sm:whitespace-normal">
+                JobProof helps you make sure that never happens.
+              </span>
             </p>
-            <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-zinc-500">
-              Most contractors only realize they need this after a dispute. By then, it&apos;s too
-              late.
+            <p className="mt-3 text-sm text-zinc-600 sm:mt-4">
+              Built with input from real contractors in Ontario.
             </p>
-            <div className="mt-10 flex flex-col items-center justify-center gap-6 sm:flex-row sm:items-start sm:gap-8">
+            <p className="mt-1 text-sm text-zinc-600">
+              Used by contractors to avoid payment disputes and get paid faster.
+            </p>
+            <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:mt-8 sm:flex-row sm:items-start sm:gap-6">
               <div className="flex w-full flex-col items-center sm:w-auto sm:items-start">
+                <p className="mb-2 text-sm font-medium text-zinc-700 sm:text-left">
+                  Protect your next job before it becomes a problem.
+                </p>
                 <a
                   href="#early-access"
                   className="w-full rounded-lg bg-[#2436BB] px-6 py-3.5 text-center font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
                 >
-                  Request Early Access
+                  Get Early Access (Free)
                 </a>
-                <p className="mt-2 max-w-[16rem] text-center text-xs leading-snug text-zinc-500 sm:text-left">
-                  Free. No commitment. Founding members lock in lower pricing before launch.
-                </p>
-                <p className="mt-1 max-w-[16rem] text-center text-xs leading-snug text-zinc-500 sm:text-left">
-                  Takes 10 seconds. No spam.
+                <p className="mt-2 max-w-[18rem] text-center text-xs leading-snug text-zinc-500 sm:text-left">
+                  Takes 10 seconds. No commitment. No spam.
                 </p>
               </div>
               <a
-                href="#how-it-works"
+                href="#protected-job-preview"
                 className="w-full rounded-lg border-2 border-[#2436BB] bg-white px-6 py-3.5 text-center font-medium text-[#2436BB] transition-colors hover:bg-[#2436BB]/5 focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:mt-0 sm:w-auto sm:self-center"
               >
                 See How It Works
               </a>
             </div>
-            <p className="mt-8 text-sm text-zinc-500">
-              Built for contractors across Ontario &mdash; and expanding across Canada.
+          </div>
+        </section>
+
+        {/* 2. CTA + simplified form (above the fold) */}
+        <section
+          id="early-access"
+          className="scroll-mt-16 border-b border-zinc-200 bg-white px-6 py-4 sm:px-8 sm:py-8"
+        >
+          <div className="mx-auto max-w-lg">
+            <p className="text-center text-sm font-medium text-zinc-700">
+              Free. Takes 10 seconds. No commitment.
             </p>
-            <p className="mt-2 text-center text-xs text-zinc-400">Works anywhere in Canada.</p>
-            <p className="mt-2 text-xs text-zinc-400">
-              Built with feedback from Ontario contractors &mdash; expanding across Canada
+            <div className="mt-2">
+              <WaitlistForm
+                email={email}
+                setEmail={setEmail}
+                province={province}
+                setProvince={setProvince}
+                website={website}
+                setWebsite={setWebsite}
+                status={status}
+                message={message}
+                onSubmit={handleSubmit}
+                compact
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* 3. Loss / proof */}
+        <section className="border-b border-zinc-200 bg-zinc-50/40 px-6 py-8 sm:px-8 sm:py-10">
+          <div className="mx-auto max-w-2xl">
+            <h2 className="text-center text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">
+              If you don&apos;t have proof, you don&apos;t get paid.
+            </h2>
+            <ul className="mt-5 space-y-2.5 text-left text-sm text-zinc-700 sm:text-base">
+              {[
+                "\"I never agreed to that\"",
+                "\"That damage was already there\"",
+                "\"This wasn't done properly\"",
+                "Payment gets delayed... or never comes",
+              ].map((line) => (
+                <li key={line} className="flex gap-2">
+                  <span className="shrink-0 font-semibold text-[#2436BB]">•</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 text-center text-base font-semibold text-zinc-900 sm:text-lg">
+              Most contractors only realize this after it happens.
             </p>
           </div>
         </section>
 
-        {/* Problem — bullet cards */}
+        {/* 4. You’ve probably dealt with this */}
         <section
           id="heard-before"
-          className="scroll-mt-20 border-b border-zinc-200 px-6 py-14 sm:px-8 sm:py-16"
+          className="scroll-mt-20 border-b border-zinc-200 px-6 py-10 sm:px-8 sm:py-12"
         >
           <div className="mx-auto max-w-4xl">
             <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
               You&apos;ve probably dealt with this before:
             </h2>
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <div className="mt-6 grid gap-3 sm:mt-8 sm:grid-cols-2">
               {[
                 "I never agreed to that",
                 "That damage was already there",
@@ -165,19 +320,19 @@ export default function Home() {
                 </div>
               ))}
             </div>
-            <p className="mt-10 text-center text-base font-semibold text-zinc-900 sm:text-lg">
+            <p className="mt-8 text-center text-base font-semibold text-zinc-900 sm:text-lg">
               Most jobs go smoothly. But one bad job can cost you thousands.
             </p>
-            <p className="mt-4 text-center text-sm font-medium text-zinc-700">
+            <p className="mt-3 text-center text-sm font-medium text-zinc-700">
               And when it happens, it usually comes down to one thing: proof.
             </p>
           </div>
         </section>
 
-        {/* Product UI mock — visual focal point */}
+        {/* 5. Product walkthrough */}
         <section
           id="protected-job-preview"
-          className="scroll-mt-20 border-b-2 border-b-[#4DBACC]/25 bg-gradient-to-b from-zinc-50 to-white px-6 py-16 sm:px-8 sm:py-24"
+          className="scroll-mt-20 border-b-2 border-b-[#4DBACC]/25 bg-gradient-to-b from-zinc-50 to-white px-6 py-12 sm:px-8 sm:py-20"
           aria-labelledby="mock-heading"
         >
           <div className="mx-auto max-w-lg">
@@ -187,12 +342,12 @@ export default function Home() {
             >
               Here&apos;s what a protected job looks like in JobProof
             </h2>
-            <p className="mx-auto mt-4 max-w-md text-center text-sm text-zinc-600">
+            <p className="mx-auto mt-3 max-w-md text-center text-sm text-zinc-600 sm:mt-4">
               This is what you&apos;ll have on every job:
             </p>
 
             <div
-              className="mt-6 overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] ring-1 ring-zinc-100"
+              className="mt-5 overflow-hidden rounded-xl border border-zinc-200/80 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.08)] ring-1 ring-zinc-100 sm:mt-6"
               role="img"
               aria-label="Example JobProof job summary card"
             >
@@ -250,70 +405,25 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <p className="mx-auto mt-6 max-w-xl text-center text-sm text-zinc-600">
+            <p className="mx-auto mt-5 max-w-xl text-center text-sm text-zinc-600 sm:mt-6">
               Customers are more likely to pay when everything is clearly documented.
             </p>
-            <p className="mt-4 text-center text-sm text-zinc-600">
+            <p className="mt-3 text-center text-sm text-zinc-600">
               If a dispute happens, everything you need is already documented.
             </p>
           </div>
         </section>
 
-        {/* Who it's for */}
-        <section
-          id="who-its-for"
-          className="scroll-mt-20 border-b border-zinc-200 px-6 py-14 sm:px-8 sm:py-16"
-        >
-          <div className="mx-auto max-w-4xl">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              Who JobProof Is Built For
-            </h2>
-
-            <p className="mt-6 text-center text-zinc-600 leading-relaxed">
-              Built for contractors who want to protect their work, avoid misunderstandings, and
-              have clear records when customers question what was agreed.
-            </p>
-
-            <div className="mt-12 grid gap-8 sm:grid-cols-2">
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">Best for</h3>
-                <ul className="mt-3 space-y-2 text-sm text-zinc-600">
-                  <li>Independent contractors</li>
-                  <li>Small teams</li>
-                  <li>Painters</li>
-                  <li>Plumbers</li>
-                  <li>Renovators</li>
-                  <li>HVAC</li>
-                  <li>Electricians</li>
-                  <li>Flooring installers</li>
-                  <li>Roofers</li>
-                  <li>Landscapers</li>
-                  <li>General contracting</li>
-                </ul>
-              </div>
-
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">Probably not necessary for</h3>
-                <ul className="mt-3 space-y-2 text-sm text-zinc-600">
-                  <li>Large commercial construction companies</li>
-                  <li>Firms with dedicated legal or compliance departments</li>
-                  <li>Companies already running complex enterprise project management systems</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* How JobProof protects you */}
+        {/* 6. Features */}
         <section
           id="benefits"
-          className="scroll-mt-20 border-b border-zinc-200 bg-zinc-50/50 px-6 py-14 sm:px-8 sm:py-16"
+          className="scroll-mt-20 border-b border-zinc-200 bg-zinc-50/50 px-6 py-12 sm:px-8 sm:py-16"
         >
           <div className="mx-auto max-w-4xl">
             <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
               How JobProof Protects You
             </h2>
-            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-8 grid gap-6 sm:mt-12 sm:grid-cols-2 lg:grid-cols-3">
               <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
                 <h3 className="font-semibold text-zinc-900">Clear contracts</h3>
                 <p className="mt-2 text-sm text-zinc-600">
@@ -352,117 +462,26 @@ export default function Home() {
           </div>
         </section>
 
-        {/* How it works */}
-        <section
-          id="how-it-works"
-          className="scroll-mt-20 border-b-2 border-b-[#4DBACC]/20 px-6 py-14 sm:px-8 sm:py-16"
-        >
-          <div className="mx-auto max-w-4xl">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              How it works
-            </h2>
-            <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#2436BB] text-lg font-bold text-white">
-                  1
-                </div>
-                <h3 className="mt-4 font-semibold text-zinc-900">Create the job</h3>
-                <p className="mt-2 text-sm text-zinc-600">Set up customer + scope.</p>
-              </div>
-              <div className="text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#2436BB] text-lg font-bold text-white">
-                  2
-                </div>
-                <h3 className="mt-4 font-semibold text-zinc-900">Send a clear contract</h3>
-                <p className="mt-2 text-sm text-zinc-600">Client signs before work begins.</p>
-              </div>
-              <div className="text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#2436BB] text-lg font-bold text-white">
-                  3
-                </div>
-                <h3 className="mt-4 font-semibold text-zinc-900">Document the job</h3>
-                <p className="mt-2 text-sm text-zinc-600">Add photos, notes, updates.</p>
-              </div>
-              <div className="text-center">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#2436BB] text-lg font-bold text-white">
-                  4
-                </div>
-                <h3 className="mt-4 font-semibold text-zinc-900">Send invoices and get paid with proof</h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  Payments backed by contracts and job documentation.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* When things go wrong */}
-        <section
-          id="when-things-go-wrong"
-          className="scroll-mt-20 border-b border-zinc-200 bg-zinc-50/50 px-6 py-14 sm:px-8 sm:py-16"
-        >
-          <div className="mx-auto max-w-4xl">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              When things go wrong
-            </h2>
-            <div className="mt-12 grid gap-6 sm:grid-cols-2">
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">
-                  Customer says damage was already there
-                </h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  <span className="font-semibold text-[#2436BB]">→</span> Your before photos prove
-                  otherwise.
-                </p>
-              </div>
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">Scope becomes unclear</h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  <span className="font-semibold text-[#2436BB]">→</span> Your contract defines
-                  exactly what was agreed.
-                </p>
-              </div>
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">Customer claims poor work</h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  <span className="font-semibold text-[#2436BB]">→</span> Your documentation shows
-                  the full process.
-                </p>
-              </div>
-              <div className="rounded-xl border border-zinc-200 border-l-4 border-l-[#4DBACC] bg-white p-6">
-                <h3 className="font-semibold text-zinc-900">Payment is delayed</h3>
-                <p className="mt-2 text-sm text-zinc-600">
-                  <span className="font-semibold text-[#2436BB]">→</span> Your documentation and
-                  invoice history support your case.
-                </p>
-              </div>
-            </div>
-            <p className="mt-10 text-center text-sm font-semibold text-zinc-700">
-              Built for real contractor jobs &mdash; not office software.
-            </p>
-          </div>
-        </section>
-
-        {/* Pricing preview */}
+        {/* 7. Pricing */}
         <section
           id="pricing"
-          className="scroll-mt-20 border-b border-zinc-200 px-6 py-14 sm:px-8 sm:py-16"
+          className="scroll-mt-20 border-b border-zinc-200 px-6 py-12 sm:px-8 sm:py-16"
         >
           <div className="mx-auto max-w-2xl">
             <p className="text-center text-lg font-medium leading-relaxed text-zinc-800">
               One disputed job can cost thousands in lost revenue or legal fees. JobProof costs less
               than a single mistake.
             </p>
-            <p className="mt-4 text-center text-sm text-zinc-600">
+            <p className="mt-3 text-center text-sm text-zinc-600">
               Founding members lock in early access pricing before public launch.
             </p>
             <p className="mt-2 text-center text-sm text-zinc-600">
               Invoices and payments are part of the JobProof workflow.
             </p>
-            <h2 className="mt-10 text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+            <h2 className="mt-8 text-center text-2xl font-bold tracking-tight text-zinc-900 sm:mt-10 sm:text-3xl">
               Simple, Transparent Pricing
             </h2>
-            <div className="mt-12 grid gap-6 sm:grid-cols-2">
+            <div className="mt-8 grid gap-6 sm:mt-12 sm:grid-cols-2">
               <div className="rounded-xl border border-zinc-200 bg-white p-6">
                 <h3 className="font-semibold text-zinc-900">Essential Protection</h3>
                 <p className="mt-2 text-2xl font-bold text-zinc-900">$39</p>
@@ -495,178 +514,27 @@ export default function Home() {
                 <p className="mt-2 text-xs text-zinc-400">Less than the cost of one service call.</p>
               </div>
             </div>
-            <p className="mt-8 text-center text-xs text-zinc-500">
+            <p className="mt-6 text-center text-xs text-zinc-500 sm:mt-8">
               Join early and keep this pricing as a founding member.
             </p>
           </div>
         </section>
 
-        {/* Early access + form */}
-        <section
-          id="early-access"
-          className="scroll-mt-20 bg-zinc-50/50 px-6 py-14 sm:px-8 sm:py-16"
-        >
-          <div className="mx-auto max-w-2xl">
-            <h2 className="text-center text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              Start protecting your jobs before problems happen
+        {/* 8. Final CTA */}
+        <section className="bg-zinc-50/50 px-6 py-10 sm:px-8 sm:py-14">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-xl font-bold tracking-tight text-zinc-900 sm:text-2xl">
+              Don&apos;t wait for a dispute to wish you had proof.
             </h2>
-            <p className="mt-6 text-center text-zinc-600 leading-relaxed">
-              We&apos;re opening early access to a small number of contractors. Founding members
-              lock in lower pricing and help shape JobProof before launch. Currently focused on
-              Ontario, but available across Canada.
+            <p className="mt-3 text-sm text-zinc-600">
+              Free. Takes 10 seconds. No commitment. No spam.
             </p>
-
-            <form
-              className="mt-12 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8"
-              onSubmit={handleSubmit}
+            <a
+              href="#early-access"
+              className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-[#2436BB] px-6 py-3.5 font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
             >
-              <h3 className="text-lg font-semibold text-zinc-900">Request Early Access</h3>
-              <p className="mt-1 text-sm text-zinc-500">
-                Be the first to know when we launch.
-              </p>
-
-              {(status === "success" || status === "error") && message && (
-                <p
-                  className={`mt-4 rounded-lg px-4 py-3 text-sm ${
-                    status === "success"
-                      ? "bg-green-50 text-green-800"
-                      : "bg-red-50 text-red-800"
-                  }`}
-                >
-                  {message}
-                </p>
-              )}
-
-              <div
-                className="absolute -left-[9999px] h-px w-px overflow-hidden"
-                aria-hidden
-              >
-                <input
-                  type="text"
-                  name="website"
-                  tabIndex={-1}
-                  autoComplete="off"
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                />
-              </div>
-
-              <div className="mt-6 space-y-4">
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="block text-sm font-medium text-zinc-700"
-                  >
-                    Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="trade"
-                    className="block text-sm font-medium text-zinc-700"
-                  >
-                    Trade <span className="text-zinc-400">(optional)</span>
-                  </label>
-                  <input
-                    id="trade"
-                    type="text"
-                    value={trade}
-                    onChange={(e) => setTrade(e.target.value)}
-                    placeholder="e.g. Plumbing, Electrical, HVAC, Renovations, Landscaping"
-                    className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="city"
-                    className="block text-sm font-medium text-zinc-700"
-                  >
-                    City <span className="text-zinc-400">(optional)</span>
-                  </label>
-                  <input
-                    id="city"
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    placeholder="e.g. London, ON"
-                    className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="province" className="block text-sm font-medium text-zinc-700">
-                    Province <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    id="province"
-                    name="province"
-                    required
-                    value={province}
-                    onChange={(e) => setProvince(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-                  >
-                    <option value="" disabled>
-                      Select province
-                    </option>
-                    <option value="Ontario">Ontario</option>
-                    <option value="Alberta">Alberta</option>
-                    <option value="British Columbia">British Columbia</option>
-                    <option value="Quebec">Quebec</option>
-                    <option value="Manitoba">Manitoba</option>
-                    <option value="Saskatchewan">Saskatchewan</option>
-                    <option value="Nova Scotia">Nova Scotia</option>
-                    <option value="New Brunswick">New Brunswick</option>
-                    <option value="Newfoundland and Labrador">Newfoundland and Labrador</option>
-                    <option value="Prince Edward Island">Prince Edward Island</option>
-                    <option value="Northwest Territories">Northwest Territories</option>
-                    <option value="Yukon">Yukon</option>
-                    <option value="Nunavut">Nunavut</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="heardAboutSource"
-                    className="block text-sm font-medium text-zinc-700"
-                  >
-                    How did you hear about JobProof?{" "}
-                    <span className="text-zinc-400">(optional)</span>
-                  </label>
-                  <select
-                    id="heardAboutSource"
-                    value={heardAboutSource}
-                    onChange={(e) => setHeardAboutSource(e.target.value)}
-                    className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-                  >
-                    <option value="">Select one</option>
-                    {HEARD_ABOUT_SOURCE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={status === "loading"}
-                className="mt-6 w-full rounded-lg bg-[#2436BB] px-4 py-3 font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto sm:px-8"
-              >
-                {status === "loading" ? "Submitting..." : "Request Early Access"}
-              </button>
-            </form>
+              Get Early Access (Free)
+            </a>
           </div>
         </section>
       </main>

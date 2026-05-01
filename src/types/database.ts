@@ -7,7 +7,16 @@ export type Json =
   | Json[];
 
 export type PlanType = "solo" | "team" | "enterprise";
-export type SubscriptionStatus = "trial" | "active" | "cancelled" | "past_due";
+export type SubscriptionStatus =
+  | "trial"
+  | "trialing"
+  | "active"
+  | "cancelled"
+  | "canceled"
+  | "past_due"
+  | "unpaid"
+  | "incomplete"
+  | "incomplete_expired";
 export type JobStatus = "active" | "completed" | "cancelled";
 export type UpdateCategory = "before" | "progress" | "materials" | "issue" | "completion" | "other";
 export type JobContractStatus = "none" | "draft" | "pending" | "signed" | "void";
@@ -62,6 +71,19 @@ export interface Profile {
   signup_first_seen_at?: string | null;
   /** Optional self-reported channel from signup/early-access forms. */
   heard_about_source?: string | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  stripe_price_id?: string | null;
+  plan_tier?: "essential" | "professional" | null;
+  pricing_version?: "founder" | "standard" | null;
+  subscription_current_period_end?: string | null;
+  trial_ends_at?: string | null;
+  grace_period_ends_at?: string | null;
+  stripe_connect_account_id?: string | null;
+  stripe_connect_onboarding_complete?: boolean;
+  stripe_connect_charges_enabled?: boolean;
+  stripe_connect_payouts_enabled?: boolean;
+  stripe_connect_details_submitted?: boolean;
   created_at: string;
   updated_at: string;
 }

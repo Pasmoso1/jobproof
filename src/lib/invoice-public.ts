@@ -74,6 +74,10 @@ export type PublicInvoicePageData = {
   eTransferEmail: string | null;
   notes: string | null;
   hasPdf: boolean;
+  stripeOnlinePaymentAvailable: boolean;
+  customerId: string | null;
+  profileId: string;
+  jobId: string;
 };
 
 type ProfileJoin = {
@@ -88,6 +92,8 @@ type ProfileJoin = {
   e_transfer_email: string | null;
   default_contract_payment_terms: string | null;
   business_contact_email: string | null;
+  stripe_connect_account_id?: string | null;
+  stripe_connect_charges_enabled?: boolean | null;
 };
 
 type CustomerJoin = {
@@ -102,6 +108,8 @@ type CustomerJoin = {
 };
 
 type JobJoin = {
+  id?: string;
+  customer_id?: string | null;
   title: string | null;
   property_address_line_1: string | null;
   property_address_line_2: string | null;
@@ -131,6 +139,8 @@ export async function fetchPublicInvoicePageData(
     .select(
       `
       id,
+      profile_id,
+      job_id,
       invoice_number,
       subtotal,
       tax_amount,
@@ -173,7 +183,9 @@ export async function fetchPublicInvoicePageData(
         postal_code,
         e_transfer_email,
         default_contract_payment_terms,
-        business_contact_email
+        business_contact_email,
+        stripe_connect_account_id,
+        stripe_connect_charges_enabled
       )
     `
     )
@@ -264,6 +276,12 @@ export async function fetchPublicInvoicePageData(
     eTransferEmail: profile.e_transfer_email?.trim() || null,
     notes: typeof row.notes === "string" ? row.notes.trim() || null : null,
     hasPdf: Boolean(pdfPath),
+    stripeOnlinePaymentAvailable: Boolean(
+      profile.stripe_connect_account_id && profile.stripe_connect_charges_enabled && balanceDue > 0
+    ),
+    customerId: (job?.customer_id as string | undefined) ?? null,
+    profileId: String(row.profile_id),
+    jobId: String(row.job_id),
   };
 }
 

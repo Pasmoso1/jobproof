@@ -59,6 +59,12 @@ export default async function AppLayout({
             >
               Settings
             </Link>
+            <Link
+              href="/settings/billing"
+              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
+            >
+              Billing
+            </Link>
             <LogoutButton />
           </nav>
         </div>
