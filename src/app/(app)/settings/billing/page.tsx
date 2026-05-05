@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateEastern } from "@/lib/datetime-eastern";
 import { getSubscriptionAccess } from "@/lib/subscription-access";
-import { BillingActionButtons } from "./billing-actions-client";
+import { BillingActionButtons, StripeConnectActionButtons } from "./billing-actions-client";
 import { refreshStripeConnectStatus } from "./actions";
 
 function fmt(iso?: string | null) {
@@ -43,6 +43,8 @@ export default async function BillingSettingsPage({
   const connectReady = Boolean(
     profile.stripe_connect_charges_enabled && profile.stripe_connect_payouts_enabled
   );
+  const hasConnectAccount = Boolean(profile.stripe_connect_account_id);
+  const hasPlanTier = Boolean(profile.plan_tier?.trim());
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -77,19 +79,32 @@ export default async function BillingSettingsPage({
           Past due. Grace period ends {fmt(profile.grace_period_ends_at)}.
         </div>
       )}
-      {isTrialing && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-          Trial active until {fmt(profile.trial_ends_at)}.
-        </div>
-      )}
+      {isTrialing &&
+        (hasPlanTier ? (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            Trial active until {fmt(profile.trial_ends_at)}.
+          </div>
+        ) : (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            Free beta access is currently enabled.
+          </div>
+        ))}
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5">
         <h2 className="text-base font-semibold text-zinc-900">Subscription</h2>
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-zinc-500">Current plan</dt>
-            <dd className="font-medium capitalize text-zinc-900">
-              {profile.plan_tier ?? "—"} {profile.pricing_version ? `(${profile.pricing_version})` : ""}
+            <dd
+              className={
+                hasPlanTier
+                  ? "font-medium capitalize text-zinc-900"
+                  : "font-medium text-zinc-900"
+              }
+            >
+              {hasPlanTier
+                ? `${profile.plan_tier}${profile.pricing_version ? ` (${profile.pricing_version})` : ""}`
+                : "Not selected"}
             </dd>
           </div>
           <div>
@@ -106,19 +121,20 @@ export default async function BillingSettingsPage({
           </div>
         </dl>
         <div className="mt-4">
-          <BillingActionButtons
-            connectOnboardingIncomplete={
-              !connectReady && Boolean(profile.stripe_connect_account_id)
-            }
-          />
+          <BillingActionButtons />
         </div>
       </section>
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5">
         <h2 className="text-base font-semibold text-zinc-900">Accept online payments</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Connect Stripe to let customers pay invoices by card. You can set this up later.
+          Connect Stripe to let customers pay invoices by credit card. You can set this up now or
+          later.
         </p>
+        <StripeConnectActionButtons
+          hasConnectAccount={hasConnectAccount}
+          connectReady={connectReady}
+        />
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-zinc-500">Connected account</dt>
