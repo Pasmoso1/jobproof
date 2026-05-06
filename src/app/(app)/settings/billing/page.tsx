@@ -11,6 +11,7 @@ function fmt(iso?: string | null) {
   return formatDateEastern(iso, { dateStyle: "medium" });
 }
 
+/** Stripe Billing Portal opens only from the client (`Manage billing`); this page does not create portal sessions during render. */
 export default async function BillingSettingsPage({
   searchParams,
 }: {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   createBillingPortalSession,
@@ -8,6 +9,7 @@ import {
 } from "./actions";
 
 export function BillingActionButtons() {
+  const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,6 +19,24 @@ export function BillingActionButtons() {
     try {
       const { url } = await fn();
       window.location.href = url;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Action failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function goPortal() {
+    setError(null);
+    setBusy("portal");
+    try {
+      const result = await createBillingPortalSession();
+      if (!result.success) {
+        setError(result.error);
+        router.refresh();
+        return;
+      }
+      window.location.href = result.url;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed.");
     } finally {
@@ -58,7 +78,7 @@ export function BillingActionButtons() {
         </button>
         <button
           type="button"
-          onClick={() => go("portal", () => createBillingPortalSession())}
+          onClick={() => void goPortal()}
           disabled={busy !== null}
           className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
         >

@@ -3,12 +3,21 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
+  clearStaleJobProofStripeBilling,
+  ensureStripeCustomerForProfile,
+  isStripeCustomerMissingError,
+} from "@/lib/stripe-customer";
+import {
   type BillingPlanTier,
   type BillingPricingVersion,
   getStripe,
   getStripePriceId,
   resolveAppUrl,
 } from "@/lib/stripe";
+
+export type BillingPortalSessionResult =
+  | { success: true; url: string }
+  | { success: false; error: string };
 
 async function requireContractorProfile() {
   const supabase = await createClient();
@@ -39,20 +48,12 @@ export async function createSubscriptionCheckoutSession(params: {
     profile.pricing_version === "standard" ? "standard" : "founder";
   const priceId = getStripePriceId(params.planTier, pricingVersion);
 
-  let customerId = (profile.stripe_customer_id as string | null)?.trim() || null;
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: user.email ?? undefined,
-      metadata: {
-        profile_id: String(profile.id),
-      },
-    });
-    customerId = customer.id;
-    await supabase
-      .from("profiles")
-      .update({ stripe_customer_id: customerId })
-      .eq("id", profile.id);
-  }
+  const { customerId } = await ensureStripeCustomerForProfile(
+    stripe,
+    supabase,
+    profile,
+    user.email
+  );
 
   const appUrl = resolveAppUrl();
   const session = await stripe.checkout.sessions.create({
@@ -82,18 +83,36 @@ export async function createSubscriptionCheckoutSession(params: {
   return { url: session.url };
 }
 
-export async function createBillingPortalSession(): Promise<{ url: string }> {
-  const { profile } = await requireContractorProfile();
+export async function createBillingPortalSession(): Promise<BillingPortalSessionResult> {
+  const { supabase, profile } = await requireContractorProfile();
   const customerId = (profile.stripe_customer_id as string | null)?.trim() || null;
   if (!customerId) {
-    throw new Error("No Stripe customer found yet.");
+    return {
+      success: false,
+      error: "Billing customer was not found. Please start a new checkout session.",
+    };
   }
+
   const stripe = getStripe();
-  const session = await stripe.billingPortal.sessions.create({
-    customer: customerId,
-    return_url: `${resolveAppUrl()}/settings/billing`,
-  });
-  return { url: session.url };
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${resolveAppUrl()}/settings/billing`,
+    });
+    if (!session.url) {
+      return { success: false, error: "Billing portal did not return a URL." };
+    }
+    return { success: true, url: session.url };
+  } catch (err) {
+    if (isStripeCustomerMissingError(err)) {
+      await clearStaleJobProofStripeBilling(supabase, profile.id);
+      return {
+        success: false,
+        error: "Billing customer was not found. Please start a new checkout session.",
+      };
+    }
+    throw err;
+  }
 }
 
 export async function createStripeConnectOnboardingLink(): Promise<{ url: string }> {
