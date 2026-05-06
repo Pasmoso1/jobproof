@@ -24,6 +24,23 @@ export type SubscriptionCheckoutSessionResult =
   | { success: true; url: string }
   | { success: false; error: string };
 
+function logStripeError(
+  context: string,
+  err: {
+    requestId?: string;
+    code?: string;
+    param?: string;
+    type?: string;
+  }
+) {
+  console.error(`[stripe] ${context}`, {
+    requestId: err.requestId ?? null,
+    code: err.code ?? null,
+    param: err.param ?? null,
+    type: err.type ?? null,
+  });
+}
+
 async function requireContractorProfile() {
   const supabase = await createClient();
   const {
@@ -100,13 +117,32 @@ export async function createSubscriptionCheckoutSession(params: {
     }
     return { success: true, url: session.url };
   } catch (err) {
+    if (isStripeCustomerMissingError(err)) {
+      await clearStaleJobProofStripeBilling(supabase, profile.id);
+      return {
+        success: false,
+        error: "Billing customer was not found. Please start a new checkout session.",
+      };
+    }
     if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+      logStripeError("createSubscriptionCheckoutSession invalid request", err);
+      const isMissingPrice =
+        (err.code === "resource_missing" && err.param === "price") ||
+        /no such price/i.test(err.message ?? "");
+      if (isMissingPrice) {
+        return {
+          success: false,
+          error:
+            "Stripe price not found. Check that your Stripe keys and price IDs are from the same mode.",
+        };
+      }
       return {
         success: false,
         error: "Could not start checkout. Please try again or contact support.",
       };
     }
     if (err instanceof Stripe.errors.StripeError) {
+      logStripeError("createSubscriptionCheckoutSession stripe error", err);
       return {
         success: false,
         error: "Could not reach Stripe. Please try again in a moment.",
