@@ -2,25 +2,37 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { BillingPlanTier } from "@/lib/stripe";
 import {
   createBillingPortalSession,
   createStripeConnectOnboardingLink,
   createSubscriptionCheckoutSession,
 } from "./actions";
 
+function formatActionError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  return "Something went wrong. Please try again.";
+}
+
 export function BillingActionButtons() {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function go(label: string, fn: () => Promise<{ url: string }>) {
+  async function goCheckout(label: "essential" | "professional", planTier: BillingPlanTier) {
     setError(null);
     setBusy(label);
     try {
-      const { url } = await fn();
-      window.location.href = url;
+      const result = await createSubscriptionCheckoutSession({ planTier });
+      if (!result.success) {
+        setError(result.error);
+        router.refresh();
+        return;
+      }
+      window.location.href = result.url;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed.");
+      setError(formatActionError(e));
     } finally {
       setBusy(null);
     }
@@ -38,7 +50,7 @@ export function BillingActionButtons() {
       }
       window.location.href = result.url;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed.");
+      setError(formatActionError(e));
     } finally {
       setBusy(null);
     }
@@ -54,11 +66,7 @@ export function BillingActionButtons() {
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() =>
-            go("essential", () =>
-              createSubscriptionCheckoutSession({ planTier: "essential" })
-            )
-          }
+          onClick={() => void goCheckout("essential", "essential")}
           disabled={busy !== null}
           className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
         >
@@ -66,11 +74,7 @@ export function BillingActionButtons() {
         </button>
         <button
           type="button"
-          onClick={() =>
-            go("professional", () =>
-              createSubscriptionCheckoutSession({ planTier: "professional" })
-            )
-          }
+          onClick={() => void goCheckout("professional", "professional")}
           disabled={busy !== null}
           className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
         >
@@ -113,7 +117,7 @@ export function StripeConnectActionButtons({
       const { url } = await createStripeConnectOnboardingLink();
       window.location.href = url;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed.");
+      setError(formatActionError(e));
     } finally {
       setBusy(false);
     }

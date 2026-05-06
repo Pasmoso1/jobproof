@@ -11,6 +11,21 @@ function fmt(iso?: string | null) {
   return formatDateEastern(iso, { dateStyle: "medium" });
 }
 
+function str(v: unknown): string {
+  if (v == null) return "";
+  return String(v);
+}
+
+function trimOrEmpty(v: unknown): string {
+  return str(v).trim();
+}
+
+function firstSearchParam(v: string | string[] | undefined): string {
+  if (v == null) return "";
+  const raw = Array.isArray(v) ? v[0] : v;
+  return trimOrEmpty(raw);
+}
+
 /** Stripe Billing Portal opens only from the client (`Manage billing`); this page does not create portal sessions during render. */
 export default async function BillingSettingsPage({
   searchParams,
@@ -24,7 +39,8 @@ export default async function BillingSettingsPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  if (sp.stripe_connect === "return" || sp.stripe_connect === "refresh") {
+  const stripeConnectParam = firstSearchParam(sp.stripe_connect);
+  if (stripeConnectParam === "return" || stripeConnectParam === "refresh") {
     await refreshStripeConnectStatus();
   }
 
@@ -36,16 +52,21 @@ export default async function BillingSettingsPage({
   if (!profile) redirect("/login");
 
   const access = getSubscriptionAccess(profile);
-  const checkoutState = String(sp.checkout ?? "");
-  const isPastDue = String(profile.subscription_status ?? "") === "past_due";
-  const isTrialing = ["trial", "trialing"].includes(
-    String(profile.subscription_status ?? "").toLowerCase()
-  );
+  const checkoutState = firstSearchParam(sp.checkout);
+  const subscriptionStatus = trimOrEmpty(profile.subscription_status).toLowerCase();
+  const isPastDue = subscriptionStatus === "past_due";
+  const isTrialing = ["trial", "trialing"].includes(subscriptionStatus);
   const connectReady = Boolean(
-    profile.stripe_connect_charges_enabled && profile.stripe_connect_payouts_enabled
+    profile.stripe_connect_charges_enabled === true &&
+      profile.stripe_connect_payouts_enabled === true
   );
-  const hasConnectAccount = Boolean(profile.stripe_connect_account_id);
-  const hasPlanTier = Boolean(profile.plan_tier?.trim());
+  const hasConnectAccount = Boolean(trimOrEmpty(profile.stripe_connect_account_id));
+  const planTierLabel = trimOrEmpty(profile.plan_tier);
+  const hasPlanTier = Boolean(planTierLabel);
+  const pricingVersionLabel = trimOrEmpty(profile.pricing_version);
+  const stripeCustomerDisplay = trimOrEmpty(profile.stripe_customer_id) || "—";
+  const stripeConnectAccountDisplay =
+    trimOrEmpty(profile.stripe_connect_account_id) || "—";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -104,13 +125,15 @@ export default async function BillingSettingsPage({
               }
             >
               {hasPlanTier
-                ? `${profile.plan_tier}${profile.pricing_version ? ` (${profile.pricing_version})` : ""}`
+                ? `${planTierLabel}${pricingVersionLabel ? ` (${pricingVersionLabel})` : ""}`
                 : "Not selected"}
             </dd>
           </div>
           <div>
             <dt className="text-zinc-500">Status</dt>
-            <dd className="font-medium text-zinc-900">{profile.subscription_status ?? "—"}</dd>
+            <dd className="font-medium text-zinc-900">
+              {trimOrEmpty(profile.subscription_status) || "—"}
+            </dd>
           </div>
           <div>
             <dt className="text-zinc-500">Current period end</dt>
@@ -118,7 +141,7 @@ export default async function BillingSettingsPage({
           </div>
           <div>
             <dt className="text-zinc-500">Stripe customer</dt>
-            <dd className="font-mono text-xs text-zinc-700">{profile.stripe_customer_id ?? "—"}</dd>
+            <dd className="font-mono text-xs text-zinc-700">{stripeCustomerDisplay}</dd>
           </div>
         </dl>
         <div className="mt-4">
@@ -139,7 +162,7 @@ export default async function BillingSettingsPage({
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-zinc-500">Connected account</dt>
-            <dd className="font-mono text-xs text-zinc-700">{profile.stripe_connect_account_id ?? "—"}</dd>
+            <dd className="font-mono text-xs text-zinc-700">{stripeConnectAccountDisplay}</dd>
           </div>
           <div>
             <dt className="text-zinc-500">Onboarding status</dt>
