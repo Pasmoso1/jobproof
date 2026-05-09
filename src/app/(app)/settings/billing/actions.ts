@@ -80,6 +80,20 @@ export async function createSubscriptionCheckoutSession(params: {
       };
     }
 
+    // Temporary debug — remove after verifying Stripe mode vs prices
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY ?? "";
+    console.log("[createSubscriptionCheckoutSession]", {
+      planTier: params.planTier,
+      pricingVersion,
+      priceId,
+      stripeSecretKeyPrefix:
+        stripeSecretKey.startsWith("sk_test")
+          ? "sk_test"
+          : stripeSecretKey.startsWith("sk_live")
+            ? "sk_live"
+            : "neither",
+    });
+
     const { customerId } = await ensureStripeCustomerForProfile(
       stripe,
       supabase,
