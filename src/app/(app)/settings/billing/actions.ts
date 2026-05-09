@@ -102,6 +102,16 @@ export async function createSubscriptionCheckoutSession(params: {
     );
 
     const appUrl = resolveAppUrl();
+    // DEBUG: verify the price exists using the active Stripe secret key.
+    // Remove after billing debugging is complete.
+    const stripePrice = await stripe.prices.retrieve(priceId);
+
+    console.log("[stripe price check]", {
+      id: stripePrice.id,
+      active: stripePrice.active,
+      product: stripePrice.product,
+    });
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
