@@ -2,11 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { BillingUiTier } from "@/lib/billing-plan-display";
 import type { BillingPlanTier } from "@/lib/stripe";
 import {
   createBillingPortalSession,
   createStripeConnectOnboardingLink,
   createSubscriptionCheckoutSession,
+  upgradeSubscriptionToProfessional,
 } from "./actions";
 
 function formatActionError(e: unknown): string {
@@ -15,7 +17,13 @@ function formatActionError(e: unknown): string {
   return "Something went wrong. Please try again.";
 }
 
-export function BillingActionButtons() {
+export function BillingActionButtons({
+  billingUiTier,
+  upgradeProfessionalLabel,
+}: {
+  billingUiTier: BillingUiTier;
+  upgradeProfessionalLabel: string;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +39,24 @@ export function BillingActionButtons() {
         return;
       }
       window.location.href = result.url;
+    } catch (e) {
+      setError(formatActionError(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function goUpgradeProfessional() {
+    setError(null);
+    setBusy("upgrade-prof");
+    try {
+      const result = await upgradeSubscriptionToProfessional();
+      if (!result.success) {
+        setError(result.error);
+        router.refresh();
+        return;
+      }
+      router.refresh();
     } catch (e) {
       setError(formatActionError(e));
     } finally {
@@ -56,6 +82,8 @@ export function BillingActionButtons() {
     }
   }
 
+  const disableAll = busy !== null;
+
   return (
     <div className="space-y-3">
       {error && (
@@ -63,31 +91,80 @@ export function BillingActionButtons() {
           {error}
         </p>
       )}
+      {billingUiTier === "essential" ? (
+        <p className="text-sm text-zinc-600">
+          Need team features? Upgrade to Professional anytime.
+        </p>
+      ) : null}
+      {billingUiTier === "professional" ? (
+        <p className="text-xs text-zinc-500">
+          Manage plan in billing portal to change or downgrade your plan.
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => void goCheckout("essential", "essential")}
-          disabled={busy !== null}
-          className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
-        >
-          {busy === "essential" ? "Opening..." : "Choose Essential — $29/mo"}
-        </button>
-        <button
-          type="button"
-          onClick={() => void goCheckout("professional", "professional")}
-          disabled={busy !== null}
-          className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
-        >
-          {busy === "professional" ? "Opening..." : "Choose Professional — $49/mo"}
-        </button>
-        <button
-          type="button"
-          onClick={() => void goPortal()}
-          disabled={busy !== null}
-          className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
-        >
-          {busy === "portal" ? "Opening..." : "Manage billing"}
-        </button>
+        {billingUiTier === "professional" ? (
+          <>
+            <button
+              type="button"
+              onClick={() => void goPortal()}
+              disabled={disableAll}
+              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
+            >
+              {busy === "portal" ? "Opening..." : "Manage billing"}
+            </button>
+            <button
+              type="button"
+              disabled
+              className="cursor-not-allowed rounded-lg border border-zinc-200 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-500"
+            >
+              Current plan
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => billingUiTier !== "essential" && void goCheckout("essential", "essential")}
+              disabled={disableAll || billingUiTier === "essential"}
+              className={
+                billingUiTier === "essential"
+                  ? "cursor-not-allowed rounded-lg border border-zinc-200 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-500"
+                  : "rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
+              }
+            >
+              {busy === "essential"
+                ? "Opening..."
+                : billingUiTier === "essential"
+                  ? "Current plan"
+                  : "Choose Essential — $29/mo"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (billingUiTier === "essential") void goUpgradeProfessional();
+                else void goCheckout("professional", "professional");
+              }}
+              disabled={disableAll}
+              className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
+            >
+              {busy === "professional"
+                ? "Opening..."
+                : busy === "upgrade-prof"
+                  ? "Upgrading..."
+                  : billingUiTier === "essential"
+                    ? upgradeProfessionalLabel
+                    : "Choose Professional — $49/mo"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void goPortal()}
+              disabled={disableAll}
+              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
+            >
+              {busy === "portal" ? "Opening..." : "Manage billing"}
+            </button>
+          </>
+        )}
       </div>
       <p className="text-xs text-zinc-600">
         Founder pricing is locked in for early subscribers.

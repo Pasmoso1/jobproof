@@ -35,11 +35,13 @@ function unixToIso(ts?: number | null): string | null {
 }
 
 function tierFromMetadata(v: unknown): BillingPlanTier | null {
-  return v === "essential" || v === "professional" ? v : null;
+  const t = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return t === "essential" || t === "professional" ? t : null;
 }
 
 function pricingFromMetadata(v: unknown): BillingPricingVersion | null {
-  return v === "founder" || v === "standard" ? v : null;
+  const t = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return t === "founder" || t === "standard" ? t : null;
 }
 
 async function findBlockingJobProofSubscription(
@@ -71,6 +73,8 @@ export type BillingPortalSessionResult =
 export type SubscriptionCheckoutSessionResult =
   | { success: true; url: string }
   | { success: false; error: string };
+
+export type UpgradeSubscriptionResult = { success: true } | { success: false; error: string };
 
 function logStripeError(
   context: string,
@@ -209,6 +213,140 @@ export async function createSubscriptionCheckoutSession(params: {
         success: false,
         error: "Could not reach Stripe. Please try again in a moment.",
       };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Moves the existing JobProof subscription from Essential → Professional in Stripe
+ * (same subscription id, founder/standard price cohort from the profile). Does not create Checkout.
+ */
+export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscriptionResult> {
+  const { supabase, user, profile } = await requireContractorProfile();
+
+  if (tierFromMetadata(profile.plan_tier) !== "essential") {
+    return {
+      success: false,
+      error: "Upgrade is only available when you’re on the Essential plan.",
+    };
+  }
+
+  const subId = (profile.stripe_subscription_id as string | null)?.trim() || null;
+  if (!subId) {
+    return { success: false, error: "No active subscription was found. Use checkout to subscribe." };
+  }
+
+  const stripe = getStripe();
+  let sub: Stripe.Subscription;
+  try {
+    sub = await stripe.subscriptions.retrieve(subId);
+  } catch {
+    return { success: false, error: "Could not load your subscription from Stripe." };
+  }
+
+  const customerId = (profile.stripe_customer_id as string | null)?.trim() || null;
+  if (!customerId || String(sub.customer) !== customerId) {
+    return { success: false, error: "Subscription does not match your billing customer." };
+  }
+
+  const blocking = SUBSCRIPTION_STATUSES_BLOCKING_NEW_CHECKOUT.has(sub.status);
+  if (!blocking) {
+    return {
+      success: false,
+      error: "This subscription can’t be upgraded from here. Use Manage billing or start a new plan.",
+    };
+  }
+
+  const pricingVersion: BillingPricingVersion =
+    profile.pricing_version === "standard" ? "standard" : "founder";
+  let newPriceId: string;
+  try {
+    newPriceId = getStripePriceId("professional", pricingVersion);
+  } catch {
+    return {
+      success: false,
+      error: "Upgrade is not available right now. Please contact support.",
+    };
+  }
+
+  const firstItem = sub.items.data[0];
+  const itemId = firstItem?.id;
+  const currentPriceId = firstItem?.price?.id ?? null;
+  if (!itemId) {
+    return { success: false, error: "Subscription has no billable items to update." };
+  }
+
+  const currentPlan = currentPriceId ? getPlanFromStripePriceId(currentPriceId) : null;
+  if (currentPlan?.planTier === "professional") {
+    await supabase
+      .from("profiles")
+      .update({
+        plan_tier: "professional",
+        stripe_price_id: currentPriceId,
+        pricing_version: currentPlan.pricingVersion ?? pricingVersion,
+        subscription_status: sub.status,
+        subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
+        trial_ends_at: unixToIso(sub.trial_end ?? null),
+      })
+      .eq("id", profile.id)
+      .eq("user_id", user.id);
+    return { success: true };
+  }
+
+  if (currentPlan?.planTier !== "essential") {
+    return {
+      success: false,
+      error: "Your Stripe subscription doesn’t match Essential. Use Manage billing to make changes.",
+    };
+  }
+
+  const meta: Record<string, string> = {
+    ...Object.fromEntries(
+      Object.entries(sub.metadata ?? {}).map(([k, v]) => [k, v == null ? "" : String(v)])
+    ),
+    profile_id: String(profile.id),
+    plan_tier: "professional",
+    pricing_version: pricingVersion,
+  };
+
+  try {
+    const updated = await stripe.subscriptions.update(subId, {
+      items: [{ id: itemId, price: newPriceId }],
+      proration_behavior: "create_prorations",
+      metadata: meta,
+    });
+
+    const priceId = updated.items.data[0]?.price?.id ?? null;
+    const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
+    const metaTier = tierFromMetadata(updated.metadata?.plan_tier);
+    const metaPricing = pricingFromMetadata(updated.metadata?.pricing_version);
+
+    await supabase
+      .from("profiles")
+      .update({
+        stripe_price_id: priceId,
+        plan_tier: plan?.planTier ?? metaTier ?? "professional",
+        pricing_version: plan?.pricingVersion ?? metaPricing ?? pricingVersion,
+        subscription_status: updated.status,
+        subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(updated)),
+        trial_ends_at: unixToIso(updated.trial_end ?? null),
+      })
+      .eq("id", profile.id)
+      .eq("user_id", user.id);
+
+    return { success: true };
+  } catch (err) {
+    if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+      logStripeError("upgradeSubscriptionToProfessional invalid request", err);
+      return {
+        success: false,
+        error: "Stripe couldn’t apply the upgrade. Try Manage billing or contact support.",
+      };
+    }
+    if (err instanceof Stripe.errors.StripeError) {
+      logStripeError("upgradeSubscriptionToProfessional stripe error", err);
+      return { success: false, error: "Could not reach Stripe. Please try again in a moment." };
     }
     throw err;
   }

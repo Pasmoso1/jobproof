@@ -4,8 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDateEastern } from "@/lib/datetime-eastern";
 import { getSubscriptionAccess } from "@/lib/subscription-access";
 import {
+  billingUiTierFromProfile,
   formatSubscriptionStatusLabel,
   getPlanDisplayLines,
+  getUpgradeProfessionalButtonLabel,
   parseBillingPlanTier,
   parseBillingPricingVersion,
 } from "@/lib/billing-plan-display";
@@ -109,6 +111,10 @@ export default async function BillingSettingsPage({
 
   const planLines =
     planTier && pricingVersion ? getPlanDisplayLines(planTier, pricingVersion) : null;
+
+  const billingUiTier = billingUiTierFromProfile(profile);
+  const pricingForUpgrade = parseBillingPricingVersion(pricingVersionRaw) ?? "founder";
+  const upgradeProfessionalLabel = getUpgradeProfessionalButtonLabel(pricingForUpgrade);
 
   let currentPlanCell: string;
   if (planLines) {
@@ -233,7 +239,10 @@ export default async function BillingSettingsPage({
           Stripe will send receipts and billing emails to your account email.
         </p>
         <div className="mt-4">
-          <BillingActionButtons />
+          <BillingActionButtons
+            billingUiTier={billingUiTier}
+            upgradeProfessionalLabel={upgradeProfessionalLabel}
+          />
         </div>
       </section>
 

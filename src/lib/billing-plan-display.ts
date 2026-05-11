@@ -10,6 +10,29 @@ export function parseBillingPricingVersion(raw: string): BillingPricingVersion |
   return t === "founder" || t === "standard" ? t : null;
 }
 
+/** Which plan-specific upgrade UI to show (requires an active-like Stripe subscription). */
+export type BillingUiTier = "none" | "essential" | "professional";
+
+export function billingUiTierFromProfile(p: {
+  plan_tier?: string | null;
+  stripe_subscription_id?: string | null;
+  subscription_status?: string | null;
+}): BillingUiTier {
+  const tier = parseBillingPlanTier(String(p.plan_tier ?? ""));
+  if (!tier) return "none";
+  const subId = String(p.stripe_subscription_id ?? "").trim();
+  const st = String(p.subscription_status ?? "").trim().toLowerCase();
+  const subscribed =
+    Boolean(subId) && ["trialing", "active", "past_due", "incomplete"].includes(st);
+  if (!subscribed) return "none";
+  return tier;
+}
+
+export function getUpgradeProfessionalButtonLabel(pricingVersion: BillingPricingVersion): string {
+  const { afterTrialLine } = getPlanDisplayLines("professional", pricingVersion);
+  return `Upgrade to Professional — ${afterTrialLine}`;
+}
+
 export type PlanDisplay = {
   planLine: string;
   afterTrialLine: string;
