@@ -11,10 +11,58 @@ import {
 import {
   type BillingPlanTier,
   type BillingPricingVersion,
+  getPlanFromStripePriceId,
   getStripe,
   getStripePriceId,
   resolveAppUrl,
 } from "@/lib/stripe";
+
+const SUBSCRIPTION_STATUSES_BLOCKING_NEW_CHECKOUT = new Set([
+  "trialing",
+  "active",
+  "past_due",
+  "incomplete",
+]);
+
+function subscriptionPeriodEndUnix(sub: Stripe.Subscription): number | null {
+  const end = (sub as Stripe.Subscription & { current_period_end?: number }).current_period_end;
+  return typeof end === "number" ? end : null;
+}
+
+function unixToIso(ts?: number | null): string | null {
+  if (!ts) return null;
+  return new Date(ts * 1000).toISOString();
+}
+
+function tierFromMetadata(v: unknown): BillingPlanTier | null {
+  return v === "essential" || v === "professional" ? v : null;
+}
+
+function pricingFromMetadata(v: unknown): BillingPricingVersion | null {
+  return v === "founder" || v === "standard" ? v : null;
+}
+
+async function findBlockingJobProofSubscription(
+  stripe: Stripe,
+  customerId: string,
+  profileId: string
+): Promise<Stripe.Subscription | null> {
+  const list = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 30,
+  });
+  const pid = String(profileId);
+  const candidates = list.data.filter((s) => {
+    if (String(s.metadata?.profile_id ?? "") === pid) return true;
+    const priceId = s.items.data[0]?.price?.id;
+    return Boolean(priceId && getPlanFromStripePriceId(priceId));
+  });
+  const blocking = candidates.filter((s) => SUBSCRIPTION_STATUSES_BLOCKING_NEW_CHECKOUT.has(s.status));
+  if (!blocking.length) return null;
+  blocking.sort((a, b) => (b.created ?? 0) - (a.created ?? 0));
+  return blocking[0] ?? null;
+}
 
 export type BillingPortalSessionResult =
   | { success: true; url: string }
@@ -80,20 +128,6 @@ export async function createSubscriptionCheckoutSession(params: {
       };
     }
 
-    // Temporary debug — remove after verifying Stripe mode vs prices
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY ?? "";
-    console.log("[createSubscriptionCheckoutSession]", {
-      planTier: params.planTier,
-      pricingVersion,
-      priceId,
-      stripeSecretKeyPrefix:
-        stripeSecretKey.startsWith("sk_test")
-          ? "sk_test"
-          : stripeSecretKey.startsWith("sk_live")
-            ? "sk_live"
-            : "neither",
-    });
-
     const { customerId } = await ensureStripeCustomerForProfile(
       stripe,
       supabase,
@@ -101,21 +135,25 @@ export async function createSubscriptionCheckoutSession(params: {
       user.email
     );
 
-    const appUrl = resolveAppUrl();
-    // DEBUG: verify the price exists using the active Stripe secret key.
-    // Remove after billing debugging is complete.
-    const stripePrice = await stripe.prices.retrieve(priceId);
+    const existingSub = await findBlockingJobProofSubscription(
+      stripe,
+      customerId,
+      String(profile.id)
+    );
+    if (existingSub) {
+      return {
+        success: false,
+        error:
+          "You already have a subscription for this account. Use Manage billing to change your plan or payment method.",
+      };
+    }
 
-    console.log("[stripe price check]", {
-      id: stripePrice.id,
-      active: stripePrice.active,
-      product: stripePrice.product,
-    });
+    const appUrl = resolveAppUrl();
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
-      success_url: `${appUrl}/settings/billing?checkout=success`,
+      success_url: `${appUrl}/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/settings/billing?checkout=cancelled`,
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
@@ -274,5 +312,93 @@ export async function refreshStripeConnectStatus(): Promise<{ ok: true }> {
     /* Stale Connect account ids or wrong Stripe mode must not crash Server Components. */
   }
   return { ok: true };
+}
+
+/**
+ * After returning from Stripe Checkout, pull the latest subscription into `profiles`
+ * so the billing page is accurate even if the webhook is slightly delayed.
+ */
+export async function syncSubscriptionAfterStripeReturn(input: {
+  checkoutSessionId?: string | null;
+}): Promise<void> {
+  const { supabase, user, profile } = await requireContractorProfile();
+  const customerId = (profile.stripe_customer_id as string | null)?.trim() || null;
+  if (!customerId) return;
+
+  const stripe = getStripe();
+  const profileIdStr = String(profile.id);
+  let sub: Stripe.Subscription | null = null;
+  const sessionId = input.checkoutSessionId?.trim() || null;
+
+  if (sessionId) {
+    try {
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ["subscription"],
+      });
+      if (session.mode !== "subscription") return;
+      if (String(session.customer ?? "") !== customerId) return;
+      if (String(session.metadata?.profile_id ?? "") !== profileIdStr) return;
+      const subRes = session.subscription;
+      if (subRes && typeof subRes === "object") {
+        sub = subRes as Stripe.Subscription;
+      } else if (typeof subRes === "string" && subRes) {
+        sub = await stripe.subscriptions.retrieve(subRes);
+      }
+    } catch {
+      /* Invalid session id, wrong customer, or Stripe error — try fallbacks below. */
+    }
+  }
+
+  if (!sub) {
+    const existingSubId = (profile.stripe_subscription_id as string | null)?.trim() || null;
+    if (existingSubId) {
+      try {
+        const r = await stripe.subscriptions.retrieve(existingSubId);
+        if (String(r.customer) === customerId) sub = r;
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  if (!sub) {
+    try {
+      const list = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: 25,
+      });
+      const candidates = list.data.filter(
+        (s) =>
+          String(s.metadata?.profile_id ?? "") === profileIdStr ||
+          Boolean(s.items.data[0]?.price?.id && getPlanFromStripePriceId(s.items.data[0].price.id))
+      );
+      sub = candidates.sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0] ?? null;
+    } catch {
+      return;
+    }
+  }
+
+  if (!sub || String(sub.customer) !== customerId) return;
+
+  const priceId = sub.items.data[0]?.price?.id ?? null;
+  const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
+  const metaTier = tierFromMetadata(sub.metadata?.plan_tier);
+  const metaPricing = pricingFromMetadata(sub.metadata?.pricing_version);
+
+  await supabase
+    .from("profiles")
+    .update({
+      stripe_customer_id: customerId,
+      stripe_subscription_id: sub.id,
+      stripe_price_id: priceId,
+      plan_tier: plan?.planTier ?? metaTier ?? profile.plan_tier ?? null,
+      pricing_version: plan?.pricingVersion ?? metaPricing ?? profile.pricing_version ?? null,
+      subscription_status: sub.status,
+      subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
+      trial_ends_at: unixToIso(sub.trial_end ?? null),
+    })
+    .eq("id", profile.id)
+    .eq("user_id", user.id);
 }
 
