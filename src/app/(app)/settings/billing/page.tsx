@@ -96,12 +96,18 @@ export default async function BillingSettingsPage({
   const isPastDue = subscriptionStatus === "past_due";
   const isTrialing = ["trial", "trialing"].includes(subscriptionStatus);
 
-  const scheduledCancelEndIso = pickScheduledSubscriptionAccessEndIso(profile);
+  /** Scheduled cancel: same source as subscription-access `scheduledAccessEndIso`. */
+  const scheduledAccessEndIso = pickScheduledSubscriptionAccessEndIso(profile);
+  const hasScheduledCancellation =
+    profile.subscription_cancel_at_period_end === true && Boolean(scheduledAccessEndIso);
+
   const showScheduledCancelBanner =
-    profile.subscription_cancel_at_period_end === true &&
-    (subscriptionStatus === "active" || isTrialing) &&
+    hasScheduledCancellation &&
     !access.isReadOnlyMode &&
-    Boolean(scheduledCancelEndIso);
+    subscriptionStatus !== "canceled" &&
+    subscriptionStatus !== "cancelled" &&
+    (subscriptionStatus === "active" || isTrialing);
+
   const showCanceledSubscriptionBanner =
     (subscriptionStatus === "canceled" || subscriptionStatus === "cancelled") &&
     access.isReadOnlyMode;
@@ -164,15 +170,24 @@ export default async function BillingSettingsPage({
         </div>
       ) : null}
 
-      {showScheduledCancelBanner ? (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-          Your subscription is scheduled to cancel on {fmt(scheduledCancelEndIso)}. You&apos;ll keep access until then.
+      {/* Banner priority: 1 read-only 2 scheduled cancel 3 checkout / beta / past due 4 trialing */}
+      {!access.isReadOnlyMode ? null : (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-medium">Read-only mode enabled</p>
+          <p className="mt-1">{access.billingReasonLabel ?? access.reason}</p>
         </div>
-      ) : null}
+      )}
 
       {showCanceledSubscriptionBanner ? (
         <div className="rounded-lg border border-zinc-200 bg-zinc-100 p-4 text-sm text-zinc-800">
           Your subscription has been canceled. Your account is in read-only mode.
+        </div>
+      ) : null}
+
+      {showScheduledCancelBanner ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          Your subscription is scheduled to cancel on {fmt(scheduledAccessEndIso)}. You&apos;ll keep
+          access until then.
         </div>
       ) : null}
 
@@ -209,32 +224,29 @@ export default async function BillingSettingsPage({
         </div>
       ) : null}
 
-      {!access.isReadOnlyMode ? null : (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
-          <p className="font-medium">Read-only mode enabled</p>
-          <p className="mt-1">{access.billingReasonLabel ?? access.reason}</p>
-        </div>
-      )}
       {isPastDue && profile.grace_period_ends_at && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Past due. Grace period ends {fmt(profile.grace_period_ends_at)}.
         </div>
       )}
-      {isTrialing && hasPlanTier && !(checkoutSuccess && billingComplete) && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-          {planTier === "professional" ? (
-            <>
-              <p>{professionalTrialingBillingBannerMessage(pricingVersion ?? "founder")}</p>
-              <p className="mt-2 text-sm text-blue-800">
-                Trial active until {fmt(profile.trial_ends_at)}.
-              </p>
-            </>
-          ) : (
-            <p>Trial active until {fmt(profile.trial_ends_at)}.</p>
-          )}
-        </div>
-      )}
-      {isTrialing && !hasPlanTier && !access.freeBetaHelperCopy && (
+      {isTrialing &&
+        hasPlanTier &&
+        !(checkoutSuccess && billingComplete) &&
+        !hasScheduledCancellation && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            {planTier === "professional" ? (
+              <>
+                <p>{professionalTrialingBillingBannerMessage(pricingVersion ?? "founder")}</p>
+                <p className="mt-2 text-sm text-blue-800">
+                  Trial active until {fmt(profile.trial_ends_at)}.
+                </p>
+              </>
+            ) : (
+              <p>Trial active until {fmt(profile.trial_ends_at)}.</p>
+            )}
+          </div>
+        )}
+      {isTrialing && !hasPlanTier && !access.freeBetaHelperCopy && !hasScheduledCancellation && (
         <div
           className={
             hasJobProofSubscription
