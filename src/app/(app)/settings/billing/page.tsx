@@ -2,7 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateEastern } from "@/lib/datetime-eastern";
-import { getSubscriptionAccess, pickScheduledSubscriptionAccessEndIso } from "@/lib/subscription-access";
+import {
+  getSubscriptionAccess,
+  pickScheduledSubscriptionAccessEndIso,
+  isSubscriptionTimestampInFuture,
+} from "@/lib/subscription-access";
 import {
   billingUiTierFromProfile,
   formatSubscriptionStatusLabel,
@@ -12,6 +16,10 @@ import {
   parseBillingPricingVersion,
   professionalTrialingBillingBannerMessage,
 } from "@/lib/billing-plan-display";
+import {
+  shouldAutoSyncStripeSubscriptionOnBillingLoad,
+  syncStripeSubscriptionToProfile,
+} from "@/lib/stripe-subscription-profile-sync";
 import { BillingActionButtons, StripeConnectActionButtons } from "./billing-actions-client";
 import { refreshStripeConnectStatus, syncSubscriptionAfterStripeReturn } from "./actions";
 
@@ -43,6 +51,25 @@ function isBillingProfileComplete(p: {
   const tier = parseBillingPlanTier(trimOrEmpty(p.plan_tier));
   const pricing = parseBillingPricingVersion(trimOrEmpty(p.pricing_version));
   return Boolean(tier && pricing && trimOrEmpty(p.subscription_status));
+}
+
+function hasActiveJobProofSubscriptionForBillingUi(p: {
+  stripe_subscription_id?: string | null;
+  subscription_status?: string | null;
+}): boolean {
+  const subId = trimOrEmpty(p.stripe_subscription_id);
+  const st = trimOrEmpty(p.subscription_status).toLowerCase();
+  if (!subId) return false;
+  return ["trialing", "active", "past_due", "incomplete", "unpaid"].includes(st);
+}
+
+function trialPeriodStillActiveForPaymentUi(p: {
+  subscription_status?: string | null;
+  trial_ends_at?: string | null;
+}): boolean {
+  const st = trimOrEmpty(p.subscription_status).toLowerCase();
+  if (!["trial", "trialing"].includes(st)) return false;
+  return isSubscriptionTimestampInFuture(p.trial_ends_at);
 }
 
 /** Stripe Billing Portal opens only from the client (`Manage billing`); this page does not create portal sessions during render. */
@@ -88,6 +115,27 @@ export default async function BillingSettingsPage({
     if (refreshed) profile = refreshed;
   }
 
+  const ranCheckoutSubscriptionSync = checkoutState === "success";
+  if (
+    !ranCheckoutSubscriptionSync &&
+    shouldAutoSyncStripeSubscriptionOnBillingLoad(profile)
+  ) {
+    try {
+      const syncResult = await syncStripeSubscriptionToProfile(supabase, user, profile);
+      if (!syncResult.ok) {
+        console.error("[billing] auto sync Stripe subscription failed", syncResult);
+      }
+    } catch (err) {
+      console.error("[billing] auto sync Stripe subscription threw", err);
+    }
+    const { data: afterAuto } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
+    if (afterAuto) profile = afterAuto;
+  }
+
   const access = getSubscriptionAccess(profile);
   const checkoutSuccess = checkoutState === "success";
   const billingComplete = isBillingProfileComplete(profile);
@@ -100,6 +148,24 @@ export default async function BillingSettingsPage({
   const scheduledAccessEndIso = pickScheduledSubscriptionAccessEndIso(profile);
   const hasScheduledCancellation =
     profile.subscription_cancel_at_period_end === true && Boolean(scheduledAccessEndIso);
+
+  const hasActiveSubscription = hasActiveJobProofSubscriptionForBillingUi(profile);
+  const isUnpaid = subscriptionStatus === "unpaid";
+  const showPaymentFailedBanner =
+    (isPastDue || isUnpaid) && !trialPeriodStillActiveForPaymentUi(profile);
+
+  const showResumeSubscription =
+    hasScheduledCancellation &&
+    hasActiveSubscription &&
+    (subscriptionStatus === "active" || isTrialing) &&
+    Boolean(scheduledAccessEndIso) &&
+    isSubscriptionTimestampInFuture(scheduledAccessEndIso) &&
+    !access.isReadOnlyMode;
+
+  let scheduledEndLabel = "—";
+  if (hasScheduledCancellation && scheduledAccessEndIso) {
+    scheduledEndLabel = fmt(scheduledAccessEndIso);
+  }
 
   const showScheduledCancelBanner =
     hasScheduledCancellation &&
@@ -224,11 +290,23 @@ export default async function BillingSettingsPage({
         </div>
       ) : null}
 
-      {isPastDue && profile.grace_period_ends_at && (
+      {showPaymentFailedBanner ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-medium">Payment failed</p>
+          <p className="mt-1">
+            Update your payment method to avoid losing access.
+          </p>
+          {isPastDue && profile.grace_period_ends_at ? (
+            <p className="mt-2 text-sm text-red-700">
+              Grace period ends {fmt(profile.grace_period_ends_at)}.
+            </p>
+          ) : null}
+        </div>
+      ) : isPastDue && profile.grace_period_ends_at ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Past due. Grace period ends {fmt(profile.grace_period_ends_at)}.
         </div>
-      )}
+      ) : null}
       {isTrialing &&
         hasPlanTier &&
         !(checkoutSuccess && billingComplete) &&
@@ -291,7 +369,10 @@ export default async function BillingSettingsPage({
           <BillingActionButtons
             billingUiTier={billingUiTier}
             upgradeProfessionalLabel={upgradeProfessionalLabel}
-            hasStripeSubscription={Boolean(trimOrEmpty(profile.stripe_subscription_id))}
+            hasActiveSubscription={hasActiveSubscription}
+            hasScheduledCancellation={hasScheduledCancellation}
+            scheduledCancellationEndLabel={scheduledEndLabel}
+            showResumeSubscription={showResumeSubscription}
           />
         </div>
       </section>
@@ -314,7 +395,7 @@ export default async function BillingSettingsPage({
           <div>
             <dt className="text-zinc-500">Onboarding status</dt>
             <dd className="font-medium text-zinc-900">
-              {connectReady ? "Stripe connected" : "Onboarding incomplete"}
+              {connectReady ? "Stripe payments enabled" : "Onboarding incomplete"}
             </dd>
           </div>
           <div>

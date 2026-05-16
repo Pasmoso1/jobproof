@@ -44,6 +44,11 @@ function isFutureIso(iso: string | null | undefined): boolean {
   return t > Date.now();
 }
 
+/** Exported for billing resume / portal guards (scheduled access must still be in the future). */
+export function isSubscriptionTimestampInFuture(iso: string | null | undefined): boolean {
+  return isFutureIso(iso);
+}
+
 function isPastOrNowIso(iso: string | null | undefined): boolean {
   if (!iso) return false;
   const t = new Date(iso).getTime();

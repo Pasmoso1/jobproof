@@ -8,6 +8,7 @@ import {
   createBillingPortalSession,
   createStripeConnectOnboardingLink,
   createSubscriptionCheckoutSession,
+  resumeScheduledSubscriptionCancellation,
   syncCurrentStripeSubscription,
   upgradeSubscriptionToProfessional,
 } from "./actions";
@@ -21,11 +22,17 @@ function formatActionError(e: unknown): string {
 export function BillingActionButtons({
   billingUiTier,
   upgradeProfessionalLabel,
-  hasStripeSubscription,
+  hasActiveSubscription,
+  hasScheduledCancellation,
+  scheduledCancellationEndLabel,
+  showResumeSubscription,
 }: {
   billingUiTier: BillingUiTier;
   upgradeProfessionalLabel: string;
-  hasStripeSubscription: boolean;
+  hasActiveSubscription: boolean;
+  hasScheduledCancellation: boolean;
+  scheduledCancellationEndLabel: string;
+  showResumeSubscription: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -110,7 +117,83 @@ export function BillingActionButtons({
     }
   }
 
+  async function goResume() {
+    setError(null);
+    setSuccessMessage(null);
+    setBusy("resume");
+    try {
+      const result = await resumeScheduledSubscriptionCancellation();
+      if (!result.success) {
+        setError(result.error);
+        router.refresh();
+        return;
+      }
+      setSuccessMessage("Your subscription will continue after the current billing period.");
+      router.refresh();
+    } catch (e) {
+      setError(formatActionError(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const disableAll = busy !== null;
+
+  if (!hasActiveSubscription) {
+    return (
+      <div className="space-y-3">
+        {error && (
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+        {successMessage && (
+          <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">
+            {successMessage}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void goCheckout("essential", "essential")}
+            disabled={disableAll}
+            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
+          >
+            {busy === "essential" ? "Opening..." : "Choose Essential — $29/mo"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void goCheckout("professional", "professional")}
+            disabled={disableAll}
+            className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
+          >
+            {busy === "professional" ? "Opening..." : "Choose Professional — $49/mo"}
+          </button>
+        </div>
+        <div>
+          <button
+            type="button"
+            onClick={() => void goResync()}
+            disabled={disableAll}
+            className="text-sm font-medium text-[#2436BB] underline-offset-2 hover:underline disabled:opacity-50"
+          >
+            {busy === "resync" ? "Refreshing…" : "Refresh billing status"}
+          </button>
+        </div>
+        <p className="text-xs text-zinc-600">
+          Founder pricing is locked in for early subscribers.
+        </p>
+        <p className="text-xs text-zinc-500">
+          Essential — $39/month regular · Professional — $59/month regular
+        </p>
+      </div>
+    );
+  }
+
+  const hideUpgrade = hasScheduledCancellation || billingUiTier === "professional";
+  const showEssentialCurrent = billingUiTier === "essential";
+  const showProfessionalCurrent = billingUiTier === "professional";
+  const essentialSignupHidden = billingUiTier !== "none";
 
   return (
     <div className="space-y-3">
@@ -124,93 +207,106 @@ export function BillingActionButtons({
           {successMessage}
         </p>
       )}
-      {billingUiTier === "essential" ? (
+      {billingUiTier === "essential" && !hasScheduledCancellation ? (
         <p className="text-sm text-zinc-600">
           Need team features? Upgrade to Professional anytime.
         </p>
       ) : null}
-      {billingUiTier === "professional" ? (
+      {billingUiTier === "professional" && !hasScheduledCancellation ? (
         <p className="text-xs text-zinc-500">
           Manage plan in billing portal to change or downgrade your plan.
         </p>
       ) : null}
+      {hasScheduledCancellation ? (
+        <p className="text-xs text-zinc-500">
+          Your subscription is scheduled to end on {scheduledCancellationEndLabel}. Resume your
+          subscription in the billing portal to keep access.
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
-        {billingUiTier === "professional" ? (
+        {showEssentialCurrent ? (
+          <button
+            type="button"
+            disabled
+            className="cursor-not-allowed rounded-lg border border-zinc-200 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-500"
+          >
+            Current plan (Essential)
+          </button>
+        ) : null}
+        {showProfessionalCurrent ? (
+          <button
+            type="button"
+            disabled
+            className="cursor-not-allowed rounded-lg border border-zinc-200 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-500"
+          >
+            Current plan (Professional)
+          </button>
+        ) : null}
+        {billingUiTier === "essential" && !hideUpgrade ? (
+          <button
+            type="button"
+            onClick={() => void goUpgradeProfessional()}
+            disabled={disableAll}
+            className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
+          >
+            {busy === "professional"
+              ? "Opening..."
+              : busy === "upgrade-prof"
+                ? "Upgrading..."
+                : upgradeProfessionalLabel}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => void goPortal()}
+          disabled={disableAll}
+          className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
+        >
+          {busy === "portal" ? "Opening..." : "Manage billing"}
+        </button>
+        {!essentialSignupHidden && billingUiTier === "none" ? (
           <>
             <button
               type="button"
-              onClick={() => void goPortal()}
+              onClick={() => void goCheckout("essential", "essential")}
               disabled={disableAll}
               className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
             >
-              {busy === "portal" ? "Opening..." : "Manage billing"}
+              {busy === "essential" ? "Opening..." : "Choose Essential — $29/mo"}
             </button>
             <button
               type="button"
-              disabled
-              className="cursor-not-allowed rounded-lg border border-zinc-200 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-500"
-            >
-              Current plan
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => billingUiTier !== "essential" && void goCheckout("essential", "essential")}
-              disabled={disableAll || billingUiTier === "essential"}
-              className={
-                billingUiTier === "essential"
-                  ? "cursor-not-allowed rounded-lg border border-zinc-200 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-500"
-                  : "rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
-              }
-            >
-              {busy === "essential"
-                ? "Opening..."
-                : billingUiTier === "essential"
-                  ? "Current plan"
-                  : "Choose Essential — $29/mo"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (billingUiTier === "essential") void goUpgradeProfessional();
-                else void goCheckout("professional", "professional");
-              }}
+              onClick={() => void goCheckout("professional", "professional")}
               disabled={disableAll}
               className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
             >
-              {busy === "professional"
-                ? "Opening..."
-                : busy === "upgrade-prof"
-                  ? "Upgrading..."
-                  : billingUiTier === "essential"
-                    ? upgradeProfessionalLabel
-                    : "Choose Professional — $49/mo"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void goPortal()}
-              disabled={disableAll}
-              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
-            >
-              {busy === "portal" ? "Opening..." : "Manage billing"}
+              {busy === "professional" ? "Opening..." : "Choose Professional — $49/mo"}
             </button>
           </>
-        )}
+        ) : null}
       </div>
-      {hasStripeSubscription ? (
+      {showResumeSubscription ? (
         <div>
           <button
             type="button"
-            onClick={() => void goResync()}
+            onClick={() => void goResume()}
             disabled={disableAll}
-            className="text-sm font-medium text-[#2436BB] underline-offset-2 hover:underline disabled:opacity-50"
+            className="rounded-lg border border-green-600 bg-green-50 px-4 py-2 text-sm font-medium text-green-900 hover:bg-green-100 disabled:opacity-60"
           >
-            {busy === "resync" ? "Refreshing…" : "Refresh billing status"}
+            {busy === "resume" ? "Resuming…" : "Resume subscription"}
           </button>
         </div>
       ) : null}
+      <div>
+        <button
+          type="button"
+          onClick={() => void goResync()}
+          disabled={disableAll}
+          className="text-sm font-medium text-[#2436BB] underline-offset-2 hover:underline disabled:opacity-50"
+        >
+          {busy === "resync" ? "Refreshing…" : "Refresh billing status"}
+        </button>
+      </div>
       <p className="text-xs text-zinc-600">
         Founder pricing is locked in for early subscribers.
       </p>
@@ -248,7 +344,7 @@ export function StripeConnectActionButtons({
   if (connectReady) {
     return (
       <div className="mt-4 space-y-1">
-        <p className="text-sm font-medium text-zinc-900">Stripe connected</p>
+        <p className="text-sm font-medium text-zinc-900">Stripe payments enabled</p>
         <p className="text-sm text-zinc-600">
           Customers can pay invoices online by card.
         </p>

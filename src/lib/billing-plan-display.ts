@@ -23,7 +23,8 @@ export function billingUiTierFromProfile(p: {
   const subId = String(p.stripe_subscription_id ?? "").trim();
   const st = String(p.subscription_status ?? "").trim().toLowerCase();
   const subscribed =
-    Boolean(subId) && ["trialing", "active", "past_due", "incomplete"].includes(st);
+    Boolean(subId) &&
+    ["trialing", "active", "past_due", "incomplete", "unpaid"].includes(st);
   if (!subscribed) return "none";
   return tier;
 }
