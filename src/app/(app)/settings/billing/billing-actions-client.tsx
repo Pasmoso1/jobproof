@@ -8,6 +8,7 @@ import {
   createBillingPortalSession,
   createStripeConnectOnboardingLink,
   createSubscriptionCheckoutSession,
+  syncCurrentStripeSubscription,
   upgradeSubscriptionToProfessional,
 } from "./actions";
 
@@ -20,9 +21,11 @@ function formatActionError(e: unknown): string {
 export function BillingActionButtons({
   billingUiTier,
   upgradeProfessionalLabel,
+  hasStripeSubscription,
 }: {
   billingUiTier: BillingUiTier;
   upgradeProfessionalLabel: string;
+  hasStripeSubscription: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -80,6 +83,26 @@ export function BillingActionButtons({
         return;
       }
       window.location.href = result.url;
+    } catch (e) {
+      setError(formatActionError(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function goResync() {
+    setError(null);
+    setSuccessMessage(null);
+    setBusy("resync");
+    try {
+      const result = await syncCurrentStripeSubscription();
+      if (!result.success) {
+        setError(result.error);
+        router.refresh();
+        return;
+      }
+      setSuccessMessage("Billing status updated from Stripe.");
+      router.refresh();
     } catch (e) {
       setError(formatActionError(e));
     } finally {
@@ -176,6 +199,18 @@ export function BillingActionButtons({
           </>
         )}
       </div>
+      {hasStripeSubscription ? (
+        <div>
+          <button
+            type="button"
+            onClick={() => void goResync()}
+            disabled={disableAll}
+            className="text-sm font-medium text-[#2436BB] underline-offset-2 hover:underline disabled:opacity-50"
+          >
+            {busy === "resync" ? "Refreshing…" : "Refresh billing status"}
+          </button>
+        </div>
+      ) : null}
       <p className="text-xs text-zinc-600">
         Founder pricing is locked in for early subscribers.
       </p>

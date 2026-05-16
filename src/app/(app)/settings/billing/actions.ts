@@ -492,6 +492,76 @@ export async function refreshStripeConnectStatus(): Promise<{ ok: true }> {
   return { ok: true };
 }
 
+export type SyncCurrentStripeSubscriptionResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/**
+ * Pull the latest subscription row from Stripe into `profiles` (webhook miss/delay recovery).
+ */
+export async function syncCurrentStripeSubscription(): Promise<SyncCurrentStripeSubscriptionResult> {
+  const { supabase, user, profile } = await requireContractorProfile();
+  const subId = (profile.stripe_subscription_id as string | null)?.trim() || null;
+  if (!subId) {
+    return {
+      success: false,
+      error: "No Stripe subscription is linked to this account yet.",
+    };
+  }
+
+  const customerId = (profile.stripe_customer_id as string | null)?.trim() || null;
+  const stripe = getStripe();
+
+  let sub: Stripe.Subscription;
+  try {
+    sub = await stripe.subscriptions.retrieve(subId);
+  } catch (err) {
+    if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+      logStripeError("syncCurrentStripeSubscription retrieve", err);
+      return {
+        success: false,
+        error:
+          "Could not load your subscription from Stripe. It may have been removed or the link may be out of date.",
+      };
+    }
+    if (err instanceof Stripe.errors.StripeError) {
+      return { success: false, error: "Could not reach Stripe. Please try again in a moment." };
+    }
+    throw err;
+  }
+
+  const subCustomer = String(sub.customer ?? "").trim();
+  if (customerId && subCustomer !== customerId) {
+    return { success: false, error: "Subscription does not match your Stripe customer." };
+  }
+
+  const priceId = sub.items.data[0]?.price?.id ?? null;
+  const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
+  const metaTier = tierFromMetadata(sub.metadata?.plan_tier);
+  const metaPricing = pricingFromMetadata(sub.metadata?.pricing_version);
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      stripe_customer_id: subCustomer || customerId || profile.stripe_customer_id,
+      stripe_subscription_id: sub.id,
+      stripe_price_id: priceId,
+      plan_tier: plan?.planTier ?? metaTier ?? profile.plan_tier ?? null,
+      pricing_version: plan?.pricingVersion ?? metaPricing ?? profile.pricing_version ?? null,
+      subscription_status: sub.status,
+      subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
+      trial_ends_at: unixToIso(sub.trial_end ?? null),
+      ...subscriptionCancellationDbFields(sub),
+    })
+    .eq("id", profile.id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+  return { success: true };
+}
+
 /**
  * After returning from Stripe Checkout, pull the latest subscription into `profiles`
  * so the billing page is accurate even if the webhook is slightly delayed.

@@ -291,6 +291,7 @@ export default async function BillingSettingsPage({
           <BillingActionButtons
             billingUiTier={billingUiTier}
             upgradeProfessionalLabel={upgradeProfessionalLabel}
+            hasStripeSubscription={Boolean(trimOrEmpty(profile.stripe_subscription_id))}
           />
         </div>
       </section>
