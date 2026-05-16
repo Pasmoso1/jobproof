@@ -145,6 +145,9 @@ export default async function AdminUserDetailPage({
       subscription_current_period_end,
       trial_ends_at,
       grace_period_ends_at,
+      subscription_cancel_at_period_end,
+      subscription_cancel_at,
+      subscription_canceled_at,
       stripe_connect_account_id,
       stripe_connect_onboarding_complete,
       stripe_connect_charges_enabled,
@@ -490,6 +493,18 @@ export default async function AdminUserDetailPage({
                 value: formatDate(toMaybeString(profile.subscription_current_period_end)),
               },
               { label: "trial_ends_at", value: formatDate(toMaybeString(profile.trial_ends_at)) },
+              {
+                label: "subscription_cancel_at_period_end",
+                value: String(profile.subscription_cancel_at_period_end ?? false),
+              },
+              {
+                label: "subscription_cancel_at",
+                value: formatDate(toMaybeString(profile.subscription_cancel_at)),
+              },
+              {
+                label: "subscription_canceled_at",
+                value: formatDate(toMaybeString(profile.subscription_canceled_at)),
+              },
               {
                 label: "grace_period_ends_at",
                 value: formatDate(toMaybeString(profile.grace_period_ends_at)),

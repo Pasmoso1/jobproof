@@ -24,6 +24,13 @@ import { buildEstimatePdf } from "@/lib/estimate-pdf";
 import { sendEstimateEmail } from "@/lib/delivery-service";
 import { generateEstimateNumber } from "@/lib/estimate-number";
 import { createCustomer } from "@/app/(app)/actions";
+import { getSubscriptionAccess, READ_ONLY_MODE_ACTION_ERROR, type ProfileSubscriptionGate } from "@/lib/subscription-access";
+
+function subscriptionWriteBlockedMessage(profile: ProfileSubscriptionGate): string | null {
+  const a = getSubscriptionAccess(profile);
+  if (!a.isReadOnlyMode) return null;
+  return a.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR;
+}
 
 function unwrapCustomerJoin(
   x: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null
@@ -381,10 +388,15 @@ export async function createEstimate(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, province")
+    .select(
+      "id, province, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
     .eq("user_id", user.id)
     .single();
   if (!profile) redirect("/login");
+
+  const subBlock = subscriptionWriteBlockedMessage(profile);
+  if (subBlock) return { error: subBlock };
 
   const parsed = parseEstimateForm(formData, profile.province as string | null);
   if ("error" in parsed) return { error: parsed.error };
@@ -446,10 +458,15 @@ export async function updateEstimateDraft(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, province")
+    .select(
+      "id, province, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
     .eq("user_id", user.id)
     .single();
   if (!profile) redirect("/login");
+
+  const subBlock = subscriptionWriteBlockedMessage(profile);
+  if (subBlock) return { error: subBlock };
 
   const { data: existing } = await supabase
     .from("estimates")
@@ -607,12 +624,15 @@ export async function sendEstimate(
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, business_contact_email"
+      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, business_contact_email, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
     )
     .eq("user_id", user.id)
     .single();
 
   if (!profile) redirect("/login");
+
+  const subBlock = subscriptionWriteBlockedMessage(profile);
+  if (subBlock) return { error: subBlock };
 
   if (
     !isBusinessProfileCompleteForApp({
@@ -774,12 +794,15 @@ export async function resendEstimateEmail(
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, business_contact_email"
+      "id, business_name, contractor_name, phone, address_line_1, address_line_2, city, province, postal_code, business_contact_email, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
     )
     .eq("user_id", user.id)
     .single();
 
   if (!profile) redirect("/login");
+
+  const subBlock = subscriptionWriteBlockedMessage(profile);
+  if (subBlock) return { error: subBlock };
 
   const { data: est2, error: estErr } = await supabase
     .from("estimates")
@@ -893,11 +916,16 @@ export async function convertEstimateToJob(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, active_job_limit, province")
+    .select(
+      "id, active_job_limit, province, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
     .eq("user_id", user.id)
     .single();
 
   if (!profile) redirect("/login");
+
+  const subBlock = subscriptionWriteBlockedMessage(profile);
+  if (subBlock) return { error: subBlock };
 
   const { count } = await supabase
     .from("jobs")
@@ -999,10 +1027,15 @@ export async function duplicateEstimateDraft(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select(
+      "id, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
     .eq("user_id", user.id)
     .single();
   if (!profile) redirect("/login");
+
+  const subBlock = subscriptionWriteBlockedMessage(profile);
+  if (subBlock) return { error: subBlock };
 
   const { data: row, error } = await supabase
     .from("estimates")

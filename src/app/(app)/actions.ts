@@ -55,7 +55,7 @@ import {
   roundInvoiceMoney,
 } from "@/lib/invoice-payment-recalc";
 import { randomUUID } from "node:crypto";
-import { getSubscriptionAccess } from "@/lib/subscription-access";
+import { getSubscriptionAccess, READ_ONLY_MODE_ACTION_ERROR } from "@/lib/subscription-access";
 
 export type ActionResult<T = unknown> =
   | { success: true; data?: T; message?: string }
@@ -67,7 +67,9 @@ async function getCurrentUserProfileForAccessGate(
 ) {
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, subscription_status, grace_period_ends_at")
+    .select(
+      "id, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
     .eq("user_id", userId)
     .single();
   if (!profile) return null;
@@ -430,11 +432,18 @@ export async function createCustomer(formData: FormData) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select(
+      "id, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
     .eq("user_id", user.id)
     .single();
 
   if (!profile) redirect("/login");
+
+  const access = getSubscriptionAccess(profile);
+  if (access.isReadOnlyMode) {
+    return { error: access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
 
   const fullName = String(formData.get("full_name") ?? formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
@@ -490,11 +499,18 @@ export async function createJob(formData: FormData) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, active_job_limit, province")
+    .select(
+      "id, active_job_limit, province, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
     .eq("user_id", user.id)
     .single();
 
   if (!profile) redirect("/login");
+
+  const access = getSubscriptionAccess(profile);
+  if (access.isReadOnlyMode) {
+    return { error: access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
 
   const { count } = await supabase
     .from("jobs")
@@ -644,12 +660,19 @@ export async function updateJob(jobId: string, formData: FormData) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select(
+      "id, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
     .eq("user_id", user.id)
     .single();
 
   if (!profile || job.profile_id !== profile.id) {
     return { error: "Unauthorized" };
+  }
+
+  const access = getSubscriptionAccess(profile);
+  if (access.isReadOnlyMode) {
+    return { error: access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
   }
 
   const { data: signedContract } = await supabase
@@ -799,12 +822,19 @@ export async function markJobComplete(jobId: string) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select(
+      "id, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
     .eq("user_id", user.id)
     .single();
 
   if (!profile || job.profile_id !== profile.id) {
     return { error: "Unauthorized" };
+  }
+
+  const access = getSubscriptionAccess(profile);
+  if (access.isReadOnlyMode) {
+    return { error: access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
   }
 
   if (job.status === "completed") {
@@ -996,12 +1026,19 @@ export async function createJobUpdate(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select(
+      "id, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
     .eq("user_id", user.id)
     .single();
 
   if (!profile || job.profile_id !== profile.id) {
     return { error: "Unauthorized" };
+  }
+
+  const access = getSubscriptionAccess(profile);
+  if (access.isReadOnlyMode) {
+    return { error: access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
   }
 
   const category = (formData.get("category") as UpdateCategory) ?? "other";
@@ -1265,8 +1302,13 @@ export async function createOrUpdateContract(
 
   const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
   if (!gate?.profile) return { error: "Unauthorized" };
-  if (!gate.access.canCreateContracts) {
-    return { error: gate.access.reason };
+  const sendingIntent =
+    intent === "submit_for_signing" || intent === "save_for_remote_delivery";
+  if (sendingIntent && !gate.access.canSendContracts) {
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
+  if (!sendingIntent && !gate.access.canCreateContracts) {
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
   }
 
   const { data: job } = await supabase
@@ -1490,7 +1532,7 @@ export async function sendContractForSigning(
   const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
   if (!gate?.profile) return { success: false, error: "Unauthorized" };
   if (!gate.access.canSendContracts) {
-    return { success: false, error: gate.access.reason };
+    return { success: false, error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
   }
 
   const { data: contract } = await supabase
@@ -1978,7 +2020,7 @@ export async function createSigningToken(contractId: string, expiresInDays = 7) 
   const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
   if (!gate?.profile) return { error: "Unauthorized" };
   if (!gate.access.canSendContracts) {
-    return { error: gate.access.reason };
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
   }
 
   const { data: contract } = await supabase
@@ -2045,7 +2087,7 @@ export async function sendRemoteContractSigningLink(params: {
   const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
   if (!gate?.profile) return { success: false, error: "Unauthorized" };
   if (!gate.access.canSendContracts) {
-    return { success: false, error: gate.access.reason };
+    return { success: false, error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
   }
 
   const { data: job } = await supabase
@@ -2316,6 +2358,12 @@ export async function createChangeOrder(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { error: "Unauthorized" };
+  if (!gate.access.canCreateContracts) {
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
+
   const titleErr = validateChangeOrderTitle(params.changeTitle);
   if (titleErr) return { fieldErrors: { change_title: titleErr } };
 
@@ -2389,6 +2437,12 @@ export async function sendChangeOrderForSigning(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { error: "Unauthorized" };
+  if (!gate.access.canSendContracts) {
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
+
   const { data: co } = await supabase
     .from("change_orders")
     .select("id, job_id, profile_id, status")
@@ -2448,6 +2502,12 @@ export async function withdrawChangeOrderToDraft(changeOrderId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { error: "Unauthorized" };
+  if (!gate.access.canCreateContracts) {
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
 
   const { data: co } = await supabase
     .from("change_orders")
@@ -2512,6 +2572,12 @@ export async function updateChangeOrder(changeOrderId: string, params: ChangeOrd
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { error: "Unauthorized" };
+  if (!gate.access.canCreateContracts) {
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
 
   const titleErr = validateChangeOrderTitle(params.changeTitle);
   if (titleErr) return { fieldErrors: { change_title: titleErr } };
@@ -2745,6 +2811,12 @@ export async function createChangeOrderSigningToken(changeOrderId: string, expir
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { error: "Unauthorized" };
+  if (!gate.access.canSendContracts) {
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
+
   const { data: co } = await supabase
     .from("change_orders")
     .select("id, profile_id")
@@ -2795,6 +2867,12 @@ export async function sendChangeOrderRemoteSigningLink(params: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { error: "Unauthorized" };
+  if (!gate.access.canSendContracts) {
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
 
   const { data: co } = await supabase
     .from("change_orders")
@@ -3174,7 +3252,7 @@ export async function createInvoice(
   const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
   if (!gate?.profile) return { error: "Unauthorized" };
   if (!gate.access.canCreateInvoices) {
-    return { error: gate.access.reason };
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
   }
 
   const contract = await getContractForJob(jobId);
@@ -3536,7 +3614,7 @@ export async function resendInvoice(
   const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
   if (!gate?.profile) return { error: "Unauthorized" };
   if (!gate.access.canSendInvoices) {
-    return { error: gate.access.reason };
+    return { error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
   }
 
   const { data: invRow, error: invErr } = await supabase
@@ -4028,6 +4106,12 @@ export async function deleteLastInvoicePayment(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { success: false, error: "Unauthorized" };
+  if (gate.access.isReadOnlyMode) {
+    return { success: false, error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
+
   const { data: invRow, error: invErr } = await supabase
     .from("invoices")
     .select("id, job_id, profile_id, status")
@@ -4109,6 +4193,12 @@ export async function updateLastInvoicePayment(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { success: false, error: "Unauthorized" };
+  if (gate.access.isReadOnlyMode) {
+    return { success: false, error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
 
   if (!isInvoicePaymentMethod(paymentMethod)) {
     return { success: false, error: "Invalid payment method." };
@@ -4316,6 +4406,12 @@ export async function sendInvoiceReminder(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const gate = await getCurrentUserProfileForAccessGate(supabase, user.id);
+  if (!gate?.profile) return { success: false, error: "Unauthorized" };
+  if (!gate.access.canSendInvoices) {
+    return { success: false, error: gate.access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
 
   const { data: invRow, error: invErr } = await supabase
     .from("invoices")

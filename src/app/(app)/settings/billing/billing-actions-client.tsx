@@ -27,9 +27,11 @@ export function BillingActionButtons({
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   async function goCheckout(label: "essential" | "professional", planTier: BillingPlanTier) {
     setError(null);
+    setSuccessMessage(null);
     setBusy(label);
     try {
       const result = await createSubscriptionCheckoutSession({ planTier });
@@ -48,6 +50,7 @@ export function BillingActionButtons({
 
   async function goUpgradeProfessional() {
     setError(null);
+    setSuccessMessage(null);
     setBusy("upgrade-prof");
     try {
       const result = await upgradeSubscriptionToProfessional();
@@ -56,6 +59,7 @@ export function BillingActionButtons({
         router.refresh();
         return;
       }
+      setSuccessMessage(result.message);
       router.refresh();
     } catch (e) {
       setError(formatActionError(e));
@@ -66,6 +70,7 @@ export function BillingActionButtons({
 
   async function goPortal() {
     setError(null);
+    setSuccessMessage(null);
     setBusy("portal");
     try {
       const result = await createBillingPortalSession();
@@ -89,6 +94,11 @@ export function BillingActionButtons({
       {error && (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
+        </p>
+      )}
+      {successMessage && (
+        <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">
+          {successMessage}
         </p>
       )}
       {billingUiTier === "essential" ? (

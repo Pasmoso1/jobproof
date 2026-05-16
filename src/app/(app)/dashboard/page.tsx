@@ -101,14 +101,25 @@ export default async function DashboardPage() {
           </Link>
         </div>
       )}
-      {!access.canCreateContracts && (
+      {access.isReadOnlyMode && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          Read-only mode is active: {access.reason}{" "}
-          <Link href="/settings/billing" className="font-medium underline hover:no-underline">
-            Open billing →
-          </Link>
+          <p>
+            Your account is in read-only mode. Update billing to continue creating and sending
+            documents.{" "}
+            <Link href="/settings/billing" className="font-medium underline hover:no-underline">
+              Update billing →
+            </Link>
+          </p>
+          {access.billingReasonLabel ? (
+            <p className="mt-2 text-sm text-red-900">{access.billingReasonLabel}</p>
+          ) : null}
         </div>
       )}
+      {access.freeBetaHelperCopy ? (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+          {access.freeBetaHelperCopy}
+        </div>
+      ) : null}
 
       {/* Alerts */}
       {(isStorageNearLimit || isJobLimitReached) && (

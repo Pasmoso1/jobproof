@@ -53,6 +53,23 @@ const TIER_NAME: Record<BillingPlanTier, string> = {
   professional: "Professional",
 };
 
+/** After upgrading to Professional during trial — no immediate charge implied. */
+export function planUpdatedProfessionalTrialingMessage(
+  pricingVersion: BillingPricingVersion
+): string {
+  const { afterTrialLine } = getPlanDisplayLines("professional", pricingVersion);
+  return `Plan updated to Professional. Your card will be charged ${afterTrialLine} after your trial ends.`;
+}
+
+/** Persistent notice on billing when Professional + trialing. */
+export function professionalTrialingBillingBannerMessage(
+  pricingVersion: BillingPricingVersion
+): string {
+  const { afterTrialLine } = getPlanDisplayLines("professional", pricingVersion);
+  const label = pricingVersion === "founder" ? "Professional Founder" : "Professional";
+  return `You're on ${label}. Your card will be charged ${afterTrialLine} after your trial ends.`;
+}
+
 export function getPlanDisplayLines(
   planTier: BillingPlanTier,
   pricingVersion: BillingPricingVersion

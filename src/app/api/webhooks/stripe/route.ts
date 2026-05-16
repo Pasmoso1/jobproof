@@ -12,6 +12,7 @@ import {
   roundInvoiceMoney,
 } from "@/lib/invoice-payment-recalc";
 import { getTodayYmdEastern } from "@/lib/datetime-eastern";
+import { subscriptionCancellationDbFields } from "@/lib/stripe-subscription-cancellation";
 
 function toIso(ts?: number | null): string | null {
   if (!ts) return null;
@@ -98,6 +99,7 @@ export async function POST(req: Request) {
             }
             const priceId = sub?.items.data[0]?.price?.id ?? session.metadata?.price_id ?? null;
             const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
+            const cancelPatch = sub ? subscriptionCancellationDbFields(sub) : null;
             await admin
               .from("profiles")
               .update({
@@ -114,6 +116,7 @@ export async function POST(req: Request) {
                   sub ? subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub) : null
                 ),
                 trial_ends_at: toIso(sub?.trial_end),
+                ...(cancelPatch ?? {}),
               })
               .eq("id", profile.id);
           }
@@ -201,6 +204,7 @@ export async function POST(req: Request) {
         if (profile) {
           const priceId = sub.items.data[0]?.price?.id ?? null;
           const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
+          const cancelPatch = subscriptionCancellationDbFields(sub);
           await admin
             .from("profiles")
             .update({
@@ -215,6 +219,7 @@ export async function POST(req: Request) {
               subscription_status: sub.status,
               subscription_current_period_end: toIso(subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub)),
               trial_ends_at: toIso(sub.trial_end),
+              ...cancelPatch,
             })
             .eq("id", profile.id);
         }
@@ -233,7 +238,13 @@ export async function POST(req: Request) {
             .from("profiles")
             .update({
               subscription_status: "canceled",
-              subscription_current_period_end: toIso(subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub)),
+              subscription_current_period_end: toIso(
+                subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub)
+              ),
+              subscription_cancel_at_period_end: false,
+              subscription_cancel_at: null,
+              subscription_canceled_at: toIso(sub.canceled_at ?? null),
+              stripe_subscription_id: sub.id,
             })
             .eq("id", profile.id);
         }

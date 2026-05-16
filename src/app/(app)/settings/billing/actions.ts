@@ -9,6 +9,10 @@ import {
   isStripeCustomerMissingError,
 } from "@/lib/stripe-customer";
 import {
+  planUpdatedProfessionalTrialingMessage,
+  professionalTrialingBillingBannerMessage,
+} from "@/lib/billing-plan-display";
+import {
   type BillingPlanTier,
   type BillingPricingVersion,
   getPlanFromStripePriceId,
@@ -16,6 +20,7 @@ import {
   getStripePriceId,
   resolveAppUrl,
 } from "@/lib/stripe";
+import { subscriptionCancellationDbFields } from "@/lib/stripe-subscription-cancellation";
 
 const SUBSCRIPTION_STATUSES_BLOCKING_NEW_CHECKOUT = new Set([
   "trialing",
@@ -74,7 +79,9 @@ export type SubscriptionCheckoutSessionResult =
   | { success: true; url: string }
   | { success: false; error: string };
 
-export type UpgradeSubscriptionResult = { success: true } | { success: false; error: string };
+export type UpgradeSubscriptionResult =
+  | { success: true; message: string; trialPreserved: boolean }
+  | { success: false; error: string };
 
 function logStripeError(
   context: string,
@@ -288,10 +295,20 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
         subscription_status: sub.status,
         subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
         trial_ends_at: unixToIso(sub.trial_end ?? null),
+        ...subscriptionCancellationDbFields(sub),
       })
       .eq("id", profile.id)
       .eq("user_id", user.id);
-    return { success: true };
+    const trialing = sub.status === "trialing";
+    return {
+      success: true,
+      message: trialing
+        ? professionalTrialingBillingBannerMessage(
+            currentPlan.pricingVersion ?? pricingVersion
+          )
+        : "Your subscription is already on the Professional plan.",
+      trialPreserved: trialing,
+    };
   }
 
   if (currentPlan?.planTier !== "essential") {
@@ -310,10 +327,17 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
     pricing_version: pricingVersion,
   };
 
+  const isTrialing = sub.status === "trialing";
+  const trialEndUnix =
+    isTrialing && sub.trial_end != null && sub.trial_end > Math.floor(Date.now() / 1000)
+      ? sub.trial_end
+      : undefined;
+
   try {
     const updated = await stripe.subscriptions.update(subId, {
       items: [{ id: itemId, price: newPriceId }],
-      proration_behavior: "create_prorations",
+      proration_behavior: isTrialing ? "none" : "create_prorations",
+      ...(trialEndUnix != null ? { trial_end: trialEndUnix } : {}),
       metadata: meta,
     });
 
@@ -331,11 +355,27 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
         subscription_status: updated.status,
         subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(updated)),
         trial_ends_at: unixToIso(updated.trial_end ?? null),
+        ...subscriptionCancellationDbFields(updated),
       })
       .eq("id", profile.id)
       .eq("user_id", user.id);
 
-    return { success: true };
+    const cohort = plan?.pricingVersion ?? metaPricing ?? pricingVersion;
+    const message = isTrialing
+      ? planUpdatedProfessionalTrialingMessage(cohort)
+      : "Plan updated to Professional. Prorated changes may apply for the rest of this billing period.";
+
+    const originalTrialEnd = sub.trial_end ?? null;
+    const trialPreserved =
+      isTrialing &&
+      originalTrialEnd != null &&
+      (updated.trial_end ?? null) === originalTrialEnd;
+
+    return {
+      success: true,
+      message,
+      trialPreserved,
+    };
   } catch (err) {
     if (err instanceof Stripe.errors.StripeInvalidRequestError) {
       logStripeError("upgradeSubscriptionToProfessional invalid request", err);
@@ -535,6 +575,7 @@ export async function syncSubscriptionAfterStripeReturn(input: {
       subscription_status: sub.status,
       subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
       trial_ends_at: unixToIso(sub.trial_end ?? null),
+      ...subscriptionCancellationDbFields(sub),
     })
     .eq("id", profile.id)
     .eq("user_id", user.id);
