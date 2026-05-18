@@ -107,6 +107,16 @@ export async function syncStripeSubscriptionToProfile(
   const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
   const metaTier = tierFromMetadata(sub.metadata?.plan_tier);
   const metaPricing = pricingFromMetadata(sub.metadata?.pricing_version);
+  const resolvedTier = plan?.planTier ?? metaTier ?? profile.plan_tier ?? null;
+
+  const clearPendingDowngrade =
+    resolvedTier === "essential"
+      ? {
+          pending_plan_tier: null,
+          pending_plan_effective_at: null,
+          stripe_subscription_schedule_id: null,
+        }
+      : {};
 
   const { error } = await supabase
     .from("profiles")
@@ -114,12 +124,13 @@ export async function syncStripeSubscriptionToProfile(
       stripe_customer_id: subCustomer || customerId || profile.stripe_customer_id,
       stripe_subscription_id: sub.id,
       stripe_price_id: priceId,
-      plan_tier: plan?.planTier ?? metaTier ?? profile.plan_tier ?? null,
+      plan_tier: resolvedTier,
       pricing_version: plan?.pricingVersion ?? metaPricing ?? profile.pricing_version ?? null,
       subscription_status: sub.status,
       subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
       trial_ends_at: unixToIso(sub.trial_end ?? null),
       ...subscriptionCancellationDbFields(sub),
+      ...clearPendingDowngrade,
     })
     .eq("id", profile.id)
     .eq("user_id", user.id);

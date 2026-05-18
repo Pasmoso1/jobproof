@@ -4,6 +4,7 @@ export type BillingAuditEventType =
   | "checkout_completed"
   | "subscription_upgraded"
   | "subscription_downgraded"
+  | "downgrade_scheduled"
   | "cancellation_scheduled"
   | "cancellation_resumed"
   | "subscription_canceled"

@@ -198,6 +198,16 @@ export default async function BillingSettingsPage({
   const billingUiTier = billingUiTierFromProfile(profile);
   const pricingForUpgrade = parseBillingPricingVersion(pricingVersionRaw) ?? "founder";
   const upgradeProfessionalLabel = getUpgradeProfessionalButtonLabel(pricingForUpgrade);
+  const hasPendingEssentialDowngrade =
+    profile.pending_plan_tier === "essential" &&
+    Boolean(trimOrEmpty(profile.pending_plan_effective_at));
+  const showPendingDowngradeBanner =
+    hasPendingEssentialDowngrade && planTier === "professional" && !hasScheduledCancellation;
+  const showDowngradeToEssential =
+    billingUiTier === "professional" &&
+    hasActiveSubscription &&
+    !hasScheduledCancellation &&
+    !hasPendingEssentialDowngrade;
 
   let currentPlanCell: string;
   if (planLines) {
@@ -254,6 +264,16 @@ export default async function BillingSettingsPage({
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
           Your subscription is scheduled to cancel on {fmt(scheduledAccessEndIso)}. You&apos;ll keep
           access until then.
+        </div>
+      ) : null}
+
+      {showPendingDowngradeBanner ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-medium">Downgrade scheduled</p>
+          <p className="mt-1">
+            Your Professional plan stays active until {fmt(profile.pending_plan_effective_at)}. You
+            will move to Essential on that date.
+          </p>
         </div>
       ) : null}
 
@@ -373,6 +393,9 @@ export default async function BillingSettingsPage({
             hasScheduledCancellation={hasScheduledCancellation}
             scheduledCancellationEndLabel={scheduledEndLabel}
             showResumeSubscription={showResumeSubscription}
+            showDowngradeToEssential={showDowngradeToEssential}
+            hasPendingEssentialDowngrade={hasPendingEssentialDowngrade}
+            subscriptionIsTrialing={isTrialing}
           />
         </div>
       </section>

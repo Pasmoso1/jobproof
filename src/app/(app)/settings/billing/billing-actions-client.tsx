@@ -9,6 +9,7 @@ import {
   createStripeConnectOnboardingLink,
   createSubscriptionCheckoutSession,
   resumeScheduledSubscriptionCancellation,
+  downgradeSubscriptionToEssential,
   syncCurrentStripeSubscription,
   upgradeSubscriptionToProfessional,
 } from "./actions";
@@ -26,6 +27,9 @@ export function BillingActionButtons({
   hasScheduledCancellation,
   scheduledCancellationEndLabel,
   showResumeSubscription,
+  showDowngradeToEssential,
+  hasPendingEssentialDowngrade,
+  subscriptionIsTrialing,
 }: {
   billingUiTier: BillingUiTier;
   upgradeProfessionalLabel: string;
@@ -33,6 +37,9 @@ export function BillingActionButtons({
   hasScheduledCancellation: boolean;
   scheduledCancellationEndLabel: string;
   showResumeSubscription: boolean;
+  showDowngradeToEssential: boolean;
+  hasPendingEssentialDowngrade: boolean;
+  subscriptionIsTrialing: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -90,6 +97,26 @@ export function BillingActionButtons({
         return;
       }
       window.location.href = result.url;
+    } catch (e) {
+      setError(formatActionError(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function goDowngradeEssential() {
+    setError(null);
+    setSuccessMessage(null);
+    setBusy("downgrade-essential");
+    try {
+      const result = await downgradeSubscriptionToEssential();
+      if (!result.success) {
+        setError(result.error);
+        router.refresh();
+        return;
+      }
+      setSuccessMessage(result.message);
+      router.refresh();
     } catch (e) {
       setError(formatActionError(e));
     } finally {
@@ -212,9 +239,17 @@ export function BillingActionButtons({
           Need team features? Upgrade to Professional anytime.
         </p>
       ) : null}
-      {billingUiTier === "professional" && !hasScheduledCancellation ? (
+      {billingUiTier === "professional" && !hasScheduledCancellation && !hasPendingEssentialDowngrade ? (
         <p className="text-xs text-zinc-500">
-          Manage plan in billing portal to change or downgrade your plan.
+          {subscriptionIsTrialing
+            ? "You can switch plans during your trial without losing trial days."
+            : "Downgrades after trial happen at your next renewal."}
+        </p>
+      ) : null}
+      {hasPendingEssentialDowngrade ? (
+        <p className="text-xs text-zinc-500">
+          Your downgrade to Essential is scheduled. Professional stays active until your current
+          billing period ends.
         </p>
       ) : null}
       {hasScheduledCancellation ? (
@@ -254,6 +289,20 @@ export function BillingActionButtons({
               : busy === "upgrade-prof"
                 ? "Upgrading..."
                 : upgradeProfessionalLabel}
+          </button>
+        ) : null}
+        {showDowngradeToEssential ? (
+          <button
+            type="button"
+            onClick={() => void goDowngradeEssential()}
+            disabled={disableAll}
+            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
+          >
+            {busy === "downgrade-essential"
+              ? subscriptionIsTrialing
+                ? "Downgrading…"
+                : "Scheduling…"
+              : "Downgrade to Essential"}
           </button>
         ) : null}
         <button

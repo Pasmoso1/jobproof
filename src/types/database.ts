@@ -82,6 +82,9 @@ export interface Profile {
   subscription_cancel_at_period_end?: boolean | null;
   subscription_cancel_at?: string | null;
   subscription_canceled_at?: string | null;
+  pending_plan_tier?: "essential" | "professional" | null;
+  pending_plan_effective_at?: string | null;
+  stripe_subscription_schedule_id?: string | null;
   stripe_connect_account_id?: string | null;
   stripe_connect_onboarding_complete?: boolean;
   stripe_connect_charges_enabled?: boolean;

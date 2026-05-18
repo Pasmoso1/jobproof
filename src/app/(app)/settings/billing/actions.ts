@@ -29,6 +29,9 @@ import {
 } from "@/lib/stripe";
 import { subscriptionCancellationDbFields } from "@/lib/stripe-subscription-cancellation";
 import {
+  scheduleEssentialDowngradeAtPeriodEnd,
+} from "@/lib/stripe-subscription-downgrade";
+import {
   pricingFromMetadata,
   subscriptionPeriodEndUnix,
   syncStripeSubscriptionToProfile,
@@ -75,6 +78,10 @@ export type SubscriptionCheckoutSessionResult =
 
 export type UpgradeSubscriptionResult =
   | { success: true; message: string; trialPreserved: boolean }
+  | { success: false; error: string };
+
+export type DowngradeSubscriptionResult =
+  | { success: true; message: string; scheduled: boolean }
   | { success: false; error: string };
 
 function logStripeError(
@@ -396,6 +403,250 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
     if (err instanceof Stripe.errors.StripeError) {
       logStripeError("upgradeSubscriptionToProfessional stripe error", err);
       return { success: false, error: "Could not reach Stripe. Please try again in a moment." };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Moves the existing JobProof subscription from Professional → Essential in Stripe
+ * (same subscription id, founder/standard cohort from the profile).
+ * Trialing: immediate change with trial preserved. Paid active-like: schedule at period end.
+ */
+export async function downgradeSubscriptionToEssential(): Promise<DowngradeSubscriptionResult> {
+  const { supabase, user, profile } = await requireContractorProfile();
+  const oldSubscriptionStatusForAudit = String(profile.subscription_status ?? "");
+
+  if (tierFromMetadata(profile.plan_tier) !== "professional") {
+    return {
+      success: false,
+      error: "Downgrade is only available when you’re on the Professional plan.",
+    };
+  }
+
+  if (profile.subscription_cancel_at_period_end === true) {
+    return {
+      success: false,
+      error: "Cancel the scheduled cancellation or resume your subscription before changing plans.",
+    };
+  }
+
+  if (profile.pending_plan_tier === "essential") {
+    return {
+      success: false,
+      error: "A downgrade to Essential is already scheduled for your account.",
+    };
+  }
+
+  const subId = (profile.stripe_subscription_id as string | null)?.trim() || null;
+  if (!subId) {
+    return { success: false, error: "No active subscription was found." };
+  }
+
+  const customerId = (profile.stripe_customer_id as string | null)?.trim() || null;
+  const stripe = getStripe();
+  let sub: Stripe.Subscription;
+  try {
+    sub = await stripe.subscriptions.retrieve(subId);
+  } catch {
+    return { success: false, error: "Could not load your subscription from Stripe." };
+  }
+
+  if (!customerId || String(sub.customer) !== customerId) {
+    return { success: false, error: "Subscription does not match your billing customer." };
+  }
+
+  const pricingVersion: BillingPricingVersion =
+    profile.pricing_version === "standard" ? "standard" : "founder";
+  let essentialPriceId: string;
+  try {
+    essentialPriceId = getStripePriceId("essential", pricingVersion);
+  } catch {
+    return {
+      success: false,
+      error: "Downgrade is not available right now. Please contact support.",
+    };
+  }
+
+  const firstItem = sub.items.data[0];
+  const itemId = firstItem?.id;
+  const currentPriceId = firstItem?.price?.id ?? null;
+  if (!itemId) {
+    return { success: false, error: "Subscription has no billable items to update." };
+  }
+
+  const currentPlan = currentPriceId ? getPlanFromStripePriceId(currentPriceId) : null;
+  if (currentPlan?.planTier === "essential") {
+    await supabase
+      .from("profiles")
+      .update({
+        plan_tier: "essential",
+        stripe_price_id: currentPriceId,
+        pricing_version: currentPlan.pricingVersion ?? pricingVersion,
+        subscription_status: sub.status,
+        subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
+        trial_ends_at: unixToIso(sub.trial_end ?? null),
+        pending_plan_tier: null,
+        pending_plan_effective_at: null,
+        stripe_subscription_schedule_id: null,
+        ...subscriptionCancellationDbFields(sub),
+      })
+      .eq("id", profile.id)
+      .eq("user_id", user.id);
+    return {
+      success: true,
+      scheduled: false,
+      message: "Your subscription is already on the Essential plan.",
+    };
+  }
+
+  if (currentPlan?.planTier !== "professional") {
+    return {
+      success: false,
+      error: "Your Stripe subscription doesn’t match Professional. Use Manage billing to make changes.",
+    };
+  }
+
+  const profileStatus = String(profile.subscription_status ?? "").trim().toLowerCase();
+  const isTrialing =
+    sub.status === "trialing" || profileStatus === "trialing" || profileStatus === "trial";
+  const scheduleAtPeriodEnd =
+    !isTrialing &&
+    (sub.status === "active" ||
+      sub.status === "past_due" ||
+      sub.status === "unpaid" ||
+      profileStatus === "active" ||
+      profileStatus === "past_due" ||
+      profileStatus === "unpaid");
+
+  if (!isTrialing && !scheduleAtPeriodEnd) {
+    return {
+      success: false,
+      error: "This subscription can’t be downgraded from here. Use Manage billing or contact support.",
+    };
+  }
+
+  const meta: Record<string, string> = {
+    ...Object.fromEntries(
+      Object.entries(sub.metadata ?? {}).map(([k, v]) => [k, v == null ? "" : String(v)])
+    ),
+    profile_id: String(profile.id),
+    plan_tier: "essential",
+    pricing_version: pricingVersion,
+  };
+
+  try {
+    if (isTrialing) {
+      const trialEndUnix =
+        sub.trial_end != null && sub.trial_end > Math.floor(Date.now() / 1000)
+          ? sub.trial_end
+          : undefined;
+
+      const updated = await stripe.subscriptions.update(subId, {
+        items: [{ id: itemId, price: essentialPriceId }],
+        proration_behavior: "none",
+        ...(trialEndUnix != null ? { trial_end: trialEndUnix } : {}),
+        metadata: meta,
+      });
+
+      const priceId = updated.items.data[0]?.price?.id ?? null;
+      const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
+
+      await supabase
+        .from("profiles")
+        .update({
+          stripe_price_id: priceId,
+          plan_tier: plan?.planTier ?? "essential",
+          pricing_version: plan?.pricingVersion ?? pricingVersion,
+          subscription_status: updated.status,
+          subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(updated)),
+          trial_ends_at: unixToIso(updated.trial_end ?? null),
+          pending_plan_tier: null,
+          pending_plan_effective_at: null,
+          stripe_subscription_schedule_id: null,
+          ...subscriptionCancellationDbFields(updated),
+        })
+        .eq("id", profile.id)
+        .eq("user_id", user.id);
+
+      void insertBillingEventLog({
+        profileId: String(profile.id),
+        stripeCustomerId: customerId,
+        stripeSubscriptionId: subId,
+        eventType: "subscription_downgraded",
+        oldSubscriptionStatus: oldSubscriptionStatusForAudit,
+        newSubscriptionStatus: updated.status,
+        metadata: {
+          from_plan_tier: "professional",
+          to_plan_tier: "essential",
+          pricing_version: pricingVersion,
+          immediate: true,
+          trialing: true,
+        },
+      });
+
+      return {
+        success: true,
+        scheduled: false,
+        message: "Plan changed to Essential. Your trial end date is unchanged.",
+      };
+    }
+
+    const { scheduleId, effectiveAtIso } = await scheduleEssentialDowngradeAtPeriodEnd({
+      stripe,
+      sub,
+      essentialPriceId,
+      pricingVersion,
+      profileId: String(profile.id),
+    });
+
+    await supabase
+      .from("profiles")
+      .update({
+        pending_plan_tier: "essential",
+        pending_plan_effective_at: effectiveAtIso,
+        stripe_subscription_schedule_id: scheduleId,
+        subscription_current_period_end: effectiveAtIso,
+      })
+      .eq("id", profile.id)
+      .eq("user_id", user.id);
+
+    void insertBillingEventLog({
+      profileId: String(profile.id),
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subId,
+      eventType: "downgrade_scheduled",
+      oldSubscriptionStatus: oldSubscriptionStatusForAudit,
+      newSubscriptionStatus: sub.status,
+      metadata: {
+        from_plan_tier: "professional",
+        to_plan_tier: "essential",
+        pricing_version: pricingVersion,
+        effective_at: effectiveAtIso,
+        stripe_subscription_schedule_id: scheduleId,
+      },
+    });
+
+    return {
+      success: true,
+      scheduled: true,
+      message:
+        "Downgrade scheduled. Your Professional plan stays active until your current billing period ends.",
+    };
+  } catch (err) {
+    if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+      logStripeError("downgradeSubscriptionToEssential invalid request", err);
+      return {
+        success: false,
+        error: "Stripe couldn’t apply the downgrade. Try Manage billing or contact support.",
+      };
+    }
+    if (err instanceof Stripe.errors.StripeError) {
+      logStripeError("downgradeSubscriptionToEssential stripe error", err);
+      return { success: false, error: "Could not reach Stripe. Please try again in a moment." };
+    }
+    if (err instanceof Error) {
+      return { success: false, error: err.message };
     }
     throw err;
   }
