@@ -31,6 +31,9 @@ import { ESTIMATE_TO_JOB_PRICING_CONTINUITY_LINE } from "@/lib/contract-pricing-
 import { InvoiceReminderButton } from "./invoices/invoice-reminder-button";
 import { MarkJobCompleteButton } from "./mark-job-complete-button";
 import { UpdateTimelinePhotos } from "./update-timeline-photos";
+import { JobProtectionChecklist } from "@/components/onboarding/job-protection-checklist";
+import { DisputePreviewCard } from "@/components/onboarding/dispute-preview-card";
+import { ProtectionMicrocopy } from "@/components/onboarding/protection-microcopy";
 
 export default async function JobDetailPage({
   params,
@@ -112,6 +115,18 @@ export default async function JobDetailPage({
     job.property_province,
     job.tax_rate
   );
+
+  const sentInv = invFlags.sentInvoiceDisplay;
+  const hasPaymentRecorded =
+    invFlags.hasSentOrPaidInvoice &&
+    (sentInv?.status === "paid" || Number(sentInv?.amount_paid_total ?? 0) > 0);
+
+  const contractCtaLabel =
+    job.contract_status === "signed"
+      ? "View contract"
+      : job.contract_status === "pending"
+        ? "Contract (pending)"
+        : "Send agreement for signature";
 
   return (
     <div className="space-y-6">
@@ -206,50 +221,54 @@ export default async function JobDetailPage({
               ) : null}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {!isJobLockedForContractEdits(job.contract_status) && (
+          <div className="flex w-full max-w-3xl flex-col gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              {!isJobLockedForContractEdits(job.contract_status) && (
+                <Link
+                  href={`/jobs/${jobId}/edit`}
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+                >
+                  Edit job
+                </Link>
+              )}
               <Link
-                href={`/jobs/${jobId}/edit`}
-                className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+                href={`/jobs/${jobId}/updates/new`}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2"
               >
-                Edit job
+                Upload proof photos
               </Link>
-            )}
-            <Link
-              href={`/jobs/${jobId}/updates/new`}
-              className="rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2"
-            >
-              Add job update (photos/notes)
-            </Link>
-            <Link
-              href={`/jobs/${jobId}/contract`}
-              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
-            >
-              {job.contract_status === "signed"
-                ? "View contract"
-                : job.contract_status === "pending"
-                  ? "Contract (pending)"
-                  : "Create contract"}
-            </Link>
-            <Link
-              href={`/jobs/${jobId}/change-orders`}
-              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
-            >
-              Add change order
-            </Link>
-            <Link
-              href={`/jobs/${jobId}/invoices`}
-              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
-            >
-              Invoices
-            </Link>
-            <Link
-              href={`/jobs/${jobId}/proof`}
-              className="rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
-            >
-              Proof report
-            </Link>
-            {job.status === "active" && <MarkJobCompleteButton jobId={jobId} />}
+              <Link
+                href={`/jobs/${jobId}/contract`}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+              >
+                {contractCtaLabel}
+              </Link>
+              <Link
+                href={`/jobs/${jobId}/change-orders`}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+              >
+                Add change order
+              </Link>
+              <Link
+                href={`/jobs/${jobId}/invoices`}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+              >
+                Invoices
+              </Link>
+              <Link
+                href={`/jobs/${jobId}/proof`}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2"
+              >
+                Proof report
+              </Link>
+              {job.status === "active" && <MarkJobCompleteButton jobId={jobId} />}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <ProtectionMicrocopy variant="photos" />
+              <ProtectionMicrocopy variant="contract" />
+              <ProtectionMicrocopy variant="change_order" />
+              <ProtectionMicrocopy variant="invoice" />
+            </div>
           </div>
           {isJobLockedForContractEdits(job.contract_status) && (
             <p className="mt-3 max-w-2xl text-sm text-zinc-600">
@@ -326,6 +345,19 @@ export default async function JobDetailPage({
               </div>
             </div>
           )}
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <JobProtectionChecklist
+            customerEmail={customer?.email}
+            customerPhone={customer?.phone}
+            contractStatus={job.contract_status}
+            updateCount={updates.length}
+            changeOrders={changeOrders}
+            hasSentOrPaidInvoice={invFlags.hasSentOrPaidInvoice}
+            hasPaymentRecorded={hasPaymentRecorded}
+          />
+          <DisputePreviewCard jobId={jobId} />
         </div>
 
         {!contract && (
@@ -469,11 +501,14 @@ export default async function JobDetailPage({
           {updates.length === 0 ? (
             <div className="px-4 py-12 text-center text-zinc-500 sm:px-6">
               <p>No updates yet.</p>
+              <div className="mx-auto mt-3 max-w-sm text-left">
+                <ProtectionMicrocopy variant="photos" />
+              </div>
               <Link
                 href={`/jobs/${jobId}/updates/new`}
-                className="mt-2 inline-block font-medium text-[#2436BB] hover:underline"
+                className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#1c2a96]"
               >
-                Add first update
+                Upload proof photos
               </Link>
             </div>
           ) : (

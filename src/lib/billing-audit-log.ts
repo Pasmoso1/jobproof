@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { trackProductEventFromBillingAudit } from "@/lib/product-analytics";
 
 export type BillingAuditEventType =
   | "checkout_completed"
@@ -70,5 +71,12 @@ export async function insertBillingEventLog(input: InsertBillingEventLogInput): 
 
   if (error) {
     console.error("[billing-audit] insert failed", error);
+    return;
   }
+
+  trackProductEventFromBillingAudit({
+    profileId: input.profileId,
+    billingEventType: input.eventType,
+    metadata: input.metadata,
+  });
 }

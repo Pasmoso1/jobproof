@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateEastern } from "@/lib/datetime-eastern";
+import { formatBillingDateOrDash } from "@/lib/billing-date-display";
 import {
   getSubscriptionAccess,
   pickScheduledSubscriptionAccessEndIso,
@@ -22,11 +22,6 @@ import {
 } from "@/lib/stripe-subscription-profile-sync";
 import { BillingActionButtons, StripeConnectActionButtons } from "./billing-actions-client";
 import { refreshStripeConnectStatus, syncSubscriptionAfterStripeReturn } from "./actions";
-
-function fmt(iso?: string | null) {
-  if (!iso) return "—";
-  return formatDateEastern(iso, { dateStyle: "medium" });
-}
 
 function str(v: unknown): string {
   if (v == null) return "";
@@ -164,7 +159,7 @@ export default async function BillingSettingsPage({
 
   let scheduledEndLabel = "—";
   if (hasScheduledCancellation && scheduledAccessEndIso) {
-    scheduledEndLabel = fmt(scheduledAccessEndIso);
+    scheduledEndLabel = formatBillingDateOrDash(scheduledAccessEndIso);
   }
 
   const showScheduledCancelBanner =
@@ -262,7 +257,7 @@ export default async function BillingSettingsPage({
 
       {showScheduledCancelBanner ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-          Your subscription is scheduled to cancel on {fmt(scheduledAccessEndIso)}. You&apos;ll keep
+          Your subscription is scheduled to cancel on {formatBillingDateOrDash(scheduledAccessEndIso)}. You&apos;ll keep
           access until then.
         </div>
       ) : null}
@@ -271,7 +266,7 @@ export default async function BillingSettingsPage({
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-medium">Downgrade scheduled</p>
           <p className="mt-1">
-            Your Professional plan stays active until {fmt(profile.pending_plan_effective_at)}. You
+            Your Professional plan stays active until {formatBillingDateOrDash(profile.pending_plan_effective_at)}. You
             will move to Essential on that date.
           </p>
         </div>
@@ -289,7 +284,7 @@ export default async function BillingSettingsPage({
               {formatSubscriptionStatusLabel(trimOrEmpty(profile.subscription_status))}
             </li>
             <li>
-              <span className="font-medium">Trial ends:</span> {fmt(profile.trial_ends_at)}
+              <span className="font-medium">Trial ends:</span> {formatBillingDateOrDash(profile.trial_ends_at)}
             </li>
             <li>
               <span className="font-medium">After trial:</span> {planLines.afterTrialLine}
@@ -318,13 +313,13 @@ export default async function BillingSettingsPage({
           </p>
           {isPastDue && profile.grace_period_ends_at ? (
             <p className="mt-2 text-sm text-red-700">
-              Grace period ends {fmt(profile.grace_period_ends_at)}.
+              Grace period ends {formatBillingDateOrDash(profile.grace_period_ends_at)}.
             </p>
           ) : null}
         </div>
       ) : isPastDue && profile.grace_period_ends_at ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Past due. Grace period ends {fmt(profile.grace_period_ends_at)}.
+          Past due. Grace period ends {formatBillingDateOrDash(profile.grace_period_ends_at)}.
         </div>
       ) : null}
       {isTrialing &&
@@ -336,11 +331,11 @@ export default async function BillingSettingsPage({
               <>
                 <p>{professionalTrialingBillingBannerMessage(pricingVersion ?? "founder")}</p>
                 <p className="mt-2 text-sm text-blue-800">
-                  Trial active until {fmt(profile.trial_ends_at)}.
+                  Trial active until {formatBillingDateOrDash(profile.trial_ends_at)}.
                 </p>
               </>
             ) : (
-              <p>Trial active until {fmt(profile.trial_ends_at)}.</p>
+              <p>Trial active until {formatBillingDateOrDash(profile.trial_ends_at)}.</p>
             )}
           </div>
         )}
@@ -371,11 +366,11 @@ export default async function BillingSettingsPage({
           </div>
           <div>
             <dt className="text-zinc-500">Current period end</dt>
-            <dd className="font-medium text-zinc-900">{fmt(profile.subscription_current_period_end)}</dd>
+            <dd className="font-medium text-zinc-900">{formatBillingDateOrDash(profile.subscription_current_period_end)}</dd>
           </div>
           <div>
             <dt className="text-zinc-500">Trial ends</dt>
-            <dd className="font-medium text-zinc-900">{fmt(profile.trial_ends_at)}</dd>
+            <dd className="font-medium text-zinc-900">{formatBillingDateOrDash(profile.trial_ends_at)}</dd>
           </div>
           <div className="sm:col-span-2">
             <dt className="text-zinc-500">Stripe customer</dt>

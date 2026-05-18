@@ -354,9 +354,17 @@ export default async function AdminPage() {
   return (
     <div className="min-h-screen bg-zinc-50">
       <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900">JobProof Admin Dashboard</h1>
-          <p className="mt-1 text-sm text-zinc-600">Waitlist + acquisition + product usage.</p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-900">JobProof Admin Dashboard</h1>
+            <p className="mt-1 text-sm text-zinc-600">Waitlist + acquisition + product usage.</p>
+          </div>
+          <Link
+            href="/admin/analytics"
+            className="inline-flex items-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+          >
+            Product analytics →
+          </Link>
         </div>
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

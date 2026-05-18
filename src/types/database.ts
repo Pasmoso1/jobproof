@@ -90,8 +90,29 @@ export interface Profile {
   stripe_connect_charges_enabled?: boolean;
   stripe_connect_payouts_enabled?: boolean;
   stripe_connect_details_submitted?: boolean;
+  onboarding_started_at?: string | null;
+  first_job_created_at?: string | null;
+  first_job_update_at?: string | null;
+  first_contract_sent_at?: string | null;
+  first_invoice_sent_at?: string | null;
+  first_payment_recorded_at?: string | null;
+  onboarding_completed_at?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Row from `product_analytics_events` — internal product/onboarding tracking */
+export interface ProductAnalyticsEvent {
+  id: string;
+  created_at: string;
+  profile_id: string | null;
+  event_name: string;
+  session_id: string | null;
+  route: string | null;
+  source: string | null;
+  metadata: Json;
+  ip_hash: string | null;
+  user_agent: string | null;
 }
 
 /** Row from `email_logs` — transactional email audit trail */

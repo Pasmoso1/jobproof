@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
-import { getCustomers, getProfile } from "../../actions";
+import { getCustomers, getJobs, getProfile } from "../../actions";
 import { CreateJobForm } from "./create-job-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function CreateJobPage() {
-  const [customers, profile] = await Promise.all([getCustomers(), getProfile()]);
+  const [customers, profile, jobs] = await Promise.all([
+    getCustomers(),
+    getProfile(),
+    getJobs(),
+  ]);
+  const isFirstProtectedJob = jobs.length === 0;
   const initialTaxRate = String(
     defaultTaxRateForNewFinancials(profile?.province ?? null, null).taxRate
   );
@@ -20,13 +25,21 @@ export default async function CreateJobPage() {
         >
           ← Back to dashboard
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-zinc-900">Create job</h1>
+        <h1 className="mt-2 text-2xl font-bold text-zinc-900">
+          {isFirstProtectedJob ? "Create your first protected job" : "Create job"}
+        </h1>
         <p className="mt-1 text-zinc-600">
-          Add a new job with customer details and scope.
+          {isFirstProtectedJob
+            ? "Start with the basics. You can add photos, contracts, estimates, and invoices after the job is created."
+            : "Add a new job with customer details and scope."}
         </p>
       </div>
 
-      <CreateJobForm customers={customers} initialTaxRate={initialTaxRate} />
+      <CreateJobForm
+        customers={customers}
+        initialTaxRate={initialTaxRate}
+        isFirstProtectedJob={isFirstProtectedJob}
+      />
     </div>
   );
 }

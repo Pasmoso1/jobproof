@@ -56,6 +56,9 @@ import {
 } from "@/lib/invoice-payment-recalc";
 import { randomUUID } from "node:crypto";
 import { getSubscriptionAccess, READ_ONLY_MODE_ACTION_ERROR } from "@/lib/subscription-access";
+import { trackContractorMilestoneSafe } from "@/lib/contractor-milestones";
+import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
+import { trackReadOnlyModeTriggeredSafe } from "@/lib/read-only-analytics";
 
 export type ActionResult<T = unknown> =
   | { success: true; data?: T; message?: string }
@@ -75,6 +78,15 @@ async function getCurrentUserProfileForAccessGate(
   if (!profile) return null;
   const access = getSubscriptionAccess(profile);
   return { profile, access };
+}
+
+function blockIfReadOnly(
+  access: ReturnType<typeof getSubscriptionAccess>,
+  profileId: string
+): string | null {
+  if (!access.isReadOnlyMode) return null;
+  trackReadOnlyModeTriggeredSafe(profileId);
+  return access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR;
 }
 
 export async function getProfile() {
@@ -508,17 +520,24 @@ export async function createJob(formData: FormData) {
   if (!profile) redirect("/login");
 
   const access = getSubscriptionAccess(profile);
-  if (access.isReadOnlyMode) {
-    return { error: access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
-  }
+  const readOnlyErr = blockIfReadOnly(access, String(profile.id));
+  if (readOnlyErr) return { error: readOnlyErr };
 
-  const { count } = await supabase
-    .from("jobs")
-    .select("*", { count: "exact", head: true })
-    .eq("profile_id", profile.id)
-    .eq("status", "active");
+  const [{ count: totalJobCount }, { count: activeJobCount }] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", profile.id),
+    supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", profile.id)
+      .eq("status", "active"),
+  ]);
 
-  if ((count ?? 0) >= profile.active_job_limit) {
+  const isFirstJob = (totalJobCount ?? 0) === 0;
+
+  if ((activeJobCount ?? 0) >= profile.active_job_limit) {
     return { error: `Active job limit (${profile.active_job_limit}) reached. Upgrade your plan for more.` };
   }
 
@@ -637,6 +656,18 @@ export async function createJob(formData: FormData) {
     .single();
 
   if (error) return { error: error.message };
+
+  if (isFirstJob) {
+    trackContractorMilestoneSafe({
+      profileId: String(profile.id),
+      eventName: PRODUCT_ANALYTICS_EVENTS.first_job_created,
+      source: "create_job",
+      metadata: {
+        trade: serviceCategory || null,
+        job_id: data.id,
+      },
+    });
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/jobs/create");
@@ -1210,6 +1241,13 @@ export async function createJobUpdate(
     }
   }
 
+  trackContractorMilestoneSafe({
+    profileId: String(profile.id),
+    eventName: PRODUCT_ANALYTICS_EVENTS.first_job_update_added,
+    source: "create_job_update",
+    metadata: { job_id: jobId },
+  });
+
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/updates/new`);
   return { success: true };
@@ -1604,6 +1642,13 @@ export async function sendContractForSigning(
     .from("jobs")
     .update({ contract_status: "pending" })
     .eq("id", contract.job_id);
+
+  trackContractorMilestoneSafe({
+    profileId: String(profile.id),
+    eventName: PRODUCT_ANALYTICS_EVENTS.first_contract_sent,
+    source: "send_contract",
+    metadata: { job_id: contract.job_id, contract_id: contractId },
+  });
 
   revalidatePath(`/jobs/${contract.job_id}`);
   revalidatePath(`/jobs/${contract.job_id}/contract`);
@@ -3594,6 +3639,13 @@ export async function createInvoice(
     console.error("[createInvoice] failed to mark invoice sent:", updateErr);
   }
 
+  trackContractorMilestoneSafe({
+    profileId: String(profile.id),
+    eventName: PRODUCT_ANALYTICS_EVENTS.first_invoice_sent,
+    source: "create_invoice",
+    metadata: { job_id: jobId, invoice_id: invoice.id },
+  });
+
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/invoices`);
   return { invoiceId: invoice.id, emailSent: true };
@@ -3899,6 +3951,13 @@ export async function resendInvoice(
     )
     .eq("id", invRow.id);
 
+  trackContractorMilestoneSafe({
+    profileId: String(profile.id),
+    eventName: PRODUCT_ANALYTICS_EVENTS.first_invoice_sent,
+    source: "resend_invoice",
+    metadata: { job_id: jobId, invoice_id: String(invRow.id) },
+  });
+
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/invoices`);
   return { emailSent: true };
@@ -4087,6 +4146,13 @@ export async function recordInvoicePayment(
       error: "Payment saved but invoice totals could not be updated. Try again.",
     };
   }
+
+  trackContractorMilestoneSafe({
+    profileId: String(profile.id),
+    eventName: PRODUCT_ANALYTICS_EVENTS.first_payment_recorded,
+    source: "record_invoice_payment",
+    metadata: { invoice_id: invoiceId, job_id: String(invRow.job_id) },
+  });
 
   const jobId = String(invRow.job_id);
   revalidatePath(`/jobs/${jobId}`);

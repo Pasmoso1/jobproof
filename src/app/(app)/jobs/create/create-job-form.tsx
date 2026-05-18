@@ -27,10 +27,12 @@ type Customer = {
 export function CreateJobForm({
   customers,
   initialTaxRate,
+  isFirstProtectedJob = false,
 }: {
   customers: Customer[];
   /** Decimal rate string from contractor province (e.g. "0.13") */
   initialTaxRate?: string;
+  isFirstProtectedJob?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -185,6 +187,16 @@ export function CreateJobForm({
           {error}
         </div>
       )}
+
+      {isFirstProtectedJob ? (
+        <div className="rounded-lg border border-[#2436BB]/20 bg-[#2436BB]/5 px-4 py-3 text-sm text-zinc-700">
+          <p className="font-medium text-zinc-900">You&apos;re setting up payment protection</p>
+          <p className="mt-1 text-zinc-600">
+            Add the customer and job basics now. Photos, contracts, and invoices come next on the
+            job timeline.
+          </p>
+        </div>
+      ) : null}
 
       {/* Customer section */}
       <div>

@@ -23,6 +23,9 @@ import {
 } from "@/lib/invoice-viewed-display";
 import { contractorInvoicePaymentStatusLabel } from "@/lib/invoice-payment-display";
 import { grossBalanceAfterDeposit, roundInvoiceMoney } from "@/lib/invoice-payment-recalc";
+import { DisputePreviewCard } from "@/components/onboarding/dispute-preview-card";
+import { ProofReportPrintButton } from "@/components/proof-report-print-button";
+import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
 
 export default async function ProofReportPage({
   params,
@@ -40,6 +43,16 @@ export default async function ProofReportPage({
   ]);
 
   if (!job) notFound();
+
+  const profileId = (profile as { id?: string } | null)?.id;
+  if (profileId) {
+    trackProductEventSafe({
+      profileId: String(profileId),
+      eventName: PRODUCT_ANALYTICS_EVENTS.proof_report_viewed,
+      route: `/jobs/${jobId}/proof`,
+      metadata: { job_id: jobId },
+    });
+  }
 
   const invoiceIds = (invoices as { id: string }[]).map((i) => i.id);
   const paymentRows = await getInvoicePaymentsByInvoiceIds(invoiceIds);
@@ -112,13 +125,20 @@ export default async function ProofReportPage({
         >
           ← Back to job
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-zinc-900">Proof report</h1>
-        <p className="mt-1 text-zinc-600">
-          {job.title} • {customer?.full_name ?? "Unknown customer"}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-900">Proof report</h1>
+            <p className="mt-1 text-zinc-600">
+              {job.title} • {customer?.full_name ?? "Unknown customer"}
+            </p>
+          </div>
+          <ProofReportPrintButton jobId={jobId} />
+        </div>
       </div>
 
       <div className="space-y-6">
+        <DisputePreviewCard jobId={jobId} showProofLink={false} />
+
         {/* Contractor information */}
         {(businessName || profile?.phone || contractorAddress) && (
           <div className="rounded-xl border border-zinc-200 bg-white p-6">

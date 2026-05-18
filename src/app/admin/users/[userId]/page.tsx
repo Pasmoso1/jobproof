@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { requireAdminUserOrRedirectLogin } from "@/lib/admin-auth";
 import { AdminNotAuthorized } from "@/app/admin/NotAuthorized";
+import { formatBillingDateTimeEastern } from "@/lib/billing-date-display";
 
 function toMaybeString(v: unknown): string | null {
   const s = String(v ?? "").trim();
@@ -16,6 +17,12 @@ function formatDate(iso: string | null | undefined): string {
   } catch {
     return String(iso);
   }
+}
+
+/** Stripe/subscription timestamps in admin — always America/Toronto. */
+function formatBillingTimestamp(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return formatBillingDateTimeEastern(iso) || "—";
 }
 
 function formatMoney(n: number | null | undefined): string {
@@ -148,6 +155,9 @@ export default async function AdminUserDetailPage({
       subscription_cancel_at_period_end,
       subscription_cancel_at,
       subscription_canceled_at,
+      pending_plan_tier,
+      pending_plan_effective_at,
+      stripe_subscription_schedule_id,
       stripe_connect_account_id,
       stripe_connect_onboarding_complete,
       stripe_connect_charges_enabled,
@@ -490,24 +500,41 @@ export default async function AdminUserDetailPage({
               { label: "stripe_price_id", value: toMaybeString(profile.stripe_price_id) ?? "" },
               {
                 label: "subscription_current_period_end",
-                value: formatDate(toMaybeString(profile.subscription_current_period_end)),
+                value: formatBillingTimestamp(
+                  toMaybeString(profile.subscription_current_period_end)
+                ),
               },
-              { label: "trial_ends_at", value: formatDate(toMaybeString(profile.trial_ends_at)) },
+              {
+                label: "trial_ends_at",
+                value: formatBillingTimestamp(toMaybeString(profile.trial_ends_at)),
+              },
               {
                 label: "subscription_cancel_at_period_end",
                 value: String(profile.subscription_cancel_at_period_end ?? false),
               },
               {
                 label: "subscription_cancel_at",
-                value: formatDate(toMaybeString(profile.subscription_cancel_at)),
+                value: formatBillingTimestamp(toMaybeString(profile.subscription_cancel_at)),
               },
               {
                 label: "subscription_canceled_at",
-                value: formatDate(toMaybeString(profile.subscription_canceled_at)),
+                value: formatBillingTimestamp(toMaybeString(profile.subscription_canceled_at)),
               },
               {
                 label: "grace_period_ends_at",
-                value: formatDate(toMaybeString(profile.grace_period_ends_at)),
+                value: formatBillingTimestamp(toMaybeString(profile.grace_period_ends_at)),
+              },
+              {
+                label: "pending_plan_tier",
+                value: toMaybeString(profile.pending_plan_tier) ?? "",
+              },
+              {
+                label: "pending_plan_effective_at",
+                value: formatBillingTimestamp(toMaybeString(profile.pending_plan_effective_at)),
+              },
+              {
+                label: "stripe_subscription_schedule_id",
+                value: toMaybeString(profile.stripe_subscription_schedule_id) ?? "",
               },
               {
                 label: "stripe_connect_account_id",

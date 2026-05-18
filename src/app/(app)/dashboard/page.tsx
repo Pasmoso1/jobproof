@@ -21,7 +21,15 @@ import {
   outstandingIndicatorLinkClassName,
 } from "@/lib/job-dashboard-status";
 import { getSubscriptionAccess } from "@/lib/subscription-access";
-import { formatDateEastern } from "@/lib/datetime-eastern";
+import { formatBillingDateOrDash } from "@/lib/billing-date-display";
+import {
+  getContractorOnboardingProgress,
+  isOnboardingProgressComplete,
+} from "@/lib/contractor-onboarding-progress";
+import { DashboardEmptyOnboarding } from "@/components/onboarding/dashboard-empty-onboarding";
+import { OnboardingProgressCard } from "@/components/onboarding/onboarding-progress-card";
+import { trackContractorMilestoneSafe } from "@/lib/contractor-milestones";
+import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
 
 function formatStorage(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -64,10 +72,30 @@ export default async function DashboardPage() {
   const access = getSubscriptionAccess(profile ?? {});
 
   const jobIds = jobs.map((j: { id: string }) => j.id);
-  const [invByJob, estimatesAwaiting] = await Promise.all([
+  const [invByJob, estimatesAwaiting, onboardingProgress] = await Promise.all([
     getInvoiceDeliverySummaryForJobIds(jobIds),
     getEstimateAwaitingResponseCount(),
+    profile?.id
+      ? getContractorOnboardingProgress(String(profile.id))
+      : Promise.resolve({
+          hasJob: false,
+          hasProofUpdate: false,
+          hasContractSent: false,
+          hasInvoiceSent: false,
+        }),
   ]);
+
+  const hasNoJobs = jobs.length === 0;
+  const showOnboardingProgress =
+    !hasNoJobs && profile?.id && !isOnboardingProgressComplete(onboardingProgress);
+
+  if (hasNoJobs && profile?.id) {
+    trackContractorMilestoneSafe({
+      profileId: String(profile.id),
+      eventName: PRODUCT_ANALYTICS_EVENTS.onboarding_started,
+      source: "dashboard_empty_state",
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -95,7 +123,7 @@ export default async function DashboardPage() {
       {profile?.subscription_status === "past_due" && profile.grace_period_ends_at && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Billing is past due. Grace period ends{" "}
-          {formatDateEastern(profile.grace_period_ends_at, { dateStyle: "medium" })}.{" "}
+          {formatBillingDateOrDash(profile.grace_period_ends_at)}.{" "}
           <Link href="/settings/billing" className="font-medium underline hover:no-underline">
             Update billing →
           </Link>
@@ -119,6 +147,12 @@ export default async function DashboardPage() {
         <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
           {access.freeBetaHelperCopy}
         </div>
+      ) : null}
+
+      {hasNoJobs ? <DashboardEmptyOnboarding /> : null}
+
+      {showOnboardingProgress ? (
+        <OnboardingProgressCard progress={onboardingProgress} />
       ) : null}
 
       {/* Alerts */}
@@ -194,12 +228,9 @@ export default async function DashboardPage() {
           </Link>
         </div>
         <div className="divide-y divide-zinc-200">
-          {jobs.length === 0 ? (
-            <div className="px-4 py-12 text-center text-zinc-500 sm:px-6">
-              <p>No jobs yet.</p>
-              <p className="mt-2 text-sm text-zinc-600">
-                Use <span className="font-medium text-zinc-800">Create job</span> above to get started.
-              </p>
+          {hasNoJobs ? (
+            <div className="px-4 py-8 text-center text-sm text-zinc-500 sm:px-6">
+              Your protected jobs will appear here once you create one.
             </div>
           ) : (
             jobs.map((job: {

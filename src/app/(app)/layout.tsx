@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
+import { getFeedbackMailtoHref } from "@/lib/onboarding-feedback";
 
 export default async function AppLayout({
   children,
@@ -65,6 +66,12 @@ export default async function AppLayout({
             >
               Billing
             </Link>
+            <a
+              href={getFeedbackMailtoHref()}
+              className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
+            >
+              Send feedback
+            </a>
             <LogoutButton />
           </nav>
         </div>

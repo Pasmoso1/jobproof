@@ -9,6 +9,8 @@ import {
   isStripeCustomerMissingError,
 } from "@/lib/stripe-customer";
 import { insertBillingEventLog } from "@/lib/billing-audit-log";
+import { trackContractorMilestoneSafe } from "@/lib/contractor-milestones";
+import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
 import { sendCancellationResumedEmail } from "@/lib/billing-email-events";
 import {
   getSubscriptionAccess,
@@ -725,6 +727,13 @@ export async function createStripeConnectOnboardingLink(): Promise<{ url: string
     return_url: `${appUrl}/settings/billing?stripe_connect=return`,
     type: "account_onboarding",
   });
+
+  trackContractorMilestoneSafe({
+    profileId: String(profile.id),
+    eventName: PRODUCT_ANALYTICS_EVENTS.stripe_connect_started,
+    source: "billing_settings",
+  });
+
   return { url: link.url };
 }
 
@@ -736,16 +745,25 @@ export async function refreshStripeConnectStatus(): Promise<{ ok: true }> {
   try {
     const stripe = getStripe();
     const account = await stripe.accounts.retrieve(accountId);
+    const onboardingComplete =
+      (account.charges_enabled && account.payouts_enabled) || account.details_submitted;
     await supabase
       .from("profiles")
       .update({
         stripe_connect_charges_enabled: account.charges_enabled,
         stripe_connect_payouts_enabled: account.payouts_enabled,
         stripe_connect_details_submitted: account.details_submitted,
-        stripe_connect_onboarding_complete:
-          (account.charges_enabled && account.payouts_enabled) || account.details_submitted,
+        stripe_connect_onboarding_complete: onboardingComplete,
       })
       .eq("id", profile.id);
+
+    if (onboardingComplete) {
+      trackContractorMilestoneSafe({
+        profileId: String(profile.id),
+        eventName: PRODUCT_ANALYTICS_EVENTS.stripe_connect_completed,
+        source: "refresh_connect_status",
+      });
+    }
   } catch {
     /* Stale Connect account ids or wrong Stripe mode must not crash Server Components. */
   }
