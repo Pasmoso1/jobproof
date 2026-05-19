@@ -3,15 +3,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { requireAdminUserOrRedirectLogin } from "@/lib/admin-auth";
 import { AdminNotAuthorized } from "@/app/admin/NotAuthorized";
 import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return String(iso);
-  }
-}
+import { formatBillingDateTimeEastern } from "@/lib/billing-date-display";
 
 function pct(numerator: number, denominator: number): string {
   if (denominator <= 0) return "—";
@@ -131,7 +123,7 @@ export default async function AdminAnalyticsPage() {
             <table className="min-w-[720px] text-left text-sm">
               <thead className="bg-zinc-50">
                 <tr>
-                  <th className="px-3 py-2 font-medium text-zinc-700">Time</th>
+                  <th className="px-3 py-2 font-medium text-zinc-700">Time (Eastern)</th>
                   <th className="px-3 py-2 font-medium text-zinc-700">Event</th>
                   <th className="px-3 py-2 font-medium text-zinc-700">Profile</th>
                   <th className="px-3 py-2 font-medium text-zinc-700">Source</th>
@@ -141,7 +133,9 @@ export default async function AdminAnalyticsPage() {
               <tbody className="divide-y divide-zinc-100">
                 {events.map((row, i) => (
                   <tr key={`${row.created_at}-${row.event_name}-${i}`}>
-                    <td className="px-3 py-2 text-zinc-600">{formatDate(row.created_at)}</td>
+                    <td className="px-3 py-2 text-zinc-600">
+                      {formatBillingDateTimeEastern(row.created_at) || "—"}
+                    </td>
                     <td className="px-3 py-2 font-medium text-zinc-800">{row.event_name}</td>
                     <td className="px-3 py-2 text-zinc-600">
                       {row.profile_id ? (
