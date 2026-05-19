@@ -2,6 +2,10 @@ import Link from "next/link";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { requireAdminUserOrRedirectLogin } from "@/lib/admin-auth";
 import { AdminNotAuthorized } from "@/app/admin/NotAuthorized";
+import {
+  computeWaitlistSummary,
+  parseWaitlistRows,
+} from "@/lib/admin-waitlist";
 
 function toMaybeString(v: unknown): string | null {
   const s = String(v ?? "").trim();
@@ -192,6 +196,7 @@ export default async function AdminPage() {
     utm_campaign: toMaybeString(r.utm_campaign),
     landing_page: toMaybeString(r.landing_page),
   }));
+  const waitlistSummary = computeWaitlistSummary(parseWaitlistRows(waitlistRows));
   const profiles = profilesRows.map((r) => ({
     id: String(r.id ?? ""),
     user_id: String(r.user_id ?? ""),
@@ -359,13 +364,54 @@ export default async function AdminPage() {
             <h1 className="text-2xl font-bold text-zinc-900">JobProof Admin Dashboard</h1>
             <p className="mt-1 text-sm text-zinc-600">Waitlist + acquisition + product usage.</p>
           </div>
-          <Link
-            href="/admin/analytics"
-            className="inline-flex items-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
-          >
-            Product analytics →
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/admin/waitlist"
+              className="inline-flex min-h-[40px] items-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+            >
+              Early access signups →
+            </Link>
+            <Link
+              href="/admin/analytics"
+              className="inline-flex min-h-[40px] items-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+            >
+              Product analytics →
+            </Link>
+          </div>
         </div>
+
+        <section className="rounded-lg border border-[#2436BB]/25 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-zinc-900">Early access signups</h2>
+              <p className="mt-1 text-sm text-zinc-600">
+                Homepage waitlist — total and recent volume (rolling 7 days).
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-4 sm:gap-8">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Total</p>
+                <p className="mt-1 text-2xl font-semibold text-zinc-900">
+                  {waitlistSummary.total.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Last 7 days
+                </p>
+                <p className="mt-1 text-2xl font-semibold text-zinc-900">
+                  {waitlistSummary.signupsLast7DaysRolling.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/admin/waitlist"
+              className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2a96]"
+            >
+              View waitlist
+            </Link>
+          </div>
+        </section>
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map(([label, value]) => (
