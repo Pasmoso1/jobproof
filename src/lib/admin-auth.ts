@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient as createAuthedClient } from "@/lib/supabase/server";
+import { ADMIN_LOGIN_PATH } from "@/lib/admin-constants";
+
+export { ADMIN_LOGIN_PATH } from "@/lib/admin-constants";
 
 export function parseAdminEmails(raw = process.env.ADMIN_EMAILS): string[] {
   if (!raw) return [];
@@ -39,7 +42,7 @@ export async function requireAdminUserOrRedirectLogin(): Promise<
 > {
   const res = await requireAdminUser();
   if (!res.ok && res.reason === "unauthenticated") {
-    redirect("/login?redirect=/admin");
+    redirect(ADMIN_LOGIN_PATH);
   }
   if (!res.ok) {
     return { ok: false, reason: "not_authorized", userEmail: res.userEmail };

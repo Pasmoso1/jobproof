@@ -16,7 +16,7 @@ function LoginForm() {
   const [resendSuccess, setResendSuccess] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectParam = searchParams.get("redirect");
+  const redirectParam = searchParams.get("next") ?? searchParams.get("redirect");
   const redirectTo = redirectParam ?? "/dashboard";
   const isAdminLogin = redirectParam === "/admin";
   const [authError, setAuthError] = useState(false);
