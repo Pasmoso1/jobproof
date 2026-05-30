@@ -4,10 +4,11 @@ import {
   type ProfileOnboardingFields,
 } from "@/lib/supabase/middleware";
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
+import { BETA_PLAN_ONBOARDING_PATH, needsBetaPlanSelection } from "@/lib/beta-tester";
 
 const PROTECTED_PATHS = ["/dashboard", "/jobs", "/estimates", "/settings", "/onboarding"];
 const AUTH_PATHS = ["/login", "/signup"];
-const ONBOARDING_PATH = "/onboarding/business-profile";
+const BUSINESS_ONBOARDING_PATH = "/onboarding/business-profile";
 const PATHS_REQUIRING_ONBOARDING = ["/dashboard", "/jobs", "/estimates", "/settings"];
 
 function isProtected(pathname: string): boolean {
@@ -19,7 +20,10 @@ function isAuthPath(pathname: string): boolean {
 }
 
 function isOnboardingPath(pathname: string): boolean {
-  return pathname === ONBOARDING_PATH || pathname.startsWith(`${ONBOARDING_PATH}/`);
+  return pathname === BUSINESS_ONBOARDING_PATH ||
+    pathname.startsWith(`${BUSINESS_ONBOARDING_PATH}/`) ||
+    pathname === BETA_PLAN_ONBOARDING_PATH ||
+    pathname.startsWith(`${BETA_PLAN_ONBOARDING_PATH}/`);
 }
 
 function requiresOnboarding(pathname: string): boolean {
@@ -44,6 +48,16 @@ function isProfileIncomplete(
   });
 }
 
+function postLoginPath(profile: ProfileOnboardingFields, accountEmail: string): string {
+  if (isProfileIncomplete(profile, accountEmail)) {
+    return BUSINESS_ONBOARDING_PATH;
+  }
+  if (needsBetaPlanSelection(profile)) {
+    return BETA_PLAN_ONBOARDING_PATH;
+  }
+  return "/dashboard";
+}
+
 export async function middleware(request: NextRequest) {
   const { response, user, profile } = await updateSession(request);
 
@@ -52,37 +66,42 @@ export async function middleware(request: NextRequest) {
   if (isProtected(pathname) && !isOnboardingPath(pathname) && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
+    url.searchParams.set("next", pathname);
     return Response.redirect(url);
   }
 
   if (isOnboardingPath(pathname) && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("redirect", pathname);
+    url.searchParams.set("next", pathname);
     return Response.redirect(url);
   }
 
   if (isAuthPath(pathname) && user) {
     const url = request.nextUrl.clone();
-    url.pathname = isProfileIncomplete(profile, user.email ?? "")
-      ? ONBOARDING_PATH
-      : "/dashboard";
+    url.pathname = postLoginPath(profile, user.email ?? "");
     return Response.redirect(url);
   }
 
-  if (
-    user &&
-    requiresOnboarding(pathname) &&
-    isProfileIncomplete(profile, user.email ?? "")
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = ONBOARDING_PATH;
-    url.searchParams.set("redirect", pathname);
-    if (request.nextUrl.searchParams.get("confirmed") === "true") {
-      url.searchParams.set("confirmed", "true");
+  if (user && requiresOnboarding(pathname)) {
+    if (isProfileIncomplete(profile, user.email ?? "")) {
+      const url = request.nextUrl.clone();
+      url.pathname = BUSINESS_ONBOARDING_PATH;
+      url.searchParams.set("redirect", pathname);
+      if (request.nextUrl.searchParams.get("confirmed") === "true") {
+        url.searchParams.set("confirmed", "true");
+      }
+      return Response.redirect(url);
     }
-    return Response.redirect(url);
+    if (
+      needsBetaPlanSelection(profile) &&
+      pathname !== BETA_PLAN_ONBOARDING_PATH &&
+      !pathname.startsWith(`${BETA_PLAN_ONBOARDING_PATH}/`)
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = BETA_PLAN_ONBOARDING_PATH;
+      return Response.redirect(url);
+    }
   }
 
   return response;

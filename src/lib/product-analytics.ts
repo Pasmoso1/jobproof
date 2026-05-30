@@ -21,6 +21,8 @@ export const PRODUCT_ANALYTICS_EVENTS = {
   subscription_downgraded: "subscription_downgraded",
   subscription_canceled: "subscription_canceled",
   read_only_mode_triggered: "read_only_mode_triggered",
+  beta_tester_created: "beta_tester_created",
+  beta_plan_selected: "beta_plan_selected",
 } as const;
 
 export type ProductAnalyticsEventName =

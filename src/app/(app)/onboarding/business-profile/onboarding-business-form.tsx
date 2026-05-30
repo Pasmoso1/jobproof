@@ -96,7 +96,7 @@ export function OnboardingBusinessForm({
       return;
     }
 
-    router.push("/dashboard?onboarded=true");
+    router.push("/onboarding/plan");
     router.refresh();
   }
 

@@ -9,6 +9,10 @@ export type ProfileOnboardingFields = {
   city: string | null;
   province: string | null;
   postal_code: string | null;
+  beta_tester?: boolean | null;
+  beta_plan_tier?: string | null;
+  stripe_subscription_id?: string | null;
+  plan_tier?: string | null;
 } | null;
 
 export async function updateSession(request: NextRequest): Promise<{
@@ -46,7 +50,7 @@ export async function updateSession(request: NextRequest): Promise<{
     const { data } = await supabase
       .from("profiles")
       .select(
-        "business_name, phone, address_line_1, city, province, postal_code"
+        "business_name, phone, address_line_1, city, province, postal_code, beta_tester, beta_plan_tier, stripe_subscription_id, plan_tier"
       )
       .eq("user_id", user.id)
       .single();

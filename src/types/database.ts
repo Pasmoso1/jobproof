@@ -97,6 +97,8 @@ export interface Profile {
   first_invoice_sent_at?: string | null;
   first_payment_recorded_at?: string | null;
   onboarding_completed_at?: string | null;
+  beta_tester?: boolean;
+  beta_plan_tier?: "essential" | "professional" | null;
   created_at: string;
   updated_at: string;
 }

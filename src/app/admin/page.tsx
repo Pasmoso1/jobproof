@@ -138,7 +138,17 @@ function NeedsPanel({
   );
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const betaFilterRaw = sp.beta;
+  const betaFilter = Array.isArray(betaFilterRaw) ? betaFilterRaw[0] : betaFilterRaw;
+  const betaFilterNorm =
+    betaFilter === "beta" || betaFilter === "non-beta" ? betaFilter : "all";
+
   const auth = await requireAdminUserOrRedirectLogin();
   if (!auth.ok) {
     return <AdminNotAuthorized userEmail={auth.userEmail ?? ""} />;
@@ -169,7 +179,7 @@ export default async function AdminPage() {
     safeSelect(
       admin,
       "profiles",
-      "id,user_id,business_name,created_at,signup_utm_source,signup_utm_medium,signup_utm_campaign,heard_about_source"
+      "id,user_id,business_name,created_at,signup_utm_source,signup_utm_medium,signup_utm_campaign,heard_about_source,beta_tester,beta_plan_tier"
     ),
     safeSelect(admin, "jobs", "id,profile_id,created_at"),
     safeSelect(admin, "contracts", "id,profile_id,status,created_at,sent_at,signed_at"),
@@ -206,7 +216,18 @@ export default async function AdminPage() {
     signup_utm_medium: toMaybeString(r.signup_utm_medium),
     signup_utm_campaign: toMaybeString(r.signup_utm_campaign),
     heard_about_source: toMaybeString(r.heard_about_source),
+    beta_tester: r.beta_tester === true,
+    beta_plan_tier: toMaybeString(r.beta_plan_tier),
   }));
+
+  const filteredProfiles =
+    betaFilterNorm === "beta"
+      ? profiles.filter((p) => p.beta_tester)
+      : betaFilterNorm === "non-beta"
+        ? profiles.filter((p) => !p.beta_tester)
+        : profiles;
+
+  const profilesForActivity = filteredProfiles;
 
   const jobsByProfile = new Map<string, number>();
   const contractsSentByProfile = new Map<string, number>();
@@ -273,11 +294,13 @@ export default async function AdminPage() {
     ["Payments recorded", [...paymentsByProfile.values()].reduce((a, b) => a + b, 0)],
   ] as const;
 
-  const userActivity = profiles.map((p) => ({
+  const userActivity = profilesForActivity.map((p) => ({
     profileId: p.id,
     email: authEmailByUserId.get(p.user_id) || "-",
     business: p.business_name || "-",
     created: p.created_at,
+    betaTester: p.beta_tester,
+    betaPlan: p.beta_plan_tier || "—",
     source:
       [p.signup_utm_source, p.signup_utm_medium, p.signup_utm_campaign]
         .filter(Boolean)
@@ -458,13 +481,38 @@ export default async function AdminPage() {
         <SourceTable title="Activation by source" rows={activationBySource} />
 
         <section className="rounded-lg border border-zinc-200 bg-white p-4 sm:p-5">
-          <h2 className="text-base font-semibold text-zinc-900">User / product activity</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-base font-semibold text-zinc-900">User / product activity</h2>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", "All users"],
+                  ["beta", "Beta testers"],
+                  ["non-beta", "Non-beta users"],
+                ] as const
+              ).map(([value, label]) => (
+                <Link
+                  key={value}
+                  href={value === "all" ? "/admin" : `/admin?beta=${value}`}
+                  className={`inline-flex min-h-[36px] items-center rounded-lg px-3 py-1.5 text-sm font-medium ${
+                    betaFilterNorm === value
+                      ? "bg-[#2436BB] text-white"
+                      : "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"
+                  }`}
+                >
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </div>
           <div className="mt-3 overflow-x-auto">
-            <table className="min-w-[1000px] text-left text-sm">
+            <table className="min-w-[1100px] text-left text-sm">
               <thead className="bg-zinc-50">
                 <tr>
                   <th className="px-3 py-2 font-medium text-zinc-700">Email</th>
                   <th className="px-3 py-2 font-medium text-zinc-700">Business</th>
+                  <th className="px-3 py-2 font-medium text-zinc-700">Beta</th>
+                  <th className="px-3 py-2 font-medium text-zinc-700">Beta plan</th>
                   <th className="px-3 py-2 font-medium text-zinc-700">Created</th>
                   <th className="px-3 py-2 font-medium text-zinc-700">Source</th>
                   <th className="px-3 py-2 font-medium text-zinc-700">Jobs</th>
@@ -489,6 +537,8 @@ export default async function AdminPage() {
                       </Link>
                     </td>
                     <td className="px-3 py-2 text-zinc-700">{u.business}</td>
+                    <td className="px-3 py-2 text-zinc-700">{u.betaTester ? "Yes" : "No"}</td>
+                    <td className="px-3 py-2 text-zinc-600">{u.betaPlan}</td>
                     <td className="px-3 py-2 text-zinc-600">{formatDate(u.created)}</td>
                     <td className="px-3 py-2 text-zinc-600">{u.source}</td>
                     <td className="px-3 py-2 text-zinc-700">{u.jobs}</td>
@@ -503,7 +553,7 @@ export default async function AdminPage() {
                 ))}
                 {userActivity.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="px-3 py-6 text-center text-zinc-500">
+                    <td colSpan={14} className="px-3 py-6 text-center text-zinc-500">
                       No users yet
                     </td>
                   </tr>

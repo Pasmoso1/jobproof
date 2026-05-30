@@ -162,7 +162,9 @@ export default async function AdminUserDetailPage({
       stripe_connect_onboarding_complete,
       stripe_connect_charges_enabled,
       stripe_connect_payouts_enabled,
-      stripe_connect_details_submitted
+      stripe_connect_details_submitted,
+      beta_tester,
+      beta_plan_tier
     `
     )
     .eq("id", userId)
@@ -492,8 +494,19 @@ export default async function AdminUserDetailPage({
         <Section title="Stripe billing / connect">
           <DefList
             rows={[
-              { label: "subscription_status", value: toMaybeString(profile.subscription_status) ?? "" },
               { label: "plan_tier", value: toMaybeString(profile.plan_tier) ?? "" },
+              {
+                label: "Beta tester",
+                value: profile.beta_tester === true ? "Yes" : "No",
+              },
+              {
+                label: "Beta plan",
+                value:
+                  profile.beta_tester === true
+                    ? toMaybeString(profile.beta_plan_tier) ?? toMaybeString(profile.plan_tier) ?? "—"
+                    : "—",
+              },
+              { label: "subscription_status", value: toMaybeString(profile.subscription_status) ?? "" },
               { label: "pricing_version", value: toMaybeString(profile.pricing_version) ?? "" },
               { label: "stripe_customer_id", value: toMaybeString(profile.stripe_customer_id) ?? "" },
               { label: "stripe_subscription_id", value: toMaybeString(profile.stripe_subscription_id) ?? "" },

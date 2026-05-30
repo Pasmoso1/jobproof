@@ -1,4 +1,5 @@
 export type ProfileSubscriptionGate = {
+  beta_tester?: boolean | null;
   subscription_status?: string | null;
   grace_period_ends_at?: string | null;
   trial_ends_at?: string | null;
@@ -118,6 +119,17 @@ function allWrites(
  * without beta, trialing with ended trial, unknown statuses.
  */
 export function getSubscriptionAccess(input: ProfileSubscriptionGate): SubscriptionAccessResult {
+  if (input.beta_tester === true) {
+    return allWrites(true, {
+      isReadOnlyMode: false,
+      reason: "Beta tester access.",
+      billingReasonLabel: null,
+      statusLabel: "Beta tester",
+      readOnlyActionError: null,
+      freeBetaHelperCopy: null,
+    });
+  }
+
   const status = String(input.subscription_status ?? "").trim().toLowerCase();
   const trialEndedWhileTrialing =
     isTrialLikeStatus(status) && isPastOrNowIso(input.trial_ends_at);

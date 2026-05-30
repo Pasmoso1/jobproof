@@ -9,13 +9,16 @@ import {
 } from "@/lib/subscription-access";
 import {
   billingUiTierFromProfile,
+  betaTesterBillingBannerMessage,
   formatSubscriptionStatusLabel,
   getPlanDisplayLines,
+  getPlanDisplayLinesForProfile,
   getUpgradeProfessionalButtonLabel,
   parseBillingPlanTier,
   parseBillingPricingVersion,
   professionalTrialingBillingBannerMessage,
 } from "@/lib/billing-plan-display";
+import { isBetaTesterProfile } from "@/lib/beta-tester";
 import {
   shouldAutoSyncStripeSubscriptionOnBillingLoad,
   syncStripeSubscriptionToProfile,
@@ -132,6 +135,7 @@ export default async function BillingSettingsPage({
   }
 
   const access = getSubscriptionAccess(profile);
+  const isBetaTester = isBetaTesterProfile(profile);
   const checkoutSuccess = checkoutState === "success";
   const billingComplete = isBillingProfileComplete(profile);
   const webhookPending = checkoutSuccess && !billingComplete;
@@ -188,7 +192,8 @@ export default async function BillingSettingsPage({
     trimOrEmpty(profile.stripe_connect_account_id) || "—";
 
   const planLines =
-    planTier && pricingVersion ? getPlanDisplayLines(planTier, pricingVersion) : null;
+    getPlanDisplayLinesForProfile(profile) ??
+    (planTier && pricingVersion ? getPlanDisplayLines(planTier, pricingVersion) : null);
 
   const billingUiTier = billingUiTierFromProfile(profile);
   const pricingForUpgrade = parseBillingPricingVersion(pricingVersionRaw) ?? "founder";
@@ -242,6 +247,13 @@ export default async function BillingSettingsPage({
       ) : null}
 
       {/* Banner priority: 1 read-only 2 scheduled cancel 3 checkout / beta / past due 4 trialing */}
+      {isBetaTester ? (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900">
+          <p className="font-medium">Beta tester</p>
+          <p className="mt-1">{betaTesterBillingBannerMessage(profile)}</p>
+        </div>
+      ) : null}
+
       {!access.isReadOnlyMode ? null : (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <p className="font-medium">Read-only mode enabled</p>
@@ -362,7 +374,9 @@ export default async function BillingSettingsPage({
           </div>
           <div>
             <dt className="text-zinc-500">Status</dt>
-            <dd className="font-medium text-zinc-900">{statusCell}</dd>
+            <dd className="font-medium text-zinc-900">
+              {isBetaTester ? "Beta tester (free access)" : statusCell}
+            </dd>
           </div>
           <div>
             <dt className="text-zinc-500">Current period end</dt>
@@ -374,14 +388,24 @@ export default async function BillingSettingsPage({
           </div>
           <div className="sm:col-span-2">
             <dt className="text-zinc-500">Stripe customer</dt>
-            <dd className="font-mono text-xs text-zinc-700">{stripeCustomerDisplay}</dd>
+            <dd className="font-mono text-xs text-zinc-700">
+              {isBetaTester ? "Not required during beta" : stripeCustomerDisplay}
+            </dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-zinc-600">
-          Stripe will send receipts and billing emails to your account email.
-        </p>
+        {!isBetaTester ? (
+          <p className="mt-3 text-xs text-zinc-600">
+            Stripe will send receipts and billing emails to your account email.
+          </p>
+        ) : (
+          <p className="mt-3 text-xs text-zinc-600">
+            Paid billing will be available when beta testing ends. Your selected plan is saved for
+            future conversion.
+          </p>
+        )}
         <div className="mt-4">
           <BillingActionButtons
+            isBetaTester={isBetaTester}
             billingUiTier={billingUiTier}
             upgradeProfessionalLabel={upgradeProfessionalLabel}
             hasActiveSubscription={hasActiveSubscription}

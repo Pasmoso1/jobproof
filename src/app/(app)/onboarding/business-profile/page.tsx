@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/app/(app)/actions";
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
+import { BETA_PLAN_ONBOARDING_PATH, needsBetaPlanSelection } from "@/lib/beta-tester";
 import { OnboardingBusinessForm } from "./onboarding-business-form";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,9 @@ export default async function OnboardingBusinessProfilePage({
       postal_code: profile.postal_code,
     })
   ) {
+    if (needsBetaPlanSelection(profile)) {
+      redirect(params.redirect ?? BETA_PLAN_ONBOARDING_PATH);
+    }
     redirect(params.redirect ?? "/dashboard");
   }
 

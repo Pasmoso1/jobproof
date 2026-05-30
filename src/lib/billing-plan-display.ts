@@ -14,10 +14,16 @@ export function parseBillingPricingVersion(raw: string): BillingPricingVersion |
 export type BillingUiTier = "none" | "essential" | "professional";
 
 export function billingUiTierFromProfile(p: {
+  beta_tester?: boolean | null;
+  beta_plan_tier?: string | null;
   plan_tier?: string | null;
   stripe_subscription_id?: string | null;
   subscription_status?: string | null;
 }): BillingUiTier {
+  if (p.beta_tester === true) {
+    const tier = parseBillingPlanTier(String(p.beta_plan_tier ?? p.plan_tier ?? ""));
+    return tier ?? "none";
+  }
   const tier = parseBillingPlanTier(String(p.plan_tier ?? ""));
   if (!tier) return "none";
   const subId = String(p.stripe_subscription_id ?? "").trim();
@@ -73,15 +79,40 @@ export function professionalTrialingBillingBannerMessage(
 
 export function getPlanDisplayLines(
   planTier: BillingPlanTier,
-  pricingVersion: BillingPricingVersion
+  pricingVersion: BillingPricingVersion,
+  options?: { betaTester?: boolean }
 ): PlanDisplay {
   const tier = TIER_NAME[planTier];
   const recurring = (pricingVersion === "founder" ? FOUNDER : STANDARD)[planTier];
-  const planLine =
-    pricingVersion === "founder"
+  const planLine = options?.betaTester
+    ? `${tier} (Beta Tester)`
+    : pricingVersion === "founder"
       ? `${tier} Founder — ${recurring}`
       : `${tier} — ${recurring}`;
   return { planLine, afterTrialLine: recurring };
+}
+
+export function getPlanDisplayLinesForProfile(p: {
+  beta_tester?: boolean | null;
+  beta_plan_tier?: string | null;
+  plan_tier?: string | null;
+  pricing_version?: string | null;
+}): PlanDisplay | null {
+  const tier =
+    parseBillingPlanTier(String(p.beta_plan_tier ?? "")) ??
+    parseBillingPlanTier(String(p.plan_tier ?? ""));
+  if (!tier) return null;
+  const pricing = parseBillingPricingVersion(String(p.pricing_version ?? "")) ?? "standard";
+  return getPlanDisplayLines(tier, pricing, { betaTester: p.beta_tester === true });
+}
+
+export function betaTesterBillingBannerMessage(p: {
+  beta_plan_tier?: string | null;
+  plan_tier?: string | null;
+}): string {
+  const tier = parseBillingPlanTier(String(p.beta_plan_tier ?? p.plan_tier ?? ""));
+  const label = tier === "professional" ? "Professional" : tier === "essential" ? "Essential" : "selected";
+  return `Thank you for helping test JobProof. You currently have free beta access to the ${label} plan.`;
 }
 
 export function formatSubscriptionStatusLabel(raw: string): string {

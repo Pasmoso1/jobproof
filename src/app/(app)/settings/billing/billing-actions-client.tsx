@@ -21,6 +21,7 @@ function formatActionError(e: unknown): string {
 }
 
 export function BillingActionButtons({
+  isBetaTester = false,
   billingUiTier,
   upgradeProfessionalLabel,
   hasActiveSubscription,
@@ -31,6 +32,7 @@ export function BillingActionButtons({
   hasPendingEssentialDowngrade,
   subscriptionIsTrialing,
 }: {
+  isBetaTester?: boolean;
   billingUiTier: BillingUiTier;
   upgradeProfessionalLabel: string;
   hasActiveSubscription: boolean;
@@ -45,6 +47,14 @@ export function BillingActionButtons({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  if (isBetaTester) {
+    return (
+      <p className="text-sm text-zinc-600">
+        Subscription changes are paused during the beta. You have full access to your selected plan.
+      </p>
+    );
+  }
 
   async function goCheckout(label: "essential" | "professional", planTier: BillingPlanTier) {
     setError(null);
