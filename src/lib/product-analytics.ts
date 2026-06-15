@@ -21,7 +21,11 @@ export const PRODUCT_ANALYTICS_EVENTS = {
   subscription_downgraded: "subscription_downgraded",
   subscription_canceled: "subscription_canceled",
   read_only_mode_triggered: "read_only_mode_triggered",
+  plan_selected: "plan_selected",
+  subscription_checkout_started: "subscription_checkout_started",
+  /** @deprecated Legacy beta onboarding — no longer fired for new signups. */
   beta_tester_created: "beta_tester_created",
+  /** @deprecated Legacy beta onboarding — no longer fired for new signups. */
   beta_plan_selected: "beta_plan_selected",
 } as const;
 

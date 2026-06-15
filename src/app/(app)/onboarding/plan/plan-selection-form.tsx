@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { BillingPlanTier } from "@/lib/stripe";
-import { selectBetaPlan } from "./actions";
+import type { BillingPlanTier, BillingPricingVersion } from "@/lib/stripe";
+import { getPlanDisplayLines } from "@/lib/billing-plan-display";
+import { startOnboardingPlanCheckout } from "./actions";
 
 function FeatureList({ items }: { items: string[] }) {
   return (
@@ -19,20 +20,25 @@ function FeatureList({ items }: { items: string[] }) {
   );
 }
 
-export function BetaPlanSelectionForm() {
+export function PlanSelectionForm({ pricingVersion }: { pricingVersion: BillingPricingVersion }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<BillingPlanTier | null>(null);
+
+  const essentialPricing = getPlanDisplayLines("essential", pricingVersion);
+  const professionalPricing = getPlanDisplayLines("professional", pricingVersion);
 
   async function choose(planTier: BillingPlanTier) {
     setError(null);
     setLoading(planTier);
     try {
-      const result = await selectBetaPlan(planTier);
-      if (result && "success" in result && !result.success) {
+      const result = await startOnboardingPlanCheckout(planTier);
+      if (!result.success) {
         setError(result.error);
+        return;
       }
+      window.location.href = result.url;
     } catch {
-      /* redirect on success */
+      setError("Could not start checkout. Please try again.");
     } finally {
       setLoading(null);
     }
@@ -41,10 +47,12 @@ export function BetaPlanSelectionForm() {
   return (
     <div className="space-y-8">
       <div className="rounded-xl border border-[#2436BB]/20 bg-[#2436BB]/5 px-4 py-3 text-sm text-zinc-700">
-        <p className="font-medium text-zinc-900">All beta plans are free during testing.</p>
+        <p className="font-medium text-zinc-900">
+          Choose the plan that fits your business.
+        </p>
         <p className="mt-1">
-          Choose the plan that best matches how you run your business. Your selection helps us build the right version
-          of JobProof for contractors like you.
+          You&apos;ll start with a free trial, and billing begins after the trial ends. A payment method
+          is required to continue.
         </p>
       </div>
 
@@ -64,8 +72,8 @@ export function BetaPlanSelectionForm() {
               <span className="text-lg font-semibold text-zinc-900">Essential</span>
               <p className="mt-1 text-sm font-medium text-zinc-700">Best for solo contractors</p>
             </div>
-            <span className="shrink-0 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600">
-              normally <span className="line-through">$29/mo</span>
+            <span className="shrink-0 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-semibold text-zinc-800">
+              {essentialPricing.afterTrialLine}
             </span>
           </div>
 
@@ -82,7 +90,7 @@ export function BetaPlanSelectionForm() {
           />
 
           <span className="mt-auto pt-4 text-sm font-semibold text-[#2436BB]">
-            {loading === "essential" ? "Saving…" : "Choose Essential"}
+            {loading === "essential" ? "Redirecting to checkout…" : "Choose Essential"}
           </span>
         </button>
 
@@ -97,8 +105,8 @@ export function BetaPlanSelectionForm() {
               <span className="text-lg font-semibold text-zinc-900">Professional</span>
               <p className="mt-1 text-sm font-medium text-zinc-700">Best for growing businesses</p>
             </div>
-            <span className="shrink-0 rounded-full border border-[#2436BB]/25 bg-[#2436BB]/5 px-2.5 py-1 text-xs font-medium text-zinc-700">
-              normally <span className="line-through">$59/mo</span>
+            <span className="shrink-0 rounded-full border border-[#2436BB]/25 bg-[#2436BB]/5 px-2.5 py-1 text-xs font-semibold text-zinc-800">
+              {professionalPricing.afterTrialLine}
             </span>
           </div>
 
@@ -114,7 +122,7 @@ export function BetaPlanSelectionForm() {
           />
 
           <span className="mt-auto pt-4 text-sm font-semibold text-[#2436BB]">
-            {loading === "professional" ? "Saving…" : "Choose Professional"}
+            {loading === "professional" ? "Redirecting to checkout…" : "Choose Professional"}
           </span>
         </button>
       </div>
@@ -165,7 +173,7 @@ export function BetaPlanSelectionForm() {
         </div>
 
         <p className="text-sm text-zinc-600">
-          Both plans are free during beta testing. Choose the plan you would realistically use after launch.
+          7-day free trial on all plans. You won&apos;t be charged until the trial ends.
         </p>
       </section>
     </div>

@@ -398,6 +398,10 @@ export async function processStripeBillingWebhook(
     case "customer.subscription.trial_will_end":
       break;
 
+    case "invoice.finalized":
+      /* Acknowledged for live/test parity; no profile mutation required today. */
+      break;
+
     case "account.updated": {
       const account = event.data.object as Stripe.Account;
       let profileId = String(account.metadata?.profile_id ?? "");

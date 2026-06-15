@@ -492,6 +492,12 @@ export default async function AdminUserDetailPage({
         </Section>
 
         <Section title="Stripe billing / connect">
+          {profile.beta_tester === true ? (
+            <p className="mb-3 text-sm text-amber-900">
+              Legacy beta tester — free access without Stripe subscription. Beta mode is no longer used for
+              new signups.
+            </p>
+          ) : null}
           <DefList
             rows={[
               { label: "plan_tier", value: toMaybeString(profile.plan_tier) ?? "" },

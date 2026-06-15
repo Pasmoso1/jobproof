@@ -30,6 +30,7 @@ import { DashboardEmptyOnboarding } from "@/components/onboarding/dashboard-empt
 import { OnboardingProgressCard } from "@/components/onboarding/onboarding-progress-card";
 import { trackContractorMilestoneSafe } from "@/lib/contractor-milestones";
 import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
+import { syncSubscriptionAfterStripeReturn } from "@/app/(app)/settings/billing/actions";
 
 function formatStorage(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -37,7 +38,30 @@ function formatStorage(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default async function DashboardPage() {
+function firstSearchParam(v: string | string[] | undefined): string {
+  if (v == null) return "";
+  const raw = Array.isArray(v) ? v[0] : v;
+  return String(raw ?? "").trim();
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const checkoutState = firstSearchParam(sp.checkout);
+  const checkoutSessionId = firstSearchParam(sp.session_id);
+  if (checkoutState === "success") {
+    try {
+      await syncSubscriptionAfterStripeReturn({
+        checkoutSessionId: checkoutSessionId || null,
+      });
+    } catch {
+      /* Stripe sync is best-effort; webhooks may have already updated the profile. */
+    }
+  }
+
   const [profile, activeCount, storageBytes, jobs, receivables, supabase] = await Promise.all([
     getProfile(),
     getActiveJobsCount(),

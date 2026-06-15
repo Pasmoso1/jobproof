@@ -1,9 +1,13 @@
+import { runStripeStartupSafetyChecks } from "@/lib/stripe-readiness";
+
 /**
  * Runs once when the Node.js server starts (not in Edge).
  * Safe diagnostics only when JOBPROOF_EMAIL_DEBUG is set — never logs secrets.
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+
+  runStripeStartupSafetyChecks();
 
   const v = process.env.JOBPROOF_EMAIL_DEBUG?.trim().toLowerCase();
   const debug = v === "1" || v === "true" || v === "yes";

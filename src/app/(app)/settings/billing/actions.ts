@@ -10,7 +10,7 @@ import {
 } from "@/lib/stripe-customer";
 import { insertBillingEventLog } from "@/lib/billing-audit-log";
 import { trackContractorMilestoneSafe } from "@/lib/contractor-milestones";
-import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
+import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
 import { sendCancellationResumedEmail } from "@/lib/billing-email-events";
 import {
   getSubscriptionAccess,
@@ -29,6 +29,7 @@ import {
   getStripePriceId,
   resolveAppUrl,
 } from "@/lib/stripe";
+import { betaTesterStripeBillingBlocked } from "@/lib/beta-tester";
 import { subscriptionCancellationDbFields } from "@/lib/stripe-subscription-cancellation";
 import {
   scheduleEssentialDowngradeAtPeriodEnd,
@@ -78,6 +79,8 @@ export type SubscriptionCheckoutSessionResult =
   | { success: true; url: string }
   | { success: false; error: string };
 
+export type SubscriptionCheckoutReturnTo = "billing" | "onboarding";
+
 export type UpgradeSubscriptionResult =
   | { success: true; message: string; trialPreserved: boolean }
   | { success: false; error: string };
@@ -124,8 +127,15 @@ async function requireContractorProfile() {
 
 export async function createSubscriptionCheckoutSession(params: {
   planTier: BillingPlanTier;
+  returnTo?: SubscriptionCheckoutReturnTo;
 }): Promise<SubscriptionCheckoutSessionResult> {
   const { supabase, user, profile } = await requireContractorProfile();
+  const returnTo = params.returnTo ?? "billing";
+
+  const betaBlock = betaTesterStripeBillingBlocked(profile);
+  if (betaBlock.blocked) {
+    return { success: false, error: betaBlock.error };
+  }
 
   try {
     const stripe = getStripe();
@@ -163,12 +173,21 @@ export async function createSubscriptionCheckoutSession(params: {
     }
 
     const appUrl = resolveAppUrl();
+    const successUrl =
+      returnTo === "onboarding"
+        ? `${appUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`
+        : `${appUrl}/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl =
+      returnTo === "onboarding"
+        ? `${appUrl}/onboarding/plan?checkout=cancelled`
+        : `${appUrl}/settings/billing?checkout=cancelled`;
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
-      success_url: `${appUrl}/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/settings/billing?checkout=cancelled`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      payment_method_collection: "always",
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
         trial_period_days: 7,
@@ -182,6 +201,7 @@ export async function createSubscriptionCheckoutSession(params: {
         profile_id: String(profile.id),
         plan_tier: params.planTier,
         pricing_version: pricingVersion,
+        checkout_source: returnTo,
       },
     });
 
@@ -191,6 +211,16 @@ export async function createSubscriptionCheckoutSession(params: {
         error: "Checkout did not return a URL. Please try again or contact support.",
       };
     }
+
+    if (returnTo === "onboarding") {
+      trackProductEventSafe({
+        profileId: String(profile.id),
+        eventName: PRODUCT_ANALYTICS_EVENTS.subscription_checkout_started,
+        source: "onboarding_plan",
+        metadata: { selected_plan: params.planTier, pricing_version: pricingVersion },
+      });
+    }
+
     return { success: true, url: session.url };
   } catch (err) {
     if (isStripeCustomerMissingError(err)) {
@@ -234,6 +264,10 @@ export async function createSubscriptionCheckoutSession(params: {
  */
 export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscriptionResult> {
   const { supabase, user, profile } = await requireContractorProfile();
+  const betaBlock = betaTesterStripeBillingBlocked(profile);
+  if (betaBlock.blocked) {
+    return { success: false, error: betaBlock.error };
+  }
   const oldSubscriptionStatusForAudit = String(profile.subscription_status ?? "");
 
   if (tierFromMetadata(profile.plan_tier) !== "essential") {
@@ -417,6 +451,10 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
  */
 export async function downgradeSubscriptionToEssential(): Promise<DowngradeSubscriptionResult> {
   const { supabase, user, profile } = await requireContractorProfile();
+  const betaBlock = betaTesterStripeBillingBlocked(profile);
+  if (betaBlock.blocked) {
+    return { success: false, error: betaBlock.error };
+  }
   const oldSubscriptionStatusForAudit = String(profile.subscription_status ?? "");
 
   if (tierFromMetadata(profile.plan_tier) !== "professional") {
@@ -656,6 +694,10 @@ export async function downgradeSubscriptionToEssential(): Promise<DowngradeSubsc
 
 export async function createBillingPortalSession(): Promise<BillingPortalSessionResult> {
   const { supabase, profile } = await requireContractorProfile();
+  const betaBlock = betaTesterStripeBillingBlocked(profile);
+  if (betaBlock.blocked) {
+    return { success: false, error: betaBlock.error };
+  }
   const customerId = (profile.stripe_customer_id as string | null)?.trim() || null;
   if (!customerId) {
     return {
@@ -783,6 +825,10 @@ export type ResumeScheduledSubscriptionResult =
  */
 export async function resumeScheduledSubscriptionCancellation(): Promise<ResumeScheduledSubscriptionResult> {
   const { supabase, user, profile } = await requireContractorProfile();
+  const betaBlock = betaTesterStripeBillingBlocked(profile);
+  if (betaBlock.blocked) {
+    return { success: false, error: betaBlock.error };
+  }
   const subId = (profile.stripe_subscription_id as string | null)?.trim() || null;
   if (!subId) {
     return { success: false, error: "No Stripe subscription found." };

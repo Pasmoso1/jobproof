@@ -1,16 +1,19 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseBillingPlanTier } from "@/lib/billing-plan-display";
 import type { BillingPlanTier } from "@/lib/stripe";
 import { isBetaTesterProfile, needsBetaPlanSelection } from "@/lib/beta-tester";
 import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
+import {
+  createSubscriptionCheckoutSession,
+  type SubscriptionCheckoutSessionResult,
+} from "@/app/(app)/settings/billing/actions";
 
-export async function selectBetaPlan(
+export async function startOnboardingPlanCheckout(
   planTier: BillingPlanTier
-): Promise<{ success: false; error: string } | { success: true }> {
+): Promise<SubscriptionCheckoutSessionResult> {
   const tier = parseBillingPlanTier(planTier);
   if (!tier) {
     return { success: false, error: "Please choose Essential or Professional." };
@@ -24,7 +27,7 @@ export async function selectBetaPlan(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, beta_tester, stripe_subscription_id, plan_tier")
+    .select("id, beta_tester, stripe_subscription_id, subscription_status")
     .eq("user_id", user.id)
     .single();
 
@@ -40,39 +43,12 @@ export async function selectBetaPlan(
     redirect("/dashboard");
   }
 
-  const profileId = String(profile.id);
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      beta_tester: true,
-      beta_plan_tier: tier,
-      plan_tier: tier,
-      pricing_version: "standard",
-      subscription_status: "active",
-    })
-    .eq("id", profileId)
-    .eq("user_id", user.id);
-
-  if (error) {
-    console.error("[selectBetaPlan] update failed", error);
-    return { success: false, error: "Could not save your plan. Please try again." };
-  }
-
   trackProductEventSafe({
-    profileId,
-    eventName: PRODUCT_ANALYTICS_EVENTS.beta_tester_created,
-    source: "onboarding_plan",
-    metadata: { selected_plan: tier },
-  });
-  trackProductEventSafe({
-    profileId,
-    eventName: PRODUCT_ANALYTICS_EVENTS.beta_plan_selected,
+    profileId: String(profile.id),
+    eventName: PRODUCT_ANALYTICS_EVENTS.plan_selected,
     source: "onboarding_plan",
     metadata: { selected_plan: tier },
   });
 
-  revalidatePath("/dashboard");
-  revalidatePath("/settings/billing");
-  revalidatePath("/onboarding/plan");
-  redirect("/dashboard");
+  return createSubscriptionCheckoutSession({ planTier: tier, returnTo: "onboarding" });
 }
