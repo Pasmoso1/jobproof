@@ -49,6 +49,12 @@ export default async function AppLayout({
               Estimates
             </Link>
             <Link
+              href="/quote-requests"
+              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
+            >
+              Quote Requests
+            </Link>
+            <Link
               href="/jobs/create"
               className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
             >

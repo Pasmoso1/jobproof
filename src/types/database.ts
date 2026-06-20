@@ -99,6 +99,10 @@ export interface Profile {
   onboarding_completed_at?: string | null;
   beta_tester?: boolean;
   beta_plan_tier?: "essential" | "professional" | null;
+  quote_slug?: string | null;
+  quote_logo_url?: string | null;
+  quote_pricing_profile?: "budget" | "average" | "premium" | null;
+  quote_primary_trade?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -416,4 +420,35 @@ export interface Invoice {
   notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type QuoteRequestStatusType =
+  | "new"
+  | "reviewed"
+  | "responded"
+  | "site_visit_requested"
+  | "converted"
+  | "closed";
+
+export interface QuoteRequest {
+  id: string;
+  contractor_id: string;
+  status: QuoteRequestStatusType;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string | null;
+  property_address: string;
+  project_type: string;
+  description: string;
+  is_urgent: boolean;
+  submitted_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteRequestAttachment {
+  id: string;
+  quote_request_id: string;
+  file_path: string;
+  created_at: string;
 }

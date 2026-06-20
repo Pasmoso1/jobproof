@@ -1,0 +1,108 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+import { validateQuoteRequestSettings } from "@/lib/validation/quote-request-settings";
+
+export type QuoteRequestSettingsResult =
+  | { success: true }
+  | { success: false; error: string; fieldErrors?: Record<string, string> };
+
+export async function updateQuoteRequestSettings(
+  formData: FormData
+): Promise<QuoteRequestSettingsResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login?next=/settings/quote-requests");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, quote_slug")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile?.id) {
+    return { success: false, error: "Profile not found." };
+  }
+
+  const validation = validateQuoteRequestSettings({
+    quoteSlug: String(formData.get("quoteSlug") ?? ""),
+    businessName: String(formData.get("businessName") ?? ""),
+    businessPhone: String(formData.get("businessPhone") ?? ""),
+    logoUrl: String(formData.get("logoUrl") ?? ""),
+    pricingProfile: String(formData.get("pricingProfile") ?? ""),
+    primaryTrade: String(formData.get("primaryTrade") ?? ""),
+  });
+
+  if (!validation.ok) {
+    const firstError = Object.values(validation.fieldErrors)[0] ?? "Please fix the errors below.";
+    return { success: false, error: firstError, fieldErrors: validation.fieldErrors };
+  }
+
+  const { quoteSlug, businessName, businessPhone, logoUrl, pricingProfile, primaryTrade } =
+    validation.data;
+
+  if (profile.quote_slug && profile.quote_slug.toLowerCase() !== quoteSlug) {
+    const { data: taken } = await supabase
+      .from("profiles")
+      .select("id")
+      .ilike("quote_slug", quoteSlug)
+      .neq("id", profile.id)
+      .maybeSingle();
+
+    if (taken?.id) {
+      return {
+        success: false,
+        error: "This quote page URL is already taken. Choose a different one.",
+        fieldErrors: { quoteSlug: "This URL is already in use." },
+      };
+    }
+  } else if (!profile.quote_slug) {
+    const { data: taken } = await supabase
+      .from("profiles")
+      .select("id")
+      .ilike("quote_slug", quoteSlug)
+      .neq("id", profile.id)
+      .maybeSingle();
+
+    if (taken?.id) {
+      return {
+        success: false,
+        error: "This quote page URL is already taken. Choose a different one.",
+        fieldErrors: { quoteSlug: "This URL is already in use." },
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      quote_slug: quoteSlug,
+      business_name: businessName,
+      phone: businessPhone,
+      quote_logo_url: logoUrl,
+      quote_pricing_profile: pricingProfile,
+      quote_primary_trade: primaryTrade,
+    })
+    .eq("id", profile.id)
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error("[updateQuoteRequestSettings] failed", error);
+    if (error.code === "23505") {
+      return {
+        success: false,
+        error: "This quote page URL is already taken.",
+        fieldErrors: { quoteSlug: "This URL is already in use." },
+      };
+    }
+    return { success: false, error: "Could not save settings. Please try again." };
+  }
+
+  revalidatePath("/settings/quote-requests");
+  revalidatePath(`/quote/${quoteSlug}`);
+  return { success: true };
+}

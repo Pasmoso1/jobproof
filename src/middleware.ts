@@ -6,10 +6,10 @@ import {
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
 import { BETA_PLAN_ONBOARDING_PATH, needsBetaPlanSelection } from "@/lib/beta-tester";
 
-const PROTECTED_PATHS = ["/dashboard", "/jobs", "/estimates", "/settings", "/onboarding"];
+const PROTECTED_PATHS = ["/dashboard", "/jobs", "/estimates", "/quote-requests", "/settings", "/onboarding"];
 const AUTH_PATHS = ["/login", "/signup"];
 const BUSINESS_ONBOARDING_PATH = "/onboarding/business-profile";
-const PATHS_REQUIRING_ONBOARDING = ["/dashboard", "/jobs", "/estimates", "/settings"];
+const PATHS_REQUIRING_ONBOARDING = ["/dashboard", "/jobs", "/estimates", "/quote-requests", "/settings"];
 
 function isProtected(pathname: string): boolean {
   return PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
