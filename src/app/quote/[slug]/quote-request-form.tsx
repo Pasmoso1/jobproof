@@ -4,6 +4,21 @@ import { useState, useRef } from "react";
 import { submitPublicQuoteRequest } from "./actions";
 import { MAX_QUOTE_REQUEST_PHOTOS, MAX_QUOTE_REQUEST_PHOTO_BYTES } from "@/lib/quote-requests/constants";
 
+const FIELD_INPUT_CLASS =
+  "mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-base text-zinc-900 placeholder:text-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB] sm:text-sm";
+
+const PHOTO_BUTTON_CLASS =
+  "inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-50 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]";
+
+function mergePhotoFiles(existing: File[], incoming: FileList | File[]): File[] {
+  const merged = [...existing];
+  for (const file of Array.from(incoming)) {
+    if (merged.length >= MAX_QUOTE_REQUEST_PHOTOS) break;
+    merged.push(file);
+  }
+  return merged;
+}
+
 export function QuoteRequestForm({
   slug,
   contractorPhone,
@@ -13,11 +28,28 @@ export function QuoteRequestForm({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [photoCount, setPhotoCount] = useState(0);
-  const formRef = useRef<HTMLFormElement>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  function onPhotosChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setPhotoCount(e.target.files?.length ?? 0);
+  function onUploadPhotosChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (files?.length) {
+      setPhotos((prev) => mergePhotoFiles(prev, files));
+    }
+    e.target.value = "";
+  }
+
+  function onCameraPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (files?.length) {
+      setPhotos((prev) => mergePhotoFiles(prev, files));
+    }
+    e.target.value = "";
+  }
+
+  function removePhoto(index: number) {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -26,6 +58,10 @@ export function QuoteRequestForm({
     setLoading(true);
     try {
       const formData = new FormData(e.currentTarget);
+      formData.delete("photos");
+      for (const photo of photos) {
+        formData.append("photos", photo);
+      }
       const result = await submitPublicQuoteRequest(slug, formData);
       if (result && "success" in result && !result.success) {
         setError(result.error);
@@ -37,8 +73,10 @@ export function QuoteRequestForm({
     }
   }
 
+  const maxPhotoMb = MAX_QUOTE_REQUEST_PHOTO_BYTES / (1024 * 1024);
+
   return (
-    <form ref={formRef} onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
       {error ? (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
@@ -52,7 +90,7 @@ export function QuoteRequestForm({
             name="customerName"
             required
             autoComplete="name"
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+            className={FIELD_INPUT_CLASS}
           />
         </label>
         <label className="block">
@@ -62,7 +100,7 @@ export function QuoteRequestForm({
             type="email"
             required
             autoComplete="email"
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+            className={FIELD_INPUT_CLASS}
           />
         </label>
         <label className="block">
@@ -71,7 +109,7 @@ export function QuoteRequestForm({
             name="customerPhone"
             type="tel"
             autoComplete="tel"
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+            className={FIELD_INPUT_CLASS}
           />
         </label>
         <label className="block sm:col-span-2">
@@ -80,7 +118,7 @@ export function QuoteRequestForm({
             name="propertyAddress"
             required
             autoComplete="street-address"
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+            className={FIELD_INPUT_CLASS}
           />
         </label>
         <label className="block sm:col-span-2">
@@ -90,7 +128,7 @@ export function QuoteRequestForm({
             required
             placeholder="e.g. Interior painting, deck repair"
             list="project-type-suggestions"
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+            className={FIELD_INPUT_CLASS}
           />
           <datalist id="project-type-suggestions">
             <option value="Interior painting" />
@@ -110,24 +148,76 @@ export function QuoteRequestForm({
             required
             rows={5}
             placeholder="Describe the project, timeline, and anything else we should know."
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
+            className={FIELD_INPUT_CLASS}
           />
         </label>
-        <label className="block sm:col-span-2">
-          <span className="text-sm font-medium text-zinc-800">Photos</span>
-          <input
-            name="photos"
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif"
-            multiple
-            onChange={onPhotosChange}
-            className="mt-1 w-full text-sm text-zinc-700 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-sm file:font-medium"
-          />
-          <p className="mt-1 text-xs text-zinc-500">
-            Up to {MAX_QUOTE_REQUEST_PHOTOS} photos, {MAX_QUOTE_REQUEST_PHOTO_BYTES / (1024 * 1024)} MB
-            each. {photoCount > 0 ? `${photoCount} selected.` : ""}
+
+        <div className="block sm:col-span-2">
+          <span className="text-sm font-medium text-zinc-800">Project photos</span>
+          <p className="mt-1 text-sm text-zinc-600">
+            Upload photos or take pictures with your phone camera. Photos help the contractor
+            understand the job before calling or visiting.
           </p>
-        </label>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => uploadInputRef.current?.click()}
+              className={PHOTO_BUTTON_CLASS}
+            >
+              Add photos or take pictures
+            </button>
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className={PHOTO_BUTTON_CLASS}
+            >
+              Take a photo
+            </button>
+          </div>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={onUploadPhotosChange}
+            className="sr-only"
+            aria-hidden
+            tabIndex={-1}
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={onCameraPhotoChange}
+            className="sr-only"
+            aria-hidden
+            tabIndex={-1}
+          />
+          <p className="mt-2 text-xs text-zinc-500">
+            Optional. Up to {MAX_QUOTE_REQUEST_PHOTOS} photos, {maxPhotoMb} MB each.
+            {photos.length > 0 ? ` ${photos.length} selected.` : ""}
+          </p>
+          {photos.length > 0 ? (
+            <ul className="mt-2 space-y-1">
+              {photos.map((file, index) => (
+                <li
+                  key={`${file.name}-${file.size}-${index}`}
+                  className="flex items-center justify-between gap-2 text-xs text-zinc-700"
+                >
+                  <span className="min-w-0 truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removePhoto(index)}
+                    className="shrink-0 text-zinc-500 hover:text-red-600"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       </div>
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
