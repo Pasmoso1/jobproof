@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { JobProofLogo } from "@/components/jobproof-logo";
 import { captureFirstTouchIfMissing, readFirstTouchClient } from "@/lib/attribution-first-touch";
 import { trackEvent } from "@/lib/metaPixel";
 
@@ -186,9 +188,9 @@ export default function Home() {
     <div className="min-h-screen bg-white font-sans">
       <header className="border-b border-zinc-200 bg-white px-6 py-4 sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <a href="/">
-            <img src="/jobproof-logo.png" alt="JobProof" className="h-10 w-auto" />
-          </a>
+          <Link href="/">
+            <JobProofLogo />
+          </Link>
           <a
             href="/login"
             className="text-sm font-medium text-[#2436BB] hover:text-[#1c2a96]"

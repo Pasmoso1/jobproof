@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { JobProofLogo } from "@/components/jobproof-logo";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import {
@@ -231,11 +232,7 @@ export default function SignupPage() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4">
         <div className="w-full max-w-sm">
           <Link href="/" className="mb-8 block text-center">
-            <img
-              src="/jobproof-logo.png"
-              alt="Job Proof"
-              className="mx-auto h-10 w-auto"
-            />
+            <JobProofLogo className="mx-auto h-10 w-auto" />
           </Link>
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
             <h1 className="text-xl font-semibold text-zinc-900">
@@ -296,11 +293,7 @@ export default function SignupPage() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4">
         <div className="w-full max-w-sm">
           <Link href="/" className="mb-8 block text-center">
-            <img
-              src="/jobproof-logo.png"
-              alt="Job Proof"
-              className="mx-auto h-10 w-auto"
-            />
+            <JobProofLogo className="mx-auto h-10 w-auto" />
           </Link>
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
             <h1 className="text-xl font-semibold text-zinc-900">
@@ -361,11 +354,7 @@ export default function SignupPage() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4">
         <div className="w-full max-w-sm">
           <Link href="/" className="mb-8 block text-center">
-            <img
-              src="/jobproof-logo.png"
-              alt="Job Proof"
-              className="mx-auto h-10 w-auto"
-            />
+            <JobProofLogo className="mx-auto h-10 w-auto" />
           </Link>
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
             <h1 className="text-xl font-semibold text-zinc-900">Check your email</h1>
@@ -419,11 +408,7 @@ export default function SignupPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4">
       <div className="w-full max-w-sm">
         <Link href="/" className="mb-8 block text-center">
-          <img
-            src="/jobproof-logo.png"
-            alt="Job Proof"
-            className="mx-auto h-10 w-auto"
-          />
+          <JobProofLogo className="mx-auto h-10 w-auto" />
         </Link>
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
           <h1 className="text-xl font-semibold text-zinc-900">Create account</h1>

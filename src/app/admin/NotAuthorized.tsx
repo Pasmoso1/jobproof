@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { JobProofLogo } from "@/components/jobproof-logo";
 import { parseAdminEmails } from "@/lib/admin-auth";
 import { AdminSignOutButton } from "@/app/admin/admin-sign-out-button";
 
@@ -10,11 +11,7 @@ export function AdminNotAuthorized({ userEmail }: { userEmail: string }) {
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-8">
       <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
         <Link href="/" className="mb-6 block text-center">
-          <img
-            src="/jobproof-logo.png"
-            alt="JobProof"
-            className="mx-auto h-9 w-auto"
-          />
+          <JobProofLogo className="mx-auto h-9 w-auto" />
         </Link>
 
         <h1 className="text-xl font-semibold text-zinc-900 sm:text-2xl">Admin access required</h1>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -611,9 +612,12 @@ export function AddUpdateForm({ jobId }: { jobId: string }) {
                   className="flex items-start gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3"
                 >
                   {imagePreviewUrls[i] ? (
-                    <img
+                    <Image
                       src={imagePreviewUrls[i]}
                       alt=""
+                      width={64}
+                      height={64}
+                      unoptimized
                       className="h-16 w-16 shrink-0 rounded object-cover"
                     />
                   ) : (

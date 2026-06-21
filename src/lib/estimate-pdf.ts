@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 
 function pdfSafe(s: string): string {
   return s

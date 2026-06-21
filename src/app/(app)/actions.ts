@@ -1950,7 +1950,9 @@ export async function getRemoteSigningBundle(
 
   const row = data as { ok?: boolean; reason?: string; [key: string]: unknown };
   if (row.ok === true) {
-    const { ok: _ok, reason: _reason, ...rest } = row;
+    const rest = { ...row };
+    delete rest.ok;
+    delete rest.reason;
     return { ok: true, data: rest as Record<string, unknown> };
   }
 

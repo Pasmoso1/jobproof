@@ -2,9 +2,28 @@
 
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { JobProofLogo } from "@/components/jobproof-logo";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+
+function readLoginFlashFromLocation(): {
+  authError: boolean;
+  resetLinkError: boolean;
+  confirmed: boolean;
+  passwordUpdated: boolean;
+} {
+  if (typeof window === "undefined") {
+    return { authError: false, resetLinkError: false, confirmed: false, passwordUpdated: false };
+  }
+  const params = new URLSearchParams(window.location.search);
+  return {
+    authError: params.get("error") === "auth",
+    resetLinkError: params.get("error") === "reset_link",
+    confirmed: params.get("confirmed") === "true",
+    passwordUpdated: params.get("passwordUpdated") === "true",
+  };
+}
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -19,29 +38,21 @@ function LoginForm() {
   const redirectParam = searchParams.get("next") ?? searchParams.get("redirect");
   const redirectTo = redirectParam ?? "/dashboard";
   const isAdminLogin = redirectParam === "/admin";
-  const [authError, setAuthError] = useState(false);
-  const [resetLinkError, setResetLinkError] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
-  const [passwordUpdated, setPasswordUpdated] = useState(false);
+  const [authError, setAuthError] = useState(() => readLoginFlashFromLocation().authError);
+  const [resetLinkError, setResetLinkError] = useState(
+    () => readLoginFlashFromLocation().resetLinkError
+  );
+  const [confirmed, setConfirmed] = useState(() => readLoginFlashFromLocation().confirmed);
+  const [passwordUpdated, setPasswordUpdated] = useState(
+    () => readLoginFlashFromLocation().passwordUpdated
+  );
 
   useEffect(() => {
-    if (searchParams.get("error") === "auth") {
-      setAuthError(true);
+    const flash = readLoginFlashFromLocation();
+    if (flash.authError || flash.resetLinkError || flash.confirmed || flash.passwordUpdated) {
       router.replace("/login", { scroll: false });
     }
-    if (searchParams.get("error") === "reset_link") {
-      setResetLinkError(true);
-      router.replace("/login", { scroll: false });
-    }
-    if (searchParams.get("confirmed") === "true") {
-      setConfirmed(true);
-      router.replace("/login", { scroll: false });
-    }
-    if (searchParams.get("passwordUpdated") === "true") {
-      setPasswordUpdated(true);
-      router.replace("/login", { scroll: false });
-    }
-  }, [searchParams, router]);
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -118,11 +129,7 @@ function LoginForm() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4">
       <div className="w-full max-w-sm">
         <Link href="/" className="mb-8 block text-center">
-          <img
-            src="/jobproof-logo.png"
-            alt="Job Proof"
-            className="mx-auto h-10 w-auto"
-          />
+          <JobProofLogo className="mx-auto h-10 w-auto" />
         </Link>
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
           <h1 className="text-xl font-semibold text-zinc-900">

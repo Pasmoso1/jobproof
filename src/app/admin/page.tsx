@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createClient as createServiceClient, type SupabaseClient } from "@supabase/supabase-js";
 import { requireAdminUserOrRedirectLogin } from "@/lib/admin-auth";
 import { AdminNotAuthorized } from "@/app/admin/NotAuthorized";
 import {
   computeWaitlistSummary,
   parseWaitlistRows,
 } from "@/lib/admin-waitlist";
+import { countRecordsCreatedInLastDays } from "@/lib/admin-metrics";
 
 function toMaybeString(v: unknown): string | null {
   const s = String(v ?? "").trim();
@@ -53,7 +54,7 @@ function maxIso(a: string | null, b: string | null): string | null {
 }
 
 async function safeSelect(
-  supabase: any,
+  supabase: SupabaseClient,
   table: string,
   columns = "*"
 ): Promise<Record<string, unknown>[]> {
@@ -62,11 +63,11 @@ async function safeSelect(
     console.warn(`[admin] ${table} unavailable:`, error.message);
     return [];
   }
-  return Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  return Array.isArray(data) ? (data as unknown as Record<string, unknown>[]) : [];
 }
 
 async function fetchAuthEmailsByUserId(
-  supabase: any
+  supabase: SupabaseClient
 ): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   let page = 1;
@@ -283,7 +284,7 @@ export default async function AdminPage({
   const cards = [
     ["Total waitlist signups", waitlist.length],
     ["Total accounts / users", profiles.length],
-    ["New accounts last 7 days", profiles.filter((p) => p.created_at >= new Date(Date.now() - 7 * 86400000).toISOString()).length],
+    ["New accounts last 7 days", countRecordsCreatedInLastDays(profiles, 7)],
     ["Activated users", activatedUsers],
     ["Jobs created", jobsRows.length],
     ["Contracts sent", [...contractsSentByProfile.values()].reduce((a, b) => a + b, 0)],

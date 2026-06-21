@@ -155,7 +155,7 @@ export async function buildSignedContractPdfBytes(
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
-  let page = doc.addPage([PAGE_W, PAGE_H]);
+  const page = doc.addPage([PAGE_W, PAGE_H]);
   const layout: Layout = { doc, page, font, fontBold, y: PAGE_H - MARGIN };
 
   const cd = input.contractData ?? {};
@@ -440,7 +440,7 @@ export async function generateSignedContractPdf(
  * @deprecated Use generateSignedContractPdf; change-order PDFs are still TODO.
  */
 export async function generateSignedChangeOrderPdf(
-  _options: {
+  options: {
     changeOrderId: string;
     changeTitle: string;
     changeDescription?: string;
@@ -453,5 +453,6 @@ export async function generateSignedChangeOrderPdf(
     signerName?: string;
   }
 ): Promise<string | null> {
+  void options;
   return null;
 }

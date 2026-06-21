@@ -1,3 +1,4 @@
+import { JobProofLogo } from "@/components/jobproof-logo";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -23,11 +24,7 @@ export default async function AppLayout({
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <img
-              src="/jobproof-logo.png"
-              alt="Job Proof"
-              className="h-8 w-auto"
-            />
+            <JobProofLogo className="h-8 w-auto" />
           </Link>
           <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
             <Link

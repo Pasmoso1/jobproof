@@ -1,30 +1,34 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+
+function readDashboardFlashFromLocation(): { confirmed: boolean; onboarded: boolean } {
+  if (typeof window === "undefined") {
+    return { confirmed: false, onboarded: false };
+  }
+  const params = new URLSearchParams(window.location.search);
+  return {
+    confirmed: params.get("confirmed") === "true",
+    onboarded: params.get("onboarded") === "true",
+  };
+}
 
 export function DashboardAlerts() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const [confirmed, setConfirmed] = useState(false);
-  const [onboarded, setOnboarded] = useState(false);
+  const [flash] = useState(readDashboardFlashFromLocation);
 
   useEffect(() => {
-    if (searchParams.get("confirmed") === "true") {
-      setConfirmed(true);
+    if (flash.confirmed || flash.onboarded) {
       router.replace("/dashboard", { scroll: false });
     }
-    if (searchParams.get("onboarded") === "true") {
-      setOnboarded(true);
-      router.replace("/dashboard", { scroll: false });
-    }
-  }, [searchParams, router]);
+  }, [flash.confirmed, flash.onboarded, router]);
 
-  if (!confirmed && !onboarded) return null;
+  if (!flash.confirmed && !flash.onboarded) return null;
 
   return (
     <div className="space-y-3">
-      {confirmed && (
+      {flash.confirmed && (
         <div
           className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
           role="status"
@@ -32,7 +36,7 @@ export function DashboardAlerts() {
           Your email has been confirmed. Your account is ready to use.
         </div>
       )}
-      {onboarded && (
+      {flash.onboarded && (
         <div
           className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
           role="status"

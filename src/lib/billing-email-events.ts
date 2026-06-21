@@ -8,22 +8,22 @@ export type BillingEmailProfileRef = {
   userEmail?: string | null;
 };
 
-export async function sendUpgradeConfirmationEmail(_ref: BillingEmailProfileRef): Promise<void> {
-  /* Stub — wire to email provider when ready */
+export async function sendUpgradeConfirmationEmail(ref: BillingEmailProfileRef): Promise<void> {
+  void ref;
 }
 
-export async function sendCancellationScheduledEmail(_ref: BillingEmailProfileRef): Promise<void> {
-  /* Stub */
+export async function sendCancellationScheduledEmail(ref: BillingEmailProfileRef): Promise<void> {
+  void ref;
 }
 
-export async function sendCancellationResumedEmail(_ref: BillingEmailProfileRef): Promise<void> {
-  /* Stub */
+export async function sendCancellationResumedEmail(ref: BillingEmailProfileRef): Promise<void> {
+  void ref;
 }
 
-export async function sendPaymentFailedEmail(_ref: BillingEmailProfileRef): Promise<void> {
-  /* Stub */
+export async function sendPaymentFailedEmail(ref: BillingEmailProfileRef): Promise<void> {
+  void ref;
 }
 
-export async function sendTrialEndingSoonEmail(_ref: BillingEmailProfileRef): Promise<void> {
-  /* Stub */
+export async function sendTrialEndingSoonEmail(ref: BillingEmailProfileRef): Promise<void> {
+  void ref;
 }

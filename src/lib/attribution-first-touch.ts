@@ -1,6 +1,4 @@
-﻿import { resolvePublicAppOrigin } from "@/lib/app-origin";
-
-export const FIRST_TOUCH_COOKIE_NAME = "jp_first_touch_v1";
+﻿export const FIRST_TOUCH_COOKIE_NAME = "jp_first_touch_v1";
 export const FIRST_TOUCH_LOCALSTORAGE_KEY = "jp_first_touch_v1";
 
 export type HeardAboutSourceOption =

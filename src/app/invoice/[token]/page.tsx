@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { after } from "next/server";
 import { PublicInvoiceToolbar } from "@/components/public-invoice-toolbar";
 import { PublicInvoicePayOnlineButton } from "@/components/public-invoice-pay-online-button";
+import { JobProofLogo } from "@/components/jobproof-logo";
 import {
   fetchPublicInvoicePageData,
   isValidPublicInvoiceToken,
@@ -81,11 +82,7 @@ export default async function PublicInvoicePage({
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10 print:max-w-none print:py-4">
         <header className="mb-6 flex flex-col gap-4 border-b border-zinc-200 pb-6 sm:flex-row sm:items-start sm:justify-between print:border-zinc-300">
           <div className="flex items-center gap-3">
-            <img
-              src="/jobproof-logo.png"
-              alt="Job Proof"
-              className="h-8 w-auto print:hidden"
-            />
+            <JobProofLogo className="h-8 w-auto print:hidden" />
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-[#2436BB] print:text-zinc-600">
                 Invoice

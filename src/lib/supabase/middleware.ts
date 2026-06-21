@@ -21,7 +21,7 @@ export async function updateSession(request: NextRequest): Promise<{
   user: User | null;
   profile: ProfileOnboardingFields;
 }> {
-  let response = NextResponse.next({
+  const response = NextResponse.next({
     request,
   });
 

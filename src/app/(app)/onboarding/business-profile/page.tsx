@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/app/(app)/actions";
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
 import { BETA_PLAN_ONBOARDING_PATH, needsBetaPlanSelection } from "@/lib/beta-tester";
+import { JobProofLogo } from "@/components/jobproof-logo";
 import { OnboardingBusinessForm } from "./onboarding-business-form";
 
 export const dynamic = "force-dynamic";
@@ -42,11 +43,7 @@ export default async function OnboardingBusinessProfilePage({
   return (
     <div className="mx-auto max-w-xl">
       <div className="mb-8 text-center">
-        <img
-          src="/jobproof-logo.png"
-          alt="Job Proof"
-          className="mx-auto mb-6 h-10 w-auto"
-        />
+        <JobProofLogo className="mx-auto mb-6 h-10 w-auto" />
         <h1 className="text-2xl font-bold text-zinc-900">Set up your business profile</h1>
         <p className="mt-2 text-sm text-zinc-600">
           This information will appear on your contracts and invoices and is required.

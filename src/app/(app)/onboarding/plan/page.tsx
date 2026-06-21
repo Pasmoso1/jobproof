@@ -8,6 +8,7 @@ import {
   isBetaTesterProfile,
   needsBetaPlanSelection,
 } from "@/lib/beta-tester";
+import { JobProofLogo } from "@/components/jobproof-logo";
 import { PlanSelectionForm } from "./plan-selection-form";
 
 export const dynamic = "force-dynamic";
@@ -65,7 +66,7 @@ export default async function PlanOnboardingPage({
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
       <div className="mb-8 text-center">
-        <img src="/jobproof-logo.png" alt="JobProof" className="mx-auto mb-6 h-10 w-auto" />
+        <JobProofLogo className="mx-auto mb-6 h-10 w-auto" />
         <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">Choose your plan</h1>
         <p className="mt-2 text-sm text-zinc-600 sm:text-base">
           Start your free trial, then continue with the plan that fits your business.
