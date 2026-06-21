@@ -164,7 +164,11 @@ export default async function AdminUserDetailPage({
       stripe_connect_payouts_enabled,
       stripe_connect_details_submitted,
       beta_tester,
-      beta_plan_tier
+      beta_plan_tier,
+      quote_slug,
+      quote_primary_trade,
+      quote_primary_trade_other,
+      quote_pricing_profile
     `
     )
     .eq("id", userId)
@@ -487,6 +491,30 @@ export default async function AdminUserDetailPage({
               { label: "signup_landing_page", value: toMaybeString(profile.signup_landing_page) ?? "" },
               { label: "signup_first_seen_at", value: formatDate(toMaybeString(profile.signup_first_seen_at)) },
               { label: "heard_about_source", value: toMaybeString(profile.heard_about_source) ?? "" },
+            ]}
+          />
+        </Section>
+
+        <Section title="Quote requests">
+          <DefList
+            rows={[
+              { label: "quote_slug", value: toMaybeString(profile.quote_slug) ?? "—" },
+              {
+                label: "Primary trade",
+                value: toMaybeString(profile.quote_primary_trade) ?? "—",
+              },
+              ...(profile.quote_primary_trade === "Other"
+                ? [
+                    {
+                      label: "Custom trade",
+                      value: toMaybeString(profile.quote_primary_trade_other) ?? "—",
+                    },
+                  ]
+                : []),
+              {
+                label: "Pricing profile",
+                value: toMaybeString(profile.quote_pricing_profile) ?? "—",
+              },
             ]}
           />
         </Section>

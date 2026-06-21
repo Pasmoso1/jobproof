@@ -6,6 +6,8 @@ import {
 } from "@/lib/quote-requests/constants";
 import { validateQuoteSlug } from "@/lib/quote-requests/slug";
 
+const MAX_PRIMARY_TRADE_OTHER_LENGTH = 80;
+
 export function parseQuotePricingProfile(raw: string): QuotePricingProfile | null {
   const v = raw.trim().toLowerCase();
   return (QUOTE_PRICING_PROFILES as readonly string[]).includes(v)
@@ -25,6 +27,7 @@ export function validateQuoteRequestSettings(input: {
   logoUrl: string;
   pricingProfile: string;
   primaryTrade: string;
+  primaryTradeOther: string;
 }): { ok: true; data: {
   quoteSlug: string;
   businessName: string;
@@ -32,6 +35,7 @@ export function validateQuoteRequestSettings(input: {
   logoUrl: string | null;
   pricingProfile: QuotePricingProfile;
   primaryTrade: QuotePrimaryTrade;
+  primaryTradeOther: string | null;
 } } | { ok: false; fieldErrors: Record<string, string> } {
   const fieldErrors: Record<string, string> = {};
 
@@ -75,7 +79,24 @@ export function validateQuoteRequestSettings(input: {
     fieldErrors.primaryTrade = "Select a primary trade.";
   }
 
-  if (Object.keys(fieldErrors).length > 0 || !slugResult.ok || !pricingProfile || !primaryTrade) {
+  let primaryTradeOther: string | null = null;
+  if (primaryTrade === "Other") {
+    const custom = input.primaryTradeOther.trim();
+    if (!custom) {
+      fieldErrors.primaryTradeOther = "Please specify your trade.";
+    } else if (custom.length > MAX_PRIMARY_TRADE_OTHER_LENGTH) {
+      fieldErrors.primaryTradeOther = `Trade name must be ${MAX_PRIMARY_TRADE_OTHER_LENGTH} characters or less.`;
+    } else {
+      primaryTradeOther = custom;
+    }
+  }
+
+  if (
+    Object.keys(fieldErrors).length > 0 ||
+    !slugResult.ok ||
+    !pricingProfile ||
+    !primaryTrade
+  ) {
     return { ok: false, fieldErrors };
   }
 
@@ -88,6 +109,7 @@ export function validateQuoteRequestSettings(input: {
       logoUrl,
       pricingProfile,
       primaryTrade,
+      primaryTradeOther,
     },
   };
 }

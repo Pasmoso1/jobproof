@@ -103,6 +103,7 @@ export interface Profile {
   quote_logo_url?: string | null;
   quote_pricing_profile?: "budget" | "average" | "premium" | null;
   quote_primary_trade?: string | null;
+  quote_primary_trade_other?: string | null;
   created_at: string;
   updated_at: string;
 }

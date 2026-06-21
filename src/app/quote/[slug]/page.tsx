@@ -26,7 +26,10 @@ export default async function PublicQuotePage({
                 className="mx-auto mb-4 h-16 w-auto max-w-[200px] object-contain"
               />
             ) : null}
-            <p className="text-sm font-medium text-zinc-600">{contractor.business_name}</p>
+            <p className="text-sm font-medium text-zinc-900">{contractor.business_name}</p>
+            {contractor.trade_label ? (
+              <p className="mt-1 text-sm text-zinc-600">{contractor.trade_label}</p>
+            ) : null}
             <h1 className="mt-2 text-2xl font-bold text-zinc-900">Request a Quote</h1>
             <p className="mt-2 text-sm text-zinc-600">
               Upload photos and answer a few questions.
