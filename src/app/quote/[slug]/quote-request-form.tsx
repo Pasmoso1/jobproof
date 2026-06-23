@@ -1,8 +1,21 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { submitPublicQuoteRequest } from "./actions";
-import { MAX_QUOTE_REQUEST_PHOTOS, MAX_QUOTE_REQUEST_PHOTO_BYTES } from "@/lib/quote-requests/constants";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import {
+  MAX_QUOTE_REQUEST_PHOTOS,
+  MAX_QUOTE_REQUEST_PHOTO_BYTES,
+  QUOTE_REQUEST_STORAGE_BUCKET,
+} from "@/lib/quote-requests/constants";
+import {
+  friendlyQuotePhotoUploadError,
+  validateQuotePhotoMeta,
+} from "@/lib/quote-requests/photo-upload";
+import {
+  createQuotePhotoUploadUrl,
+  deleteQuotePhotoUpload,
+  submitPublicQuoteRequest,
+} from "./actions";
 
 const FIELD_INPUT_CLASS =
   "mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-base text-zinc-900 placeholder:text-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB] sm:text-sm";
@@ -10,41 +23,32 @@ const FIELD_INPUT_CLASS =
 const PHOTO_BUTTON_CLASS =
   "inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-50 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB] disabled:cursor-not-allowed disabled:opacity-50";
 
+type PhotoUploadStatus = "uploading" | "uploaded" | "failed";
+
+type PhotoUploadItem = {
+  id: string;
+  fileName: string;
+  file: File;
+  status: PhotoUploadStatus;
+  filePath?: string;
+  error?: string;
+};
+
 function isNextRedirectError(err: unknown): boolean {
   if (typeof err !== "object" || err === null) return false;
   const digest = "digest" in err ? (err as { digest?: unknown }).digest : undefined;
   return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
 }
 
-function mergePhotoFiles(existing: File[], incoming: FileList | File[]): File[] {
-  const merged = [...existing];
-  for (const file of Array.from(incoming)) {
-    if (merged.length >= MAX_QUOTE_REQUEST_PHOTOS) break;
-    merged.push(file);
+function newUploadSessionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
   }
-  return merged;
-}
-
-function validatePhotosClient(files: File[]): string | null {
-  if (files.length > MAX_QUOTE_REQUEST_PHOTOS) {
-    return `You can upload up to ${MAX_QUOTE_REQUEST_PHOTOS} photos.`;
-  }
-  const maxMb = MAX_QUOTE_REQUEST_PHOTO_BYTES / (1024 * 1024);
-  for (const file of files) {
-    if (file.size > MAX_QUOTE_REQUEST_PHOTO_BYTES) {
-      return `"${file.name}" is too large. Each photo must be ${maxMb} MB or smaller.`;
-    }
-  }
-  return null;
-}
-
-function syncPhotosToHiddenInput(input: HTMLInputElement | null, files: File[]) {
-  if (!input) return;
-  const dt = new DataTransfer();
-  for (const file of files) {
-    dt.items.add(file);
-  }
-  input.files = dt.files;
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 export function QuoteRequestForm({
@@ -56,18 +60,114 @@ export function QuoteRequestForm({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [photos, setPhotos] = useState<File[]>([]);
+  const [uploadSessionId] = useState(newUploadSessionId);
+  const [photos, setPhotos] = useState<PhotoUploadItem[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
-  const photosHiddenRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const photosRef = useRef<PhotoUploadItem[]>([]);
+
+  const syncPhotosRef = useCallback((next: PhotoUploadItem[]) => {
+    photosRef.current = next;
+    setPhotos(next);
+  }, []);
+
+  const updatePhoto = useCallback((id: string, patch: Partial<PhotoUploadItem>) => {
+    setPhotos((prev) => {
+      const next = prev.map((p) => (p.id === id ? { ...p, ...patch } : p));
+      photosRef.current = next;
+      return next;
+    });
+  }, []);
 
   const atPhotoLimit = photos.length >= MAX_QUOTE_REQUEST_PHOTOS;
+  const uploadingCount = photos.filter((p) => p.status === "uploading").length;
+  const hasUploading = uploadingCount > 0;
+  const hasFailed = photos.some((p) => p.status === "failed");
+
+  const uploadOne = useCallback(
+    async (id: string, file: File) => {
+      const metaCheck = validateQuotePhotoMeta({
+        mimeType: file.type,
+        byteSize: file.size,
+      });
+      if (!metaCheck.ok) {
+        updatePhoto(id, { status: "failed", error: metaCheck.error });
+        return;
+      }
+
+      updatePhoto(id, { status: "uploading", error: undefined });
+
+      try {
+        const signed = await createQuotePhotoUploadUrl(slug, uploadSessionId, {
+          fileName: file.name,
+          mimeType: metaCheck.mime,
+          byteSize: file.size,
+        });
+
+        if (!signed.success) {
+          updatePhoto(id, { status: "failed", error: signed.error });
+          return;
+        }
+
+        const supabase = createClient();
+        const { error: uploadError } = await supabase.storage
+          .from(QUOTE_REQUEST_STORAGE_BUCKET)
+          .uploadToSignedUrl(signed.path, signed.token, file, {
+            contentType: metaCheck.mime,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          updatePhoto(id, {
+            status: "failed",
+            error: friendlyQuotePhotoUploadError(uploadError),
+          });
+          return;
+        }
+
+        updatePhoto(id, {
+          status: "uploaded",
+          filePath: signed.path,
+          error: undefined,
+        });
+      } catch (err) {
+        updatePhoto(id, {
+          status: "failed",
+          error: friendlyQuotePhotoUploadError(err),
+        });
+      }
+    },
+    [slug, updatePhoto, uploadSessionId]
+  );
+
+  const addFiles = useCallback(
+    (incoming: FileList | File[]) => {
+      const available = MAX_QUOTE_REQUEST_PHOTOS - photosRef.current.length;
+      if (available <= 0) return;
+
+      const files = Array.from(incoming).slice(0, available);
+      const newItems: PhotoUploadItem[] = files.map((file) => ({
+        id: newUploadSessionId(),
+        fileName: file.name || "photo.jpg",
+        file,
+        status: "uploading",
+      }));
+
+      const next = [...photosRef.current, ...newItems];
+      syncPhotosRef(next);
+
+      for (const item of newItems) {
+        void uploadOne(item.id, item.file);
+      }
+    },
+    [syncPhotosRef, uploadOne]
+  );
 
   function onUploadPhotosChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (files?.length) {
-      setPhotos((prev) => mergePhotoFiles(prev, files));
+      addFiles(files);
     }
     e.target.value = "";
   }
@@ -75,13 +175,21 @@ export function QuoteRequestForm({
   function onCameraPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (files?.length) {
-      setPhotos((prev) => mergePhotoFiles(prev, files));
+      addFiles(files);
     }
     e.target.value = "";
   }
 
-  function removePhoto(index: number) {
-    setPhotos((prev) => prev.filter((_, i) => i !== index));
+  async function removePhoto(item: PhotoUploadItem) {
+    if (item.status === "uploaded" && item.filePath) {
+      await deleteQuotePhotoUpload(slug, uploadSessionId, item.filePath);
+    }
+    syncPhotosRef(photosRef.current.filter((p) => p.id !== item.id));
+  }
+
+  function retryPhoto(item: PhotoUploadItem) {
+    updatePhoto(item.id, { status: "uploading", error: undefined });
+    void uploadOne(item.id, item.file);
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -93,18 +201,35 @@ export function QuoteRequestForm({
       return;
     }
 
-    const photoError = validatePhotosClient(photos);
-    if (photoError) {
-      setError(photoError);
+    if (hasUploading) {
+      setError("Please wait for photos to finish uploading.");
       return;
     }
 
+    if (hasFailed) {
+      setError("Remove or retry failed photos before submitting.");
+      return;
+    }
+
+    const uploadedPaths = photosRef.current
+      .filter((p) => p.status === "uploaded" && p.filePath)
+      .map((p) => p.filePath as string);
+
     setLoading(true);
     try {
-      syncPhotosToHiddenInput(photosHiddenRef.current, photos);
       const formData = new FormData(form);
+      const result = await submitPublicQuoteRequest(slug, {
+        customerName: String(formData.get("customerName") ?? ""),
+        customerEmail: String(formData.get("customerEmail") ?? ""),
+        customerPhone: String(formData.get("customerPhone") ?? ""),
+        propertyAddress: String(formData.get("propertyAddress") ?? ""),
+        projectType: String(formData.get("projectType") ?? ""),
+        description: String(formData.get("description") ?? ""),
+        isUrgent: formData.get("isUrgent") === "on",
+        uploadSessionId,
+        photoPaths: uploadedPaths,
+      });
 
-      const result = await submitPublicQuoteRequest(slug, formData);
       if (result && "success" in result && !result.success) {
         setError(result.error);
       }
@@ -113,13 +238,11 @@ export function QuoteRequestForm({
         throw err;
       }
       console.error("[QuoteRequestForm] submit failed", err);
-      const message =
-        err instanceof Error && /body exceeded|413/i.test(err.message)
-          ? "Photos are too large to upload. Try fewer or smaller photos."
-          : err instanceof Error
-            ? err.message
-            : "Could not submit your request. Please try again.";
-      setError(message);
+      setError(
+        err instanceof Error
+          ? friendlyQuotePhotoUploadError(err)
+          : "Could not submit your request. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -127,9 +250,16 @@ export function QuoteRequestForm({
 
   const maxPhotoMb = MAX_QUOTE_REQUEST_PHOTO_BYTES / (1024 * 1024);
 
+  const uploadProgressLabel = useMemo(() => {
+    if (!hasUploading) return null;
+    const done = photos.filter((p) => p.status === "uploaded").length;
+    const total = photos.length;
+    const current = Math.min(done + 1, total);
+    return `Uploading photo ${current} of ${total}…`;
+  }, [hasUploading, photos]);
+
   return (
     <>
-      {/* Pickers live outside the form so they cannot block native submit/validation. */}
       <input
         ref={uploadInputRef}
         type="file"
@@ -251,35 +381,56 @@ export function QuoteRequestForm({
                 Take a photo
               </button>
             </div>
-            <input
-              ref={photosHiddenRef}
-              type="file"
-              name="photos"
-              multiple
-              accept="image/*"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden
-            />
             <p className="mt-2 text-xs text-zinc-500">
               Optional. Up to {MAX_QUOTE_REQUEST_PHOTOS} photos, {maxPhotoMb} MB each.
               {photos.length > 0 ? ` ${photos.length} selected.` : ""}
             </p>
+            {uploadProgressLabel ? (
+              <p className="mt-2 text-sm font-medium text-[#2436BB]">{uploadProgressLabel}</p>
+            ) : null}
             {photos.length > 0 ? (
-              <ul className="mt-2 space-y-1">
-                {photos.map((file, index) => (
+              <ul className="mt-2 space-y-2">
+                {photos.map((item, index) => (
                   <li
-                    key={`${file.name}-${file.lastModified}-${file.size}-${index}`}
-                    className="flex items-center justify-between gap-2 text-xs text-zinc-700"
+                    key={item.id}
+                    className="flex items-start justify-between gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs"
                   >
-                    <span className="min-w-0 truncate">{file.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => removePhoto(index)}
-                      className="shrink-0 text-zinc-500 hover:text-red-600"
-                    >
-                      Remove
-                    </button>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-zinc-800">{item.fileName}</p>
+                      <p
+                        className={
+                          item.status === "failed"
+                            ? "mt-0.5 text-red-700"
+                            : item.status === "uploaded"
+                              ? "mt-0.5 text-green-700"
+                              : "mt-0.5 text-zinc-600"
+                        }
+                      >
+                        {item.status === "uploading"
+                          ? `Uploading photo ${index + 1} of ${photos.length}…`
+                          : item.status === "uploaded"
+                            ? "Uploaded"
+                            : item.error ?? "Failed"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      {item.status === "failed" ? (
+                        <button
+                          type="button"
+                          onClick={() => retryPhoto(item)}
+                          className="text-[#2436BB] hover:underline"
+                        >
+                          Retry
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => void removePhoto(item)}
+                        className="text-zinc-500 hover:text-red-600"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -321,10 +472,10 @@ export function QuoteRequestForm({
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || hasUploading}
           className="w-full rounded-lg bg-[#2436BB] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c2a96] disabled:opacity-60"
         >
-          {loading ? "Submitting…" : "Submit quote request"}
+          {loading ? "Submitting…" : hasUploading ? "Waiting for photos…" : "Submit quote request"}
         </button>
       </form>
     </>

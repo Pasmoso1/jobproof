@@ -139,6 +139,6 @@ export async function convertQuoteRequestPlaceholder(
   void requestId;
   return {
     success: false,
-    error: "Convert to customer is coming soon. This will create a customer and job from the quote request.",
+    error: "Create customer record is coming soon. This will create a customer and job from the quote request.",
   };
 }

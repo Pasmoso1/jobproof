@@ -76,11 +76,11 @@ export function QuoteRequestActionButtons({ requestId }: { requestId: string }) 
           type="button"
           disabled={disabled}
           onClick={() =>
-            void run("Convert to customer", () => convertQuoteRequestPlaceholder(requestId))
+            void run("Create customer record", () => convertQuoteRequestPlaceholder(requestId))
           }
           className="rounded-lg border border-[#2436BB]/30 bg-[#2436BB]/5 px-3 py-2 text-sm font-medium text-[#2436BB] hover:bg-[#2436BB]/10 disabled:opacity-60"
         >
-          Convert to customer
+          Create customer record (coming soon)
         </button>
         <button
           type="button"
