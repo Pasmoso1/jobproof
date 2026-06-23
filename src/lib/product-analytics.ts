@@ -27,6 +27,9 @@ export const PRODUCT_ANALYTICS_EVENTS = {
   beta_tester_created: "beta_tester_created",
   /** @deprecated Legacy beta onboarding — no longer fired for new signups. */
   beta_plan_selected: "beta_plan_selected",
+  quote_request_received: "quote_request_received",
+  quote_request_notification_sent: "quote_request_notification_sent",
+  quote_request_notification_failed: "quote_request_notification_failed",
 } as const;
 
 export type ProductAnalyticsEventName =

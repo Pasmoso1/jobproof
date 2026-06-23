@@ -13,6 +13,11 @@ import {
   validateQuotePhotoPathList,
 } from "@/lib/quote-requests/photo-upload";
 import { getContractorByQuoteSlug } from "@/lib/quote-requests/public";
+import { sendQuoteRequestReceivedEmail } from "@/lib/quote-requests/notifications";
+import {
+  PRODUCT_ANALYTICS_EVENTS,
+  trackProductEventSafe,
+} from "@/lib/product-analytics";
 import { validatePublicQuoteRequestFields } from "@/lib/validation/public-quote-request";
 
 export type SubmitQuoteRequestResult =
@@ -172,6 +177,8 @@ export async function submitPublicQuoteRequest(
     return { success: false, error: "Could not save your request. Please try again." };
   }
 
+  let photoCount = 0;
+
   for (const tmpPath of photoPaths) {
     const attachmentId = generateUUID();
     const ext = tmpPath.split(".").pop()?.toLowerCase() || "jpg";
@@ -194,7 +201,69 @@ export async function submitPublicQuoteRequest(
 
     if (attachError) {
       console.error("[submitPublicQuoteRequest] attachment insert failed", attachError);
+      continue;
     }
+
+    photoCount += 1;
+  }
+
+  const notificationPayload = {
+    contractorId: contractor.id,
+    requestId,
+    customerName: input.customerName.trim(),
+    customerEmail: input.customerEmail.trim(),
+    customerPhone: input.customerPhone.trim() || null,
+    propertyAddress: input.propertyAddress.trim(),
+    projectType: input.projectType.trim(),
+    description: input.description.trim(),
+    isUrgent: input.isUrgent,
+    photoCount,
+    submittedAt,
+  };
+
+  trackProductEventSafe({
+    profileId: contractor.id,
+    eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_received,
+    route: `/quote/${contractor.quote_slug}`,
+    source: "public_quote_form",
+    metadata: {
+      contractor_id: contractor.id,
+      request_id: requestId,
+      project_type: notificationPayload.projectType,
+      urgent: input.isUrgent,
+      photo_count: photoCount,
+    },
+  });
+
+  const notificationResult = await sendQuoteRequestReceivedEmail(admin, notificationPayload);
+
+  if (notificationResult.sent) {
+    trackProductEventSafe({
+      profileId: contractor.id,
+      eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_notification_sent,
+      route: `/quote-requests/${requestId}`,
+      source: "quote_request_notification",
+      metadata: {
+        contractor_id: contractor.id,
+        request_id: requestId,
+        urgent: input.isUrgent,
+        photo_count: photoCount,
+      },
+    });
+  } else {
+    trackProductEventSafe({
+      profileId: contractor.id,
+      eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_notification_failed,
+      route: `/quote-requests/${requestId}`,
+      source: "quote_request_notification",
+      metadata: {
+        contractor_id: contractor.id,
+        request_id: requestId,
+        reason: notificationResult.reason,
+        urgent: input.isUrgent,
+        photo_count: photoCount,
+      },
+    });
   }
 
   redirect(`/quote/${contractor.quote_slug}/success`);
