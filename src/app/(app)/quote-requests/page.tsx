@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { QuoteRequestUrgentListBadge } from "@/components/quote-request-urgency";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 import {
   quoteRequestListBucket,
@@ -11,7 +12,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function statusPill(status: string, urgent: boolean) {
+function statusPill(status: string) {
   const label = quoteRequestStatusLabel(status);
   let cls = "bg-zinc-100 text-zinc-800";
   if (status === "new") cls = "bg-blue-50 text-blue-800";
@@ -19,15 +20,8 @@ function statusPill(status: string, urgent: boolean) {
   if (status === "responded") cls = "bg-emerald-50 text-emerald-900";
   if (status === "closed" || status === "converted") cls = "bg-zinc-200 text-zinc-700";
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
-        {label}
-      </span>
-      {urgent ? (
-        <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
-          Urgent
-        </span>
-      ) : null}
+    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
+      {label}
     </span>
   );
 }
@@ -61,11 +55,13 @@ function RequestTable({ rows }: { rows: QuoteRequestListRow[] }) {
                 <div className="text-xs text-zinc-500">{r.customer_email}</div>
               </td>
               <td className="px-4 py-3 text-zinc-700">{r.project_type}</td>
-              <td className="px-4 py-3 text-zinc-700">{r.is_urgent ? "Yes" : "—"}</td>
+              <td className="px-4 py-3">
+                <QuoteRequestUrgentListBadge isUrgent={r.is_urgent} />
+              </td>
               <td className="px-4 py-3 text-zinc-600">
                 {formatDateTimeEastern(r.submitted_at)}
               </td>
-              <td className="px-4 py-3">{statusPill(r.status, r.is_urgent)}</td>
+              <td className="px-4 py-3">{statusPill(r.status)}</td>
             </tr>
           ))}
         </tbody>

@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  QuoteRequestNewUrgentBanner,
+  QuoteRequestUrgentDetailBadge,
+  QuoteRequestUrgentListBadge,
+} from "@/components/quote-request-urgency";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 import { quoteRequestStatusLabel } from "@/lib/quote-requests/constants";
 import { getQuoteRequestDetail } from "../quote-request-actions";
@@ -18,17 +23,15 @@ export default async function QuoteRequestDetailPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <QuoteRequestNewUrgentBanner isNew={request.status === "new"} isUrgent={request.is_urgent} />
+
       <div>
         <Link href="/quote-requests" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
           ← Quote requests
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-bold text-zinc-900">{request.customer_name}</h1>
-          {request.is_urgent ? (
-            <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-              Urgent
-            </span>
-          ) : null}
+          {request.is_urgent ? <QuoteRequestUrgentListBadge isUrgent /> : null}
         </div>
         <p className="mt-1 text-sm text-zinc-600">
           Submitted {formatDateTimeEastern(request.submitted_at)}
@@ -84,7 +87,9 @@ export default async function QuoteRequestDetailPage({
           </div>
           <div>
             <dt className="text-zinc-500">Urgent</dt>
-            <dd className="font-medium text-zinc-900">{request.is_urgent ? "Yes" : "No"}</dd>
+            <dd className="mt-1">
+              <QuoteRequestUrgentDetailBadge isUrgent={request.is_urgent} />
+            </dd>
           </div>
         </dl>
       </section>
