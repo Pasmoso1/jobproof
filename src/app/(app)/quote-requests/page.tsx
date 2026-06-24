@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { QuoteRequestResponseListBadge } from "@/components/quote-request-response";
 import { QuoteRequestUrgentListBadge } from "@/components/quote-request-urgency";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 import {
@@ -61,7 +62,15 @@ function RequestTable({ rows }: { rows: QuoteRequestListRow[] }) {
               <td className="px-4 py-3 text-zinc-600">
                 {formatDateTimeEastern(r.submitted_at)}
               </td>
-              <td className="px-4 py-3">{statusPill(r.status)}</td>
+              <td className="px-4 py-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {r.status === "new" ? (
+                    <QuoteRequestResponseListBadge status={r.status} submittedAt={r.submitted_at} />
+                  ) : (
+                    statusPill(r.status)
+                  )}
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>

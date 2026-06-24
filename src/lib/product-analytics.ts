@@ -30,6 +30,9 @@ export const PRODUCT_ANALYTICS_EVENTS = {
   quote_request_received: "quote_request_received",
   quote_request_notification_sent: "quote_request_notification_sent",
   quote_request_notification_failed: "quote_request_notification_failed",
+  quote_request_reviewed: "quote_request_reviewed",
+  quote_request_responded: "quote_request_responded",
+  quote_request_site_visit_requested: "quote_request_site_visit_requested",
 } as const;
 
 export type ProductAnalyticsEventName =

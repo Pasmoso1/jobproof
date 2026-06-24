@@ -28,6 +28,7 @@ import {
 } from "@/lib/contractor-onboarding-progress";
 import { DashboardEmptyOnboarding } from "@/components/onboarding/dashboard-empty-onboarding";
 import { OnboardingProgressCard } from "@/components/onboarding/onboarding-progress-card";
+import { QuoteRequestDashboardAlerts } from "@/components/quote-request-response";
 import { trackContractorMilestoneSafe } from "@/lib/contractor-milestones";
 import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
 import { syncSubscriptionAfterStripeReturn } from "@/app/(app)/settings/billing/actions";
@@ -134,6 +135,10 @@ export default async function DashboardPage({
           Welcome back. Here&apos;s an overview of your jobs.
         </p>
       </div>
+
+      {profile?.id ? (
+        <QuoteRequestDashboardAlerts contractorId={String(profile.id)} />
+      ) : null}
 
       {/* Business profile banner */}
       {!businessProfileComplete && (

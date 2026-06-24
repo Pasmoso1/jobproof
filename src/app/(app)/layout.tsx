@@ -1,6 +1,8 @@
 import { JobProofLogo } from "@/components/jobproof-logo";
+import { QuoteRequestsNavLink } from "@/components/quote-requests-nav-link";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getNewQuoteRequestCount } from "@/lib/quote-requests/response-alerts";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
 import { getFeedbackMailtoHref } from "@/lib/onboarding-feedback";
@@ -18,6 +20,16 @@ export default async function AppLayout({
   if (!user) {
     redirect("/login");
   }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const newQuoteRequestCount = profile?.id
+    ? await getNewQuoteRequestCount(String(profile.id))
+    : 0;
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -45,12 +57,7 @@ export default async function AppLayout({
             >
               Estimates
             </Link>
-            <Link
-              href="/quote-requests"
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
-            >
-              Quote Requests
-            </Link>
+            <QuoteRequestsNavLink newCount={newQuoteRequestCount} />
             <Link
               href="/jobs/create"
               className="text-sm font-medium text-zinc-700 hover:text-zinc-900"

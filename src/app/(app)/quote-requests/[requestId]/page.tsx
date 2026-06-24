@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  QuoteRequestNeedsResponseBanner,
+  QuoteRequestOverdueBanner,
+} from "@/components/quote-request-response";
+import {
   QuoteRequestNewUrgentBanner,
   QuoteRequestUrgentDetailBadge,
   QuoteRequestUrgentListBadge,
@@ -23,6 +27,8 @@ export default async function QuoteRequestDetailPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <QuoteRequestOverdueBanner status={request.status} submittedAt={request.submitted_at} />
+      <QuoteRequestNeedsResponseBanner status={request.status} submittedAt={request.submitted_at} />
       <QuoteRequestNewUrgentBanner isNew={request.status === "new"} isUrgent={request.is_urgent} />
 
       <div>

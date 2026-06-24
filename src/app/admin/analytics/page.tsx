@@ -3,6 +3,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { requireAdminUserOrRedirectLogin } from "@/lib/admin-auth";
 import { AdminNotAuthorized } from "@/app/admin/NotAuthorized";
 import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
+import { getAdminQuoteRequestMetrics } from "@/lib/quote-requests/response-alerts";
 import { formatBillingDateTimeEastern } from "@/lib/billing-date-display";
 
 function pct(numerator: number, denominator: number): string {
@@ -54,6 +55,7 @@ export default async function AdminAnalyticsPage() {
     recentEvents,
     profilesWithFirstJob,
     profilesOnboardingCompleted,
+    quoteRequestMetrics,
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     countEvents(supabase, PRODUCT_ANALYTICS_EVENTS.onboarding_started),
@@ -74,6 +76,7 @@ export default async function AdminAnalyticsPage() {
       .from("profiles")
       .select("id", { count: "exact", head: true })
       .not("onboarding_completed_at", "is", null),
+    getAdminQuoteRequestMetrics(supabase),
   ]);
 
   const totalSignups = signupCount ?? 0;
@@ -91,6 +94,12 @@ export default async function AdminAnalyticsPage() {
     ["Stripe Connect completed", stripeConnectCompleted],
     ["Activation rate", pct(activatedProfiles, totalSignups)],
     ["Onboarding completion rate", pct(completedProfiles, totalSignups)],
+  ] as const;
+
+  const quoteCards = [
+    ["New quote requests", quoteRequestMetrics.newCount],
+    ["Overdue quote requests", quoteRequestMetrics.overdueCount],
+    ["Average response time", quoteRequestMetrics.averageResponseTimeLabel],
   ] as const;
 
   return (
@@ -115,6 +124,23 @@ export default async function AdminAnalyticsPage() {
               </p>
             </div>
           ))}
+        </section>
+
+        <section>
+          <h2 className="text-base font-semibold text-zinc-900">Quote requests</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Response tracking across all contractors (status = new; overdue = older than 24 hours).
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {quoteCards.map(([label, value]) => (
+              <div key={label} className="rounded-lg border border-zinc-200 bg-white p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</p>
+                <p className="mt-2 text-2xl font-semibold text-zinc-900">
+                  {typeof value === "number" ? value.toLocaleString() : value}
+                </p>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="rounded-lg border border-zinc-200 bg-white p-4 sm:p-5">
