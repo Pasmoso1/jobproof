@@ -14,6 +14,7 @@ import {
 } from "@/lib/quote-requests/constants";
 import { hoursSinceSubmission } from "@/lib/quote-requests/response-alerts";
 import { sendQuoteRequestSiteVisitCustomerEmail } from "@/lib/quote-requests/notifications";
+import { sendQuoteRequestSiteVisitCustomerSms } from "@/lib/quote-requests/sms-notifications";
 import type { QuoteRequest, QuoteRequestAttachment } from "@/types/database";
 
 export type QuoteRequestListRow = QuoteRequest;
@@ -100,8 +101,13 @@ export type UpdateQuoteRequestStatusResult =
   | { success: false; error: string };
 
 export type MarkQuoteRequestSiteVisitResult =
-  | { success: true; emailSent: true }
-  | { success: true; emailSent: false; emailWarning: string }
+  | {
+      success: true;
+      emailSent: boolean;
+      smsSent: boolean;
+      emailWarning?: string;
+      smsWarning?: string;
+    }
   | { success: false; error: string };
 
 function revalidateQuoteRequestSurfaces(requestId: string) {
@@ -181,7 +187,7 @@ export async function markQuoteRequestSiteVisit(
   const { data: request } = await supabase
     .from("quote_requests")
     .select(
-      "id, contractor_id, customer_name, customer_email, property_address, project_type, submitted_at, status"
+      "id, contractor_id, customer_name, customer_email, customer_phone, property_address, project_type, submitted_at, status"
     )
     .eq("id", requestId)
     .eq("contractor_id", profileId)
@@ -222,14 +228,26 @@ export async function markQuoteRequestSiteVisit(
   revalidateQuoteRequestSurfaces(requestId);
 
   const customerEmailPresent = Boolean(String(request.customer_email ?? "").trim());
-  const emailResult = await sendQuoteRequestSiteVisitCustomerEmail({
+  const customerPhonePresent = Boolean(String(request.customer_phone ?? "").trim());
+
+  const notificationPayload = {
     requestId,
     contractorId: String(request.contractor_id),
     customerName: String(request.customer_name),
-    customerEmail: String(request.customer_email ?? ""),
-    propertyAddress: String(request.property_address),
     projectType: String(request.project_type),
-  });
+  };
+
+  const [emailResult, smsResult] = await Promise.all([
+    sendQuoteRequestSiteVisitCustomerEmail({
+      ...notificationPayload,
+      customerEmail: String(request.customer_email ?? ""),
+      propertyAddress: String(request.property_address),
+    }),
+    sendQuoteRequestSiteVisitCustomerSms({
+      ...notificationPayload,
+      customerPhone: String(request.customer_phone ?? ""),
+    }),
+  ]);
 
   const emailAnalyticsBase = {
     profileId: String(request.contractor_id),
@@ -247,24 +265,65 @@ export async function markQuoteRequestSiteVisit(
       ...emailAnalyticsBase,
       eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_site_visit_email_sent,
     });
-    return { success: true, emailSent: true };
+  } else {
+    trackProductEventSafe({
+      ...emailAnalyticsBase,
+      eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_site_visit_email_failed,
+      metadata: {
+        ...emailAnalyticsBase.metadata,
+        reason: emailResult.reason,
+      },
+    });
   }
 
-  trackProductEventSafe({
-    ...emailAnalyticsBase,
-    eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_site_visit_email_failed,
+  const smsAnalyticsBase = {
+    profileId: String(request.contractor_id),
+    route: `/quote-requests/${requestId}`,
+    source: "quote_request_site_visit_sms",
     metadata: {
-      ...emailAnalyticsBase.metadata,
-      reason: emailResult.reason,
+      request_id: requestId,
+      contractor_id: String(request.contractor_id),
+      customer_phone_present: customerPhonePresent,
     },
-  });
+  };
 
-  const emailWarning =
-    emailResult.reason === "no_customer_email"
-      ? "Site visit requested, but no customer email was on file."
-      : "Site visit requested, but the customer email could not be sent.";
+  if (smsResult.sent) {
+    trackProductEventSafe({
+      ...smsAnalyticsBase,
+      eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_site_visit_sms_sent,
+    });
+  } else {
+    trackProductEventSafe({
+      ...smsAnalyticsBase,
+      eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_site_visit_sms_failed,
+      metadata: {
+        ...smsAnalyticsBase.metadata,
+        reason: smsResult.reason,
+      },
+    });
+  }
 
-  return { success: true, emailSent: false, emailWarning };
+  const emailWarning = emailResult.sent
+    ? undefined
+    : emailResult.reason === "no_customer_email"
+      ? "Customer email not sent (no email on file)."
+      : "Customer email could not be sent.";
+
+  const smsWarning = smsResult.sent
+    ? undefined
+    : smsResult.reason === "no_customer_phone"
+      ? "Customer text not sent (no phone on file)."
+      : smsResult.reason === "invalid_customer_phone"
+        ? "Customer text not sent (invalid phone number)."
+        : "Customer text could not be sent.";
+
+  return {
+    success: true,
+    emailSent: emailResult.sent,
+    smsSent: smsResult.sent,
+    emailWarning,
+    smsWarning,
+  };
 }
 
 export async function closeQuoteRequest(requestId: string) {

@@ -46,13 +46,35 @@ export function QuoteRequestActionButtons({ requestId }: { requestId: string }) 
         setError(result.error ?? "Something went wrong.");
         return;
       }
+      const sentParts: string[] = [];
+      const warningParts: string[] = [];
+
       if (result.emailSent) {
-        setMessage("Site visit requested. Customer email sent.");
+        sentParts.push("email");
+      } else if (result.emailWarning) {
+        warningParts.push(result.emailWarning);
+      }
+
+      if (result.smsSent) {
+        sentParts.push("text");
+      } else if (result.smsWarning) {
+        warningParts.push(result.smsWarning);
+      }
+
+      if (sentParts.length > 0) {
+        const channelLabel =
+          sentParts.length === 2
+            ? "Customer email and text sent"
+            : sentParts[0] === "email"
+              ? "Customer email sent"
+              : "Customer text sent";
+        setMessage(`Site visit requested. ${channelLabel}.`);
       } else {
-        setWarning(
-          result.emailWarning ??
-            "Site visit requested, but the customer email could not be sent."
-        );
+        setMessage("Site visit requested.");
+      }
+
+      if (warningParts.length > 0) {
+        setWarning(warningParts.join(" "));
       }
       router.refresh();
     } finally {

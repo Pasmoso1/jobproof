@@ -35,6 +35,8 @@ export const PRODUCT_ANALYTICS_EVENTS = {
   quote_request_site_visit_requested: "quote_request_site_visit_requested",
   quote_request_site_visit_email_sent: "quote_request_site_visit_email_sent",
   quote_request_site_visit_email_failed: "quote_request_site_visit_email_failed",
+  quote_request_site_visit_sms_sent: "quote_request_site_visit_sms_sent",
+  quote_request_site_visit_sms_failed: "quote_request_site_visit_sms_failed",
 } as const;
 
 export type ProductAnalyticsEventName =
