@@ -14,12 +14,14 @@ export function QuoteRequestActionButtons({ requestId }: { requestId: string }) 
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function run(label: string, fn: () => Promise<{ success: boolean; error?: string }>) {
     setBusy(label);
     setError(null);
     setMessage(null);
+    setWarning(null);
     try {
       const result = await fn();
       if (!result.success) {
@@ -33,6 +35,31 @@ export function QuoteRequestActionButtons({ requestId }: { requestId: string }) 
     }
   }
 
+  async function runSiteVisit() {
+    setBusy("Request site visit");
+    setError(null);
+    setMessage(null);
+    setWarning(null);
+    try {
+      const result = await markQuoteRequestSiteVisit(requestId);
+      if (!result.success) {
+        setError(result.error ?? "Something went wrong.");
+        return;
+      }
+      if (result.emailSent) {
+        setMessage("Site visit requested. Customer email sent.");
+      } else {
+        setWarning(
+          result.emailWarning ??
+            "Site visit requested, but the customer email could not be sent."
+        );
+      }
+      router.refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const disabled = busy !== null;
 
   return (
@@ -40,6 +67,11 @@ export function QuoteRequestActionButtons({ requestId }: { requestId: string }) 
       {message ? (
         <p className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
           {message}
+        </p>
+      ) : null}
+      {warning ? (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {warning}
         </p>
       ) : null}
       {error ? (
@@ -67,7 +99,7 @@ export function QuoteRequestActionButtons({ requestId }: { requestId: string }) 
         <button
           type="button"
           disabled={disabled}
-          onClick={() => void run("Request site visit", () => markQuoteRequestSiteVisit(requestId))}
+          onClick={() => void runSiteVisit()}
           className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-60"
         >
           {busy === "Request site visit" ? "Saving…" : "Request site visit"}

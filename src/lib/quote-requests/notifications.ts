@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolvePublicAppOrigin } from "@/lib/app-origin";
 import { resolveContractorContactEmail } from "@/lib/contractor-contact-email";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export type QuoteRequestNotificationPayload = {
   contractorId: string;
@@ -39,6 +40,16 @@ function extractResendMailbox(raw: string): string {
 function buildResendFromHeader(): string {
   const envRaw = process.env.RESEND_FROM?.trim() || "Job Proof <hello@jobproof.ca>";
   const email = extractResendMailbox(envRaw);
+  return `JobProof <${email}>`;
+}
+
+function buildResendFromHeaderForBusiness(businessDisplayName: string | null | undefined): string {
+  const envRaw = process.env.RESEND_FROM?.trim() || "Job Proof <hello@jobproof.ca>";
+  const email = extractResendMailbox(envRaw);
+  const biz = businessDisplayName?.replace(/[\r\n<>"]/g, "").trim().slice(0, 100);
+  if (biz) {
+    return `${biz} via JobProof <${email}>`;
+  }
   return `JobProof <${email}>`;
 }
 
@@ -219,6 +230,195 @@ export async function sendQuoteRequestReceivedEmail(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[quote-request-notification] unexpected error", {
+      contractorId: payload.contractorId,
+      requestId: payload.requestId,
+      message,
+    });
+    return { sent: false, reason: "send_failed", error: message };
+  }
+}
+
+export type QuoteRequestSiteVisitCustomerEmailPayload = {
+  requestId: string;
+  contractorId: string;
+  customerName: string;
+  customerEmail: string;
+  propertyAddress: string;
+  projectType: string;
+};
+
+export type QuoteRequestSiteVisitCustomerEmailResult =
+  | { sent: true; toEmail: string; resendMessageId?: string }
+  | {
+      sent: false;
+      reason: "no_customer_email" | "not_configured" | "send_failed";
+      error?: string;
+    };
+
+function buildSiteVisitEmailSubject(businessName: string): string {
+  const biz = businessName.trim();
+  if (biz) {
+    return `${biz} would like to schedule a site visit`;
+  }
+  return "Your contractor would like to schedule a site visit";
+}
+
+function buildSiteVisitNextStepCopy(
+  contractorPhone: string | null,
+  replyToEmail: string | null
+): string {
+  const phone = contractorPhone?.trim();
+  if (phone && replyToEmail) {
+    return `Please reply to this email or call ${phone} to arrange a time.`;
+  }
+  if (phone) {
+    return `Please call ${phone} to arrange a time.`;
+  }
+  if (replyToEmail) {
+    return "Please reply to this email to arrange a time.";
+  }
+  return "Please contact the contractor to arrange a time.";
+}
+
+function buildSiteVisitCustomerEmailHtml(input: {
+  customerName: string;
+  businessName: string;
+  contractorPhone: string | null;
+  projectType: string;
+  propertyAddress: string;
+  replyToEmail: string | null;
+}): string {
+  const greeting = input.customerName.trim() || "there";
+  const businessName = input.businessName.trim() || "Your contractor";
+  const nextStep = buildSiteVisitNextStepCopy(input.contractorPhone, input.replyToEmail);
+
+  return `
+    <div style="font-family:Arial,sans-serif;line-height:1.5;max-width:560px;color:#18181B;">
+      <p>Hi ${escapeHtml(greeting)},</p>
+      <p>
+        Thanks for submitting your quote request. <strong>${escapeHtml(businessName)}</strong> has reviewed your project details and would like to arrange a site visit before providing the quote.
+      </p>
+      <table style="border-collapse:collapse;width:100%;font-size:14px;margin:16px 0;">
+        <tr><td style="padding:6px 12px 6px 0;color:#52525B;vertical-align:top;">Project type</td><td style="padding:6px 0;">${escapeHtml(input.projectType)}</td></tr>
+        <tr><td style="padding:6px 12px 6px 0;color:#52525B;vertical-align:top;">Property address</td><td style="padding:6px 0;">${escapeHtml(input.propertyAddress)}</td></tr>
+        ${
+          input.contractorPhone?.trim()
+            ? `<tr><td style="padding:6px 12px 6px 0;color:#52525B;vertical-align:top;">Contractor phone</td><td style="padding:6px 0;">${escapeHtml(input.contractorPhone.trim())}</td></tr>`
+            : ""
+        }
+      </table>
+      <p style="font-size:14px;color:#3F3F46;"><strong>Suggested next step:</strong> ${escapeHtml(nextStep)}</p>
+      <p style="font-size:13px;color:#A1A1AA;margin-top:24px;">— Job Proof</p>
+    </div>
+  `;
+}
+
+function buildSiteVisitCustomerEmailText(input: {
+  customerName: string;
+  businessName: string;
+  contractorPhone: string | null;
+  projectType: string;
+  propertyAddress: string;
+  replyToEmail: string | null;
+}): string {
+  const greeting = input.customerName.trim() || "there";
+  const businessName = input.businessName.trim() || "Your contractor";
+  const nextStep = buildSiteVisitNextStepCopy(input.contractorPhone, input.replyToEmail);
+
+  return [
+    `Hi ${greeting},`,
+    "",
+    `Thanks for submitting your quote request. ${businessName} has reviewed your project details and would like to arrange a site visit before providing the quote.`,
+    "",
+    `Project type: ${input.projectType}`,
+    `Property address: ${input.propertyAddress}`,
+    input.contractorPhone?.trim() ? `Contractor phone: ${input.contractorPhone.trim()}` : null,
+    "",
+    `Suggested next step: ${nextStep}`,
+    "",
+    "— Job Proof",
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+}
+
+/**
+ * Email the customer when a contractor requests a site visit. Never throws.
+ */
+export async function sendQuoteRequestSiteVisitCustomerEmail(
+  payload: QuoteRequestSiteVisitCustomerEmailPayload
+): Promise<QuoteRequestSiteVisitCustomerEmailResult> {
+  const customerEmail = payload.customerEmail?.trim();
+  if (!customerEmail) {
+    console.warn("[quote-request-site-visit-email] no customer email", {
+      contractorId: payload.contractorId,
+      requestId: payload.requestId,
+    });
+    return { sent: false, reason: "no_customer_email" };
+  }
+
+  try {
+    const admin = createServiceRoleClient();
+    if (!admin) {
+      console.warn("[quote-request-site-visit-email] service role unavailable", {
+        contractorId: payload.contractorId,
+        requestId: payload.requestId,
+      });
+      return { sent: false, reason: "not_configured" };
+    }
+
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("business_name, phone, business_contact_email, user_id")
+      .eq("id", payload.contractorId)
+      .maybeSingle();
+
+    const businessName = String(profile?.business_name ?? "Your contractor");
+    const contractorPhone = profile?.phone ? String(profile.phone) : null;
+
+    const { email: replyToEmail } = await resolveContractorNotificationEmail(admin, payload.contractorId);
+
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (!apiKey) {
+      console.warn("[quote-request-site-visit-email] RESEND_API_KEY not configured", {
+        contractorId: payload.contractorId,
+        requestId: payload.requestId,
+      });
+      return { sent: false, reason: "not_configured" };
+    }
+
+    const emailContent = {
+      customerName: payload.customerName,
+      businessName,
+      contractorPhone,
+      projectType: payload.projectType,
+      propertyAddress: payload.propertyAddress,
+      replyToEmail,
+    };
+
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send({
+      from: buildResendFromHeaderForBusiness(businessName),
+      to: [customerEmail],
+      subject: buildSiteVisitEmailSubject(businessName),
+      html: buildSiteVisitCustomerEmailHtml(emailContent),
+      text: buildSiteVisitCustomerEmailText(emailContent),
+      ...(replyToEmail ? { replyTo: replyToEmail } : {}),
+    });
+
+    if (error) {
+      console.error("[quote-request-site-visit-email] Resend error", {
+        contractorId: payload.contractorId,
+        requestId: payload.requestId,
+        message: error.message,
+      });
+      return { sent: false, reason: "send_failed", error: error.message };
+    }
+
+    return { sent: true, toEmail: customerEmail, resendMessageId: data?.id };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[quote-request-site-visit-email] unexpected error", {
       contractorId: payload.contractorId,
       requestId: payload.requestId,
       message,

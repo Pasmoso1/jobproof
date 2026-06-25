@@ -13,6 +13,7 @@ import {
   type QuoteRequestStatus,
 } from "@/lib/quote-requests/constants";
 import { hoursSinceSubmission } from "@/lib/quote-requests/response-alerts";
+import { sendQuoteRequestSiteVisitCustomerEmail } from "@/lib/quote-requests/notifications";
 import type { QuoteRequest, QuoteRequestAttachment } from "@/types/database";
 
 export type QuoteRequestListRow = QuoteRequest;
@@ -98,6 +99,11 @@ export type UpdateQuoteRequestStatusResult =
   | { success: true }
   | { success: false; error: string };
 
+export type MarkQuoteRequestSiteVisitResult =
+  | { success: true; emailSent: true }
+  | { success: true; emailSent: false; emailWarning: string }
+  | { success: false; error: string };
+
 function revalidateQuoteRequestSurfaces(requestId: string) {
   revalidatePath("/dashboard");
   revalidatePath("/quote-requests");
@@ -166,12 +172,99 @@ export async function markQuoteRequestResponded(requestId: string) {
   );
 }
 
-export async function markQuoteRequestSiteVisit(requestId: string) {
-  return updateQuoteRequestStatus(
+export async function markQuoteRequestSiteVisit(
+  requestId: string
+): Promise<MarkQuoteRequestSiteVisitResult> {
+  const profileId = await requireProfileId();
+  const supabase = await createClient();
+
+  const { data: request } = await supabase
+    .from("quote_requests")
+    .select(
+      "id, contractor_id, customer_name, customer_email, property_address, project_type, submitted_at, status"
+    )
+    .eq("id", requestId)
+    .eq("contractor_id", profileId)
+    .maybeSingle();
+
+  if (!request) {
+    return { success: false, error: "Could not find this quote request." };
+  }
+
+  const { error } = await supabase
+    .from("quote_requests")
+    .update({ status: "site_visit_requested" })
+    .eq("id", requestId)
+    .eq("contractor_id", profileId);
+
+  if (error) {
+    console.error("[markQuoteRequestSiteVisit] update failed", error);
+    return { success: false, error: "Could not update this request." };
+  }
+
+  if (request.submitted_at) {
+    trackProductEventSafe({
+      profileId: String(request.contractor_id),
+      eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_site_visit_requested,
+      route: `/quote-requests/${requestId}`,
+      source: "quote_request_actions",
+      metadata: {
+        request_id: requestId,
+        contractor_id: String(request.contractor_id),
+        hours_since_submission:
+          Math.round(hoursSinceSubmission(String(request.submitted_at)) * 10) / 10,
+        previous_status: String(request.status),
+        new_status: "site_visit_requested",
+      },
+    });
+  }
+
+  revalidateQuoteRequestSurfaces(requestId);
+
+  const customerEmailPresent = Boolean(String(request.customer_email ?? "").trim());
+  const emailResult = await sendQuoteRequestSiteVisitCustomerEmail({
     requestId,
-    "site_visit_requested",
-    PRODUCT_ANALYTICS_EVENTS.quote_request_site_visit_requested
-  );
+    contractorId: String(request.contractor_id),
+    customerName: String(request.customer_name),
+    customerEmail: String(request.customer_email ?? ""),
+    propertyAddress: String(request.property_address),
+    projectType: String(request.project_type),
+  });
+
+  const emailAnalyticsBase = {
+    profileId: String(request.contractor_id),
+    route: `/quote-requests/${requestId}`,
+    source: "quote_request_site_visit_email",
+    metadata: {
+      request_id: requestId,
+      contractor_id: String(request.contractor_id),
+      customer_email_present: customerEmailPresent,
+    },
+  };
+
+  if (emailResult.sent) {
+    trackProductEventSafe({
+      ...emailAnalyticsBase,
+      eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_site_visit_email_sent,
+    });
+    return { success: true, emailSent: true };
+  }
+
+  trackProductEventSafe({
+    ...emailAnalyticsBase,
+    eventName: PRODUCT_ANALYTICS_EVENTS.quote_request_site_visit_email_failed,
+    metadata: {
+      ...emailAnalyticsBase.metadata,
+      reason: emailResult.reason,
+    },
+  });
+
+  const emailWarning =
+    emailResult.reason === "no_customer_email"
+      ? "Site visit requested, but no customer email was on file."
+      : "Site visit requested, but the customer email could not be sent.";
+
+  return { success: true, emailSent: false, emailWarning };
 }
 
 export async function closeQuoteRequest(requestId: string) {
