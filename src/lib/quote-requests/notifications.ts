@@ -263,51 +263,45 @@ function buildSiteVisitEmailSubject(businessName: string): string {
   return "Your contractor would like to schedule a site visit";
 }
 
-function buildSiteVisitNextStepCopy(
-  contractorPhone: string | null,
-  replyToEmail: string | null
-): string {
-  const phone = contractorPhone?.trim();
-  if (phone && replyToEmail) {
-    return `Please reply to this email or call ${phone} to arrange a time.`;
-  }
-  if (phone) {
-    return `Please call ${phone} to arrange a time.`;
-  }
-  if (replyToEmail) {
-    return "Please reply to this email to arrange a time.";
-  }
-  return "Please contact the contractor to arrange a time.";
-}
-
 function buildSiteVisitCustomerEmailHtml(input: {
   customerName: string;
   businessName: string;
   contractorPhone: string | null;
   projectType: string;
   propertyAddress: string;
-  replyToEmail: string | null;
 }): string {
   const greeting = input.customerName.trim() || "there";
   const businessName = input.businessName.trim() || "Your contractor";
-  const nextStep = buildSiteVisitNextStepCopy(input.contractorPhone, input.replyToEmail);
+  const contractorPhone = input.contractorPhone?.trim() ?? null;
 
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.5;max-width:560px;color:#18181B;">
       <p>Hi ${escapeHtml(greeting)},</p>
+      <p>Thanks for submitting your quote request.</p>
       <p>
-        Thanks for submitting your quote request. <strong>${escapeHtml(businessName)}</strong> has reviewed your project details and would like to arrange a site visit before providing the quote.
+        <strong>${escapeHtml(businessName)}</strong> has reviewed your project details and would like to schedule a site visit before preparing your quote.
       </p>
       <table style="border-collapse:collapse;width:100%;font-size:14px;margin:16px 0;">
         <tr><td style="padding:6px 12px 6px 0;color:#52525B;vertical-align:top;">Project type</td><td style="padding:6px 0;">${escapeHtml(input.projectType)}</td></tr>
         <tr><td style="padding:6px 12px 6px 0;color:#52525B;vertical-align:top;">Property address</td><td style="padding:6px 0;">${escapeHtml(input.propertyAddress)}</td></tr>
         ${
-          input.contractorPhone?.trim()
-            ? `<tr><td style="padding:6px 12px 6px 0;color:#52525B;vertical-align:top;">Contractor phone</td><td style="padding:6px 0;">${escapeHtml(input.contractorPhone.trim())}</td></tr>`
+          contractorPhone
+            ? `<tr><td style="padding:6px 12px 6px 0;color:#52525B;vertical-align:top;">Contractor phone</td><td style="padding:6px 0;">${escapeHtml(contractorPhone)}</td></tr>`
             : ""
         }
       </table>
-      <p style="font-size:14px;color:#3F3F46;"><strong>Suggested next step:</strong> ${escapeHtml(nextStep)}</p>
+      <p style="font-size:14px;color:#3F3F46;margin:16px 0 8px;"><strong>What happens next</strong></p>
+      <p style="font-size:14px;color:#3F3F46;">
+        A representative from <strong>${escapeHtml(businessName)}</strong> will contact you soon using the phone number or email you provided to arrange a convenient time for the site visit.
+      </p>
+      ${
+        contractorPhone
+          ? `<p style="font-size:14px;color:#3F3F46;">If you would prefer to speak with them sooner, you can also call <strong>${escapeHtml(contractorPhone)}</strong>.</p>`
+          : ""
+      }
+      <p style="font-size:14px;color:#3F3F46;margin-top:16px;">
+        Your original project details and photos have already been shared with the contractor, so there is no need to explain everything again when they contact you.
+      </p>
       <p style="font-size:13px;color:#A1A1AA;margin-top:24px;">— Job Proof</p>
     </div>
   `;
@@ -319,22 +313,30 @@ function buildSiteVisitCustomerEmailText(input: {
   contractorPhone: string | null;
   projectType: string;
   propertyAddress: string;
-  replyToEmail: string | null;
 }): string {
   const greeting = input.customerName.trim() || "there";
   const businessName = input.businessName.trim() || "Your contractor";
-  const nextStep = buildSiteVisitNextStepCopy(input.contractorPhone, input.replyToEmail);
+  const contractorPhone = input.contractorPhone?.trim() ?? null;
 
   return [
     `Hi ${greeting},`,
     "",
-    `Thanks for submitting your quote request. ${businessName} has reviewed your project details and would like to arrange a site visit before providing the quote.`,
+    "Thanks for submitting your quote request.",
+    "",
+    `${businessName} has reviewed your project details and would like to schedule a site visit before preparing your quote.`,
     "",
     `Project type: ${input.projectType}`,
     `Property address: ${input.propertyAddress}`,
-    input.contractorPhone?.trim() ? `Contractor phone: ${input.contractorPhone.trim()}` : null,
+    contractorPhone ? `Contractor phone: ${contractorPhone}` : null,
     "",
-    `Suggested next step: ${nextStep}`,
+    "What happens next",
+    "",
+    `A representative from ${businessName} will contact you soon using the phone number or email you provided to arrange a convenient time for the site visit.`,
+    contractorPhone
+      ? `If you would prefer to speak with them sooner, you can also call ${contractorPhone}.`
+      : null,
+    "",
+    "Your original project details and photos have already been shared with the contractor, so there is no need to explain everything again when they contact you.",
     "",
     "— Job Proof",
   ]
@@ -393,7 +395,6 @@ export async function sendQuoteRequestSiteVisitCustomerEmail(
       contractorPhone,
       projectType: payload.projectType,
       propertyAddress: payload.propertyAddress,
-      replyToEmail,
     };
 
     const resend = new Resend(apiKey);
