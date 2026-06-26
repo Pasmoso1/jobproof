@@ -45,11 +45,13 @@ function buildSiteVisitSmsBody(input: {
   const projectType = smsProjectType(input.projectType);
   const phone = input.businessPhone?.trim();
 
+  const base = `Hi ${name}, thanks for reaching out to ${business} for a quote on your ${projectType}. We've reviewed your request and would like to schedule a site visit before preparing your quote. We'll contact you soon using the phone number or email you provided.`;
+
   if (phone) {
-    return `Hi ${name}, ${business} reviewed your quote request for ${projectType} and would like to schedule a site visit. They'll contact you soon. If you prefer, call ${phone}. — JobProof`;
+    return `${base} If you'd prefer to speak with us sooner, feel free to call ${phone}.`;
   }
 
-  return `Hi ${name}, ${business} reviewed your quote request for ${projectType} and would like to schedule a site visit. They'll contact you soon. — JobProof`;
+  return base;
 }
 
 /**
