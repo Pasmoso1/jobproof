@@ -11,6 +11,7 @@ import {
 } from "@/components/quote-request-urgency";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 import { quoteRequestStatusLabel } from "@/lib/quote-requests/constants";
+import { formatFollowUpAnswerDisplay } from "@/lib/quote-requests/follow-up-types";
 import { getQuoteRequestDetail } from "../quote-request-actions";
 import { QuoteRequestActionButtons } from "./quote-request-action-buttons";
 
@@ -132,6 +133,24 @@ export default async function QuoteRequestDetailPage({
           </div>
         </section>
       ) : null}
+
+      <section className="rounded-xl border border-zinc-200 bg-white p-5">
+        <h2 className="text-base font-semibold text-zinc-900">Additional information</h2>
+        {request.followUpAnswers.length > 0 ? (
+          <dl className="mt-4 space-y-4">
+            {request.followUpAnswers.map((item) => (
+              <div key={item.id} className="border-b border-zinc-100 pb-4 last:border-b-0 last:pb-0">
+                <dt className="text-sm text-zinc-500">{item.question}</dt>
+                <dd className="mt-1 text-sm font-medium text-zinc-900">
+                  {formatFollowUpAnswerDisplay(item.answer, item.question_type)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p className="mt-3 text-sm text-zinc-600">No additional customer answers yet.</p>
+        )}
+      </section>
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5">
         <h2 className="text-base font-semibold text-zinc-900">Actions</h2>

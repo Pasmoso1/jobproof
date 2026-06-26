@@ -442,9 +442,20 @@ export interface QuoteRequest {
   project_type: string;
   description: string;
   is_urgent: boolean;
+  follow_up_token: string | null;
   submitted_at: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface QuoteRequestFollowUpAnswer {
+  id: string;
+  quote_request_id: string;
+  question: string;
+  answer: string | null;
+  question_type: string;
+  display_order: number;
+  created_at: string;
 }
 
 export interface QuoteRequestAttachment {

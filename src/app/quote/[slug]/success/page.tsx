@@ -1,20 +1,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContractorByQuoteSlug } from "@/lib/quote-requests/public";
+import { QuoteFollowUpFlow } from "./quote-follow-up-flow";
 
 export const dynamic = "force-dynamic";
 
 export default async function QuoteRequestSuccessPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ rid?: string; ft?: string }>;
 }) {
   const { slug } = await params;
+  const { rid, ft } = await searchParams;
   const contractor = await getContractorByQuoteSlug(slug);
   if (!contractor) notFound();
 
   const phone = contractor.phone.trim();
   const telHref = phone ? `tel:${phone.replace(/\s/g, "")}` : null;
+  const showFollowUp = Boolean(rid?.trim() && ft?.trim());
 
   return (
     <div className="min-h-screen bg-zinc-50 py-8 sm:py-12">
@@ -46,6 +51,10 @@ export default async function QuoteRequestSuccessPage({
           <p className="mt-6 text-sm text-zinc-600">
             Most quote requests receive a response within 24 hours.
           </p>
+
+          {showFollowUp ? (
+            <QuoteFollowUpFlow slug={slug} requestId={rid!.trim()} token={ft!.trim()} />
+          ) : null}
 
           <div className="mt-8 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
             <h2 className="text-sm font-semibold text-zinc-900">Need immediate assistance?</h2>

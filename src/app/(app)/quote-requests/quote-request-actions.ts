@@ -15,12 +15,13 @@ import {
 import { hoursSinceSubmission } from "@/lib/quote-requests/response-alerts";
 import { sendQuoteRequestSiteVisitCustomerEmail } from "@/lib/quote-requests/notifications";
 import { sendQuoteRequestSiteVisitCustomerSms } from "@/lib/quote-requests/sms-notifications";
-import type { QuoteRequest, QuoteRequestAttachment } from "@/types/database";
+import type { QuoteRequest, QuoteRequestAttachment, QuoteRequestFollowUpAnswer } from "@/types/database";
 
 export type QuoteRequestListRow = QuoteRequest;
 
 export type QuoteRequestDetail = QuoteRequest & {
   attachments: Array<QuoteRequestAttachment & { signedUrl: string | null }>;
+  followUpAnswers: QuoteRequestFollowUpAnswer[];
 };
 
 async function requireProfileId(): Promise<string> {
@@ -90,9 +91,16 @@ export async function getQuoteRequestDetail(
     })
   );
 
+  const { data: followUpAnswers } = await supabase
+    .from("quote_request_followup_answers")
+    .select("*")
+    .eq("quote_request_id", requestId)
+    .order("display_order", { ascending: true });
+
   return {
     ...(request as QuoteRequest),
     attachments: withUrls,
+    followUpAnswers: (followUpAnswers ?? []) as QuoteRequestFollowUpAnswer[],
   };
 }
 

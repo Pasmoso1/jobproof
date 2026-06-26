@@ -156,11 +156,13 @@ export async function submitPublicQuoteRequest(
   }
 
   const requestId = generateUUID();
+  const followUpToken = generateUUID();
   const submittedAt = new Date().toISOString();
 
   const { error: insertError } = await admin.from("quote_requests").insert({
     id: requestId,
     contractor_id: contractor.id,
+    follow_up_token: followUpToken,
     status: "new",
     customer_name: input.customerName.trim(),
     customer_email: input.customerEmail.trim(),
@@ -266,5 +268,5 @@ export async function submitPublicQuoteRequest(
     });
   }
 
-  redirect(`/quote/${contractor.quote_slug}/success`);
+  redirect(`/quote/${contractor.quote_slug}/success?rid=${requestId}&ft=${followUpToken}`);
 }
