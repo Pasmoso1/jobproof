@@ -1,71 +1,73 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { QUOTE_REQUEST_STORAGE_BUCKET } from "@/lib/quote-requests/constants";
-import { getGenericFollowUpQuestions } from "@/lib/quote-requests/follow-up-generic";
+import type { FollowUpQuestion } from "@/lib/quote-requests/follow-up-types";
 import {
-  type FollowUpQuestion,
-  type FollowUpQuestionType,
-  isFollowUpQuestionType,
-} from "@/lib/quote-requests/follow-up-types";
+  assembleFollowUpQuestions,
+  selectFallbackLibraryQuestionIds,
+} from "@/lib/quote-requests/question-library/assemble";
+import {
+  getLibraryQuestionsForTrades,
+  toCatalogEntry,
+} from "@/lib/quote-requests/question-library/registry";
+import { resolveLibraryTrades } from "@/lib/quote-requests/question-library/resolve-trade";
+import type { AiQuestionSelectionResponse } from "@/lib/quote-requests/question-library/types";
 import { getEffectiveQuoteTrade } from "@/lib/quote-requests/trade";
-import { generateUUID } from "@/lib/utils/uuid";
 
 const MAX_AI_PHOTOS = 4;
 const MIN_QUESTIONS = 3;
 const MAX_QUESTIONS = 8;
 
-type AiQuestionPayload = {
-  question?: string;
-  question_type?: string;
-  options?: string[];
-  display_order?: number;
-};
+const DEFAULT_PHOTO_CLARIFICATION =
+  "The uploaded photo doesn't appear to show the project area. Could you upload another photo or briefly describe that area?";
 
-type AiResponsePayload = {
-  questions?: AiQuestionPayload[];
-};
+function buildSelectionSystemPrompt(): string {
+  return `You are JobProof's quote follow-up decision engine.
 
-function buildSystemPrompt(): string {
-  return `You generate optional follow-up questions for a home-services quote request.
+You do NOT write new question wording except for ONE optional photo clarification when required.
 
-Rules:
-- Generate 3 to 6 useful questions (maximum 8).
-- Do NOT ask about information already clearly stated in the customer description.
-- Do NOT ask questions whose answers are already obvious from the photos.
-- Use short, mobile-friendly wording.
-- Prefer multiple_choice or yes_no when practical.
-- Every question is optional for the customer.
-- Question types allowed: multiple_choice, checkbox, short_text, number, date, yes_no.
-- For multiple_choice and checkbox, include 2-6 concise options.
-- Do not ask for duplicate contact info already collected on the form.
+Your job:
+1. Read the contractor trade, project type, customer description, and uploaded photos.
+2. Determine what information is already known from the description and photos.
+3. Select the best 3–6 question IDs from the provided JobProof Question Library (maximum 8).
+4. Prefer very_high and high priority questions that improve quote accuracy and site visit preparation.
+5. Do NOT select questions for information already stated in the description or clearly visible in photos.
+6. Do NOT invent question IDs — only use IDs from the catalog.
+7. Do NOT select budget or pricing-range questions (none exist in the library).
 
-Photo analysis (internal only — never mention photo observations to the customer):
-- Inspect uploaded photos to improve question selection only.
-- If photos are unclear, blurry, irrelevant, or do not match the stated project type, include a clarification question instead of guessing.
-- If project type is Deck but photo shows a kitchen, ask the customer to describe or upload the correct outdoor/deck area.
-- If a photo is too blurry to interpret, ask for a clearer photo or a short description.
-- If photos are not useful, fall back to trade and project-type questions.
-- Never invent details from photos. Never state confident assumptions about what is in a photo.
+Photo rules (internal analysis only — never describe photo observations to the customer):
+- Use photos to eliminate redundant library questions.
+- Example: if photos clearly show stairs, railings, and pressure-treated decking, do NOT select questions about those features.
+- If photos are blurry, irrelevant, wrong project area, or unclear, set photo_clarification_needed to true and provide exactly ONE short clarification question.
+- Only one photo clarification question. Do not ask repeatedly for more photos.
+- Never invent details from photos. Never make confident assumptions.
+
+Question priority order when selecting:
+1. Project size
+2. Existing conditions
+3. Materials
+4. Special features
+5. Access / removal
+6. Desired completion timeframe
+7. Customer preferences
 
 Return JSON only:
 {
-  "questions": [
-    {
-      "question": "string",
-      "question_type": "multiple_choice|checkbox|short_text|number|date|yes_no",
-      "options": ["optional for choice types"],
-      "display_order": 1
-    }
-  ]
+  "known_from_description": ["tag or short phrase"],
+  "known_from_photos": ["tag or short phrase"],
+  "selected_question_ids": ["library_question_id"],
+  "photo_clarification_needed": false,
+  "photo_clarification_question": null
 }`;
 }
 
-function buildUserPrompt(input: {
+function buildSelectionUserPrompt(input: {
   tradeLabel: string | null;
   primaryTrade: string | null;
   primaryTradeOther: string | null;
   projectType: string;
   description: string;
   photoCount: number;
+  catalogJson: string;
 }): string {
   const tradeLine = input.tradeLabel
     ? `Contractor trade: ${input.tradeLabel}`
@@ -81,54 +83,39 @@ function buildUserPrompt(input: {
     `Project type: ${input.projectType}`,
     `Customer description:\n${input.description}`,
     `Number of photos uploaded: ${input.photoCount}`,
-    photoCountNote(input.photoCount),
+    input.photoCount === 0
+      ? "No photos uploaded — select from library based on description and trade only."
+      : "Photos are attached — use them to skip redundant library questions or request one clarification if needed.",
+    "",
+    "Question library catalog (select by id only):",
+    input.catalogJson,
   ]
     .filter(Boolean)
     .join("\n\n");
 }
 
-function photoCountNote(photoCount: number): string {
-  if (photoCount === 0) {
-    return "No photos were uploaded. Use trade and project-type questions only.";
+function parseSelectionResponse(content: string): AiQuestionSelectionResponse | null {
+  try {
+    return JSON.parse(content) as AiQuestionSelectionResponse;
+  } catch {
+    return null;
   }
-  return "Photos are attached. Use them only to avoid redundant questions and to spot mismatches or unclear images.";
 }
 
-function normalizeAiQuestions(raw: AiQuestionPayload[]): FollowUpQuestion[] {
-  const normalized: FollowUpQuestion[] = [];
+function normalizeSelectedIds(
+  raw: AiQuestionSelectionResponse | null,
+  validIds: Set<string>
+): string[] {
+  if (!raw?.selected_question_ids?.length) return [];
 
-  for (const item of raw) {
-    const question = String(item.question ?? "").trim();
-    const questionType = String(item.question_type ?? "").trim();
-    if (!question || !isFollowUpQuestionType(questionType)) continue;
-
-    const options =
-      questionType === "multiple_choice" || questionType === "checkbox"
-        ? (item.options ?? [])
-            .map((o) => String(o).trim())
-            .filter(Boolean)
-            .slice(0, 6)
-        : undefined;
-
-    if (
-      (questionType === "multiple_choice" || questionType === "checkbox") &&
-      (!options || options.length < 2)
-    ) {
-      continue;
-    }
-
-    normalized.push({
-      id: generateUUID(),
-      question,
-      question_type: questionType as FollowUpQuestionType,
-      options,
-      display_order: normalized.length + 1,
-    });
-
-    if (normalized.length >= MAX_QUESTIONS) break;
+  const ids: string[] = [];
+  for (const id of raw.selected_question_ids) {
+    const normalized = String(id).trim();
+    if (!validIds.has(normalized) || ids.includes(normalized)) continue;
+    ids.push(normalized);
+    if (ids.length >= MAX_QUESTIONS) break;
   }
-
-  return normalized;
+  return ids;
 }
 
 async function signAttachmentUrls(
@@ -159,8 +146,38 @@ export type GenerateFollowUpQuestionsOutput = {
   usedFallback: boolean;
 };
 
+function buildFallbackOutput(
+  libraryQuestions: ReturnType<typeof getLibraryQuestionsForTrades>,
+  description: string
+): GenerateFollowUpQuestionsOutput {
+  const selectedIds = selectFallbackLibraryQuestionIds(libraryQuestions, description);
+  let questions = assembleFollowUpQuestions({
+    libraryQuestions,
+    selectedIds,
+    description,
+  });
+
+  if (questions.length < MIN_QUESTIONS) {
+    const backupIds = libraryQuestions
+      .slice()
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .slice(0, 6)
+      .map((q) => q.id);
+    questions = assembleFollowUpQuestions({
+      libraryQuestions,
+      selectedIds: backupIds,
+      description,
+    });
+  }
+
+  return {
+    questions,
+    usedFallback: true,
+  };
+}
+
 /**
- * Generate personalized follow-up questions via OpenAI vision. Falls back to generic questions on failure.
+ * Select personalized follow-up questions from the JobProof library via OpenAI. Falls back to priority-based library selection on failure.
  */
 export async function generateFollowUpQuestions(
   admin: SupabaseClient,
@@ -177,10 +194,18 @@ export async function generateFollowUpQuestions(
     quote_primary_trade_other: profile?.quote_primary_trade_other,
   });
 
-  const fallback = () => ({
-    questions: getGenericFollowUpQuestions(input.projectType, tradeLabel),
-    usedFallback: true,
+  const libraryTrades = resolveLibraryTrades({
+    primaryTrade: profile?.quote_primary_trade ? String(profile.quote_primary_trade) : null,
+    primaryTradeOther: profile?.quote_primary_trade_other
+      ? String(profile.quote_primary_trade_other)
+      : null,
+    projectType: input.projectType,
   });
+
+  const libraryQuestions = getLibraryQuestionsForTrades(libraryTrades);
+  const validIds = new Set(libraryQuestions.map((q) => q.id));
+
+  const fallback = () => buildFallbackOutput(libraryQuestions, input.description);
 
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
@@ -189,8 +214,11 @@ export async function generateFollowUpQuestions(
   }
 
   try {
+    const catalog = libraryQuestions.map(toCatalogEntry);
+    const catalogJson = JSON.stringify(catalog);
+
     const imageUrls = await signAttachmentUrls(admin, input.attachmentPaths);
-    const userText = buildUserPrompt({
+    const userText = buildSelectionUserPrompt({
       tradeLabel,
       primaryTrade: profile?.quote_primary_trade ? String(profile.quote_primary_trade) : null,
       primaryTradeOther: profile?.quote_primary_trade_other
@@ -199,6 +227,7 @@ export async function generateFollowUpQuestions(
       projectType: input.projectType,
       description: input.description,
       photoCount: input.attachmentPaths.length,
+      catalogJson,
     });
 
     const userContent: Array<
@@ -218,11 +247,11 @@ export async function generateFollowUpQuestions(
       },
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini",
-        temperature: 0.4,
-        max_tokens: 1800,
+        temperature: 0.2,
+        max_tokens: 1200,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: buildSystemPrompt() },
+          { role: "system", content: buildSelectionSystemPrompt() },
           { role: "user", content: userContent },
         ],
       }),
@@ -246,11 +275,35 @@ export async function generateFollowUpQuestions(
       return fallback();
     }
 
-    const parsed = JSON.parse(content) as AiResponsePayload;
-    const questions = normalizeAiQuestions(parsed.questions ?? []);
+    const parsed = parseSelectionResponse(content);
+    const selectedIds = normalizeSelectedIds(parsed, validIds);
+
+    const knownTags = [
+      ...(parsed?.known_from_description ?? []),
+      ...(parsed?.known_from_photos ?? []),
+    ].map((t) => String(t).trim()).filter(Boolean);
+
+    const clarification =
+      parsed?.photo_clarification_needed === true
+        ? String(parsed.photo_clarification_question ?? "").trim() ||
+          DEFAULT_PHOTO_CLARIFICATION
+        : null;
+
+    if (selectedIds.length === 0 && !clarification) {
+      console.warn("[follow-up-ai] no selections from AI, using fallback");
+      return fallback();
+    }
+
+    const questions = assembleFollowUpQuestions({
+      libraryQuestions,
+      selectedIds,
+      description: input.description,
+      knownTags,
+      clarificationQuestion: clarification,
+    });
 
     if (questions.length < MIN_QUESTIONS) {
-      console.warn("[follow-up-ai] too few questions, using fallback", {
+      console.warn("[follow-up-ai] too few assembled questions, using fallback", {
         count: questions.length,
       });
       return fallback();

@@ -1,0 +1,61 @@
+import type { FollowUpQuestionType } from "@/lib/quote-requests/follow-up-types";
+
+export const LIBRARY_TRADES = [
+  "painter",
+  "plumber",
+  "hvac",
+  "electrician",
+  "roofer",
+  "deck_fence",
+  "flooring",
+  "kitchen_renovation",
+  "bathroom_renovation",
+  "landscaping",
+  "concrete",
+  "windows_doors",
+  "general_renovation",
+  "handyman",
+  "other",
+] as const;
+
+export type LibraryTradeKey = (typeof LIBRARY_TRADES)[number];
+
+export type QuestionPriority = "very_high" | "high" | "medium" | "low";
+
+export type QuestionCategory =
+  | "project_size"
+  | "existing_conditions"
+  | "materials"
+  | "special_features"
+  | "access_removal"
+  | "timeline"
+  | "customer_preferences";
+
+export type LibraryQuestion = {
+  id: string;
+  trade: LibraryTradeKey | "shared";
+  category: QuestionCategory;
+  priority: QuestionPriority;
+  question: string;
+  questionType: FollowUpQuestionType;
+  choices?: string[];
+  requiredInformation: string;
+  tags: string[];
+};
+
+export type LibraryQuestionCatalogEntry = {
+  id: string;
+  trade: LibraryTradeKey | "shared";
+  category: QuestionCategory;
+  priority: QuestionPriority;
+  requiredInformation: string;
+  tags: string[];
+};
+
+export type AiQuestionSelectionResponse = {
+  known_from_description?: string[];
+  known_from_photos?: string[];
+  selected_question_ids?: string[];
+  photo_clarification_needed?: boolean;
+  photo_clarification_question?: string;
+};
