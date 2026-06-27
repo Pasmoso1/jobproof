@@ -31,6 +31,13 @@ function inferTradeFromText(text: string): LibraryTradeKey | null {
   if (/\bpaint(ing)?\b|\bwall(s)?\b/.test(p)) return "painter";
   if (/\brenovat|\bremodel\b|\bdrywall\b/.test(p)) return "general_renovation";
   if (/\bfence\b/.test(p)) return "deck_fence";
+  if (
+    /\bfoundation crack|\bbasement leak|\bwaterproof|\bweeping tile|\bsump pump|\bwater intrusion|\bfoundation repair|\bbasement moisture|\bconcrete crack/i.test(
+      p
+    )
+  ) {
+    return "concrete";
+  }
 
   return null;
 }
@@ -42,6 +49,7 @@ export function resolveLibraryTrades(input: {
   primaryTrade: string | null;
   primaryTradeOther: string | null;
   projectType: string;
+  description?: string;
 }): LibraryTradeKey[] {
   const trades = new Set<LibraryTradeKey>();
 
@@ -61,6 +69,13 @@ export function resolveLibraryTrades(input: {
   const fromProject = inferTradeFromText(input.projectType);
   if (fromProject) {
     trades.add(fromProject);
+  }
+
+  const fromDescription = input.description?.trim()
+    ? inferTradeFromText(input.description)
+    : null;
+  if (fromDescription) {
+    trades.add(fromDescription);
   }
 
   if (trades.size === 0) {

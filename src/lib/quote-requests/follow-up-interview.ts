@@ -14,7 +14,7 @@ import {
 } from "@/lib/quote-requests/question-library/registry";
 import { resolveLibraryTrades } from "@/lib/quote-requests/question-library/resolve-trade";
 import { sortLibraryQuestions } from "@/lib/quote-requests/question-library/sort";
-import type { AiInterviewStepResponse } from "@/lib/quote-requests/question-library/types";
+import type { LibraryQuestion } from "@/lib/quote-requests/question-library/types";
 import {
   isScopeFit,
   normalizeScopeAssessment,
@@ -26,6 +26,15 @@ import {
   getScopeFallbackCustomQuestions,
   inferHeuristicScopeAssessment,
 } from "@/lib/quote-requests/scope-fallback";
+import { detectSpecialty } from "@/lib/quote-requests/specialty/detection";
+import {
+  filterCatalogForSpecialty,
+  getSpecialtyQuestionById,
+  getSpecialtyQuestions,
+  shouldBlockQuestionId,
+} from "@/lib/quote-requests/specialty/registry";
+import type { SpecialtyClassification } from "@/lib/quote-requests/specialty/types";
+import type { AiInterviewStepResponse } from "@/lib/quote-requests/question-library/types";
 import { getEffectiveQuoteTrade } from "@/lib/quote-requests/trade";
 import { generateUUID } from "@/lib/utils/uuid";
 import { isFollowUpQuestionType } from "@/lib/quote-requests/follow-up-types";
@@ -35,9 +44,24 @@ const MAX_AI_PHOTOS = 4;
 const DEFAULT_PHOTO_CLARIFICATION =
   "The uploaded photo doesn't appear to show the project area. Could you upload another photo or briefly describe that area?";
 
-function buildInterviewSystemPrompt(isFirstStep: boolean): string {
-  return `You are an experienced contractor estimator conducting an adaptive quote interview for JobProof.
+function buildInterviewSystemPrompt(
+  isFirstStep: boolean,
+  specialty: SpecialtyClassification | null
+): string {
+  const specialtyRules = specialty
+    ? `
+SPECIALTY PROJECT DETECTED: ${specialty.label} (${specialty.key})
+- Ask specialty catalog questions FIRST before generic trade questions.
+- Do NOT ask generic landscaping yard condition, property size, or "what type of landscaping" questions.
+- Do NOT ask "Will someone be on site/home?" — use project-specific access questions from the specialty catalog instead.
+- Do NOT ask timeline or "how soon to move forward" as the first question${specialty.urgent ? " — this is urgent water intrusion; ask about active leaking and water source first" : ""}.
+- After specialty questions are exhausted, select remaining relevant library IDs only.
+- Branch based on answers: if customer confirms full pool installation, abandon generic landscaping questions (same pattern for foundation leaks vs yard questions).
+`
+    : "";
 
+  return `You are an experienced contractor estimator conducting an adaptive quote interview for JobProof.
+${specialtyRules}
 Ask ONE question at a time. After each customer answer, decide the single most valuable next question.
 
 Behave like a real estimator — not a long form. Questions should become more specific as the interview progresses. Natural finish is 3–5 questions. Maximum 6 total.
@@ -92,9 +116,11 @@ function buildInterviewUserPrompt(input: {
   description: string;
   photoCount: number;
   previousAnswers: PreviousInterviewAnswer[];
+  specialtyCatalogJson: string | null;
   remainingCatalogJson: string;
   existingScopeFit: ScopeFit | null;
   questionNumber: number;
+  specialty: SpecialtyClassification | null;
 }): string {
   const tradeLine = input.tradeLabel
     ? `Contractor trade: ${input.tradeLabel}`
@@ -117,6 +143,9 @@ function buildInterviewUserPrompt(input: {
   return [
     tradeLine,
     otherTrade,
+    input.specialty
+      ? `Detected job specialty: ${input.specialty.label} (${input.specialty.key}, urgent=${input.specialty.urgent})`
+      : null,
     input.existingScopeFit ? `Current scope assessment: ${input.existingScopeFit}` : null,
     `Project type: ${input.projectType}`,
     `Customer description:\n${input.description}`,
@@ -126,8 +155,11 @@ function buildInterviewUserPrompt(input: {
     "",
     "Interview transcript:",
     transcript,
+    input.specialtyCatalogJson
+      ? `\nSpecialty question catalog (PREFER these ids first):\n${input.specialtyCatalogJson}`
+      : null,
     "",
-    "Remaining question library catalog (select ONE id or use custom_question):",
+    "Remaining general question library catalog (select ONE id or use custom_question):",
     input.remainingCatalogJson,
   ]
     .filter(Boolean)
@@ -190,23 +222,38 @@ function buildCustomFollowUpQuestion(
   };
 }
 
+function resolveQuestionById(id: string): LibraryQuestion | undefined {
+  return getSpecialtyQuestionById(id) ?? getLibraryQuestionById(id);
+}
+
 function getFallbackNextQuestion(input: {
+  specialty: SpecialtyClassification | null;
   scopeAssessment: ScopeAssessment;
   libraryQuestions: ReturnType<typeof getLibraryQuestionsForTrades>;
   previousAnswers: PreviousInterviewAnswer[];
   projectType: string;
   description: string;
   displayOrder: number;
+  questionNumber: number;
 }): FollowUpQuestion | null {
   const asked = askedLibraryIds(input.previousAnswers);
-  const index = input.previousAnswers.length;
 
-  if (input.scopeAssessment.fit !== "within_scope") {
+  if (input.specialty) {
+    const specialtyQs = getSpecialtyQuestions(input.specialty);
+    const nextSpecialty = specialtyQs.find((q) => !asked.has(q.id));
+    if (nextSpecialty) {
+      const followUp = libraryQuestionToFollowUp(nextSpecialty, input.displayOrder);
+      return { ...followUp, library_question_id: nextSpecialty.id, is_custom: false };
+    }
+  }
+
+  if (input.scopeAssessment.fit !== "within_scope" && !input.specialty) {
     const customs = getScopeFallbackCustomQuestions(
       input.scopeAssessment,
       input.projectType,
       input.description
     );
+    const index = input.previousAnswers.length;
     const custom = customs[index];
     if (custom) {
       return { ...custom, display_order: input.displayOrder, is_custom: true };
@@ -214,7 +261,11 @@ function getFallbackNextQuestion(input: {
   }
 
   const remaining = sortLibraryQuestions(
-    input.libraryQuestions.filter((q) => !asked.has(q.id))
+    input.libraryQuestions.filter(
+      (q) =>
+        !asked.has(q.id) &&
+        !shouldBlockQuestionId(q.id, input.specialty, input.questionNumber)
+    )
   );
 
   const nextLibrary = remaining[0];
@@ -278,17 +329,30 @@ export async function getNextInterviewStep(
     ? String(profile.quote_primary_trade_other)
     : null;
 
+  const specialty = detectSpecialty(input.projectType, input.description);
+
   const libraryTrades = resolveLibraryTrades({
     primaryTrade,
     primaryTradeOther,
     projectType: input.projectType,
+    description: input.description,
   });
 
   const libraryQuestions = getLibraryQuestionsForTrades(libraryTrades);
   const asked = askedLibraryIds(input.previousAnswers);
-  const remainingCatalog = libraryQuestions
-    .filter((q) => !asked.has(q.id))
-    .map(toCatalogEntry);
+  const remainingCatalog = filterCatalogForSpecialty(
+    libraryQuestions.filter((q) => !asked.has(q.id)),
+    specialty,
+    questionNumber
+  ).map(toCatalogEntry);
+
+  const specialtyCatalogJson = specialty
+    ? JSON.stringify(
+        getSpecialtyQuestions(specialty)
+          .filter((q) => !asked.has(q.id))
+          .map(toCatalogEntry)
+      )
+    : null;
 
   const existingScopeFit = await loadExistingScope(admin, input.requestId);
   const isFirstStep = answeredCount === 0;
@@ -302,12 +366,14 @@ export async function getNextInterviewStep(
 
   const fallbackNext = (scope: ScopeAssessment): InterviewStepResult => {
     const question = getFallbackNextQuestion({
+      specialty,
       scopeAssessment: scope,
       libraryQuestions,
       previousAnswers: input.previousAnswers,
       projectType: input.projectType,
       description: input.description,
       displayOrder,
+      questionNumber,
     });
 
     if (!question) {
@@ -341,9 +407,11 @@ export async function getNextInterviewStep(
       description: input.description,
       photoCount: input.attachmentPaths.length,
       previousAnswers: input.previousAnswers,
+      specialtyCatalogJson,
       remainingCatalogJson: JSON.stringify(remainingCatalog),
       existingScopeFit,
       questionNumber,
+      specialty,
     });
 
     const userContent: Array<
@@ -370,7 +438,7 @@ export async function getNextInterviewStep(
         max_tokens: 900,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: buildInterviewSystemPrompt(isFirstStep) },
+          { role: "system", content: buildInterviewSystemPrompt(isFirstStep, specialty) },
           { role: "user", content: userContent },
         ],
       }),
@@ -450,8 +518,12 @@ export async function getNextInterviewStep(
     }
 
     const libraryId = String(parsed.selected_library_question_id ?? "").trim();
-    if (libraryId && !asked.has(libraryId)) {
-      const libraryQuestion = getLibraryQuestionById(libraryId);
+    if (
+      libraryId &&
+      !asked.has(libraryId) &&
+      !shouldBlockQuestionId(libraryId, specialty, questionNumber)
+    ) {
+      const libraryQuestion = resolveQuestionById(libraryId);
       if (libraryQuestion) {
         const followUp = libraryQuestionToFollowUp(libraryQuestion, displayOrder);
         return {

@@ -19,6 +19,8 @@ import { PAINTER_QUESTIONS } from "@/lib/quote-requests/question-library/trades/
 import { PLUMBER_QUESTIONS } from "@/lib/quote-requests/question-library/trades/plumber";
 import { ROOFER_QUESTIONS } from "@/lib/quote-requests/question-library/trades/roofer";
 import { WINDOWS_DOORS_QUESTIONS } from "@/lib/quote-requests/question-library/trades/windows-doors";
+import { EXTERIOR_DRAINAGE_QUESTIONS } from "@/lib/quote-requests/specialty/exterior-drainage";
+import { FOUNDATION_WATERPROOFING_QUESTIONS } from "@/lib/quote-requests/specialty/foundation-waterproofing";
 
 const TRADE_QUESTION_MAP: Record<LibraryTradeKey, LibraryQuestion[]> = {
   painter: PAINTER_QUESTIONS,
@@ -40,6 +42,8 @@ const TRADE_QUESTION_MAP: Record<LibraryTradeKey, LibraryQuestion[]> = {
 
 const ALL_LIBRARY_QUESTIONS: LibraryQuestion[] = [
   ...SHARED_LIBRARY_QUESTIONS,
+  ...FOUNDATION_WATERPROOFING_QUESTIONS,
+  ...EXTERIOR_DRAINAGE_QUESTIONS,
   ...Object.values(TRADE_QUESTION_MAP).flat(),
 ];
 

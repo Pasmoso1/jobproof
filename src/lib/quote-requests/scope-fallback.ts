@@ -1,5 +1,7 @@
 import type { FollowUpQuestion } from "@/lib/quote-requests/follow-up-types";
 import type { ScopeAssessment, ScopeFit } from "@/lib/quote-requests/scope-assessment";
+import { detectSpecialty } from "@/lib/quote-requests/specialty/detection";
+import { inferSpecialtyScopeAssessment } from "@/lib/quote-requests/specialty/scope";
 import { generateUUID } from "@/lib/utils/uuid";
 
 const POOL_PATTERN = /\bpool\b|\bswimming pool\b|\binground pool\b|\babove[- ]ground pool\b/i;
@@ -29,6 +31,15 @@ export function inferHeuristicScopeAssessment(input: {
   description: string;
 }): ScopeAssessment {
   const text = combinedText(input.projectType, input.description);
+  const specialty = detectSpecialty(input.projectType, input.description);
+  if (specialty) {
+    return inferSpecialtyScopeAssessment(
+      specialty,
+      input.tradeLabel,
+      input.primaryTrade
+    );
+  }
+
   const trade = (input.tradeLabel ?? input.primaryTrade ?? "").toLowerCase();
   const isLandscaper = trade.includes("landscap");
   const isPainter = trade.includes("paint");

@@ -33,7 +33,7 @@ export type QuestionCategory =
 
 export type LibraryQuestion = {
   id: string;
-  trade: LibraryTradeKey | "shared";
+  trade: LibraryTradeKey | "shared" | "specialty";
   category: QuestionCategory;
   priority: QuestionPriority;
   question: string;
@@ -45,7 +45,7 @@ export type LibraryQuestion = {
 
 export type LibraryQuestionCatalogEntry = {
   id: string;
-  trade: LibraryTradeKey | "shared";
+  trade: LibraryTradeKey | "shared" | "specialty";
   category: QuestionCategory;
   priority: QuestionPriority;
   requiredInformation: string;
