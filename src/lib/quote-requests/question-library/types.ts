@@ -71,3 +71,18 @@ export type AiQuestionSelectionResponse = {
   photo_clarification_needed?: boolean;
   photo_clarification_question?: string | null;
 };
+
+export type AiInterviewStepResponse = {
+  interview_complete?: boolean;
+  complete_reason?: string;
+  known_information?: string[];
+  scopeAssessment?: AiQuestionSelectionResponse["scopeAssessment"];
+  selected_library_question_id?: string | null;
+  custom_question?: {
+    question?: string;
+    question_type?: string;
+    options?: string[];
+  } | null;
+  photo_clarification_needed?: boolean;
+  photo_clarification_question?: string | null;
+};

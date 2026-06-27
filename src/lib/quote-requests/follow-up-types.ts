@@ -15,6 +15,28 @@ export type FollowUpQuestion = {
   question_type: FollowUpQuestionType;
   options?: string[];
   display_order: number;
+  library_question_id?: string | null;
+  is_custom?: boolean;
+};
+
+export type InterviewStepResult =
+  | {
+      status: "question";
+      question: FollowUpQuestion;
+      questionNumber: number;
+      maxQuestions: number;
+      usedFallback: boolean;
+    }
+  | { status: "complete"; usedFallback: boolean };
+
+export const MAX_FOLLOW_UP_INTERVIEW_QUESTIONS = 6;
+
+export type PreviousInterviewAnswer = {
+  question: string;
+  answer: string | null;
+  question_type: string;
+  display_order: number;
+  library_question_id?: string | null;
 };
 
 export type QuoteRequestFollowUpAnswer = {
@@ -24,6 +46,7 @@ export type QuoteRequestFollowUpAnswer = {
   answer: string | null;
   question_type: string;
   display_order: number;
+  library_question_id: string | null;
   created_at: string;
 };
 

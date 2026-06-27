@@ -25,6 +25,8 @@ export function libraryQuestionToFollowUp(
     question_type: question.questionType,
     options: question.choices,
     display_order: displayOrder,
+    library_question_id: question.id,
+    is_custom: false,
   };
 }
 

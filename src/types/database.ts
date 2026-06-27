@@ -459,6 +459,7 @@ export interface QuoteRequestFollowUpAnswer {
   answer: string | null;
   question_type: string;
   display_order: number;
+  library_question_id: string | null;
   created_at: string;
 }
 
