@@ -53,9 +53,21 @@ export type LibraryQuestionCatalogEntry = {
 };
 
 export type AiQuestionSelectionResponse = {
+  scopeAssessment?: {
+    fit?: string;
+    reason?: string;
+    contractorNote?: string;
+    customerClarificationNeeded?: boolean;
+  };
   known_from_description?: string[];
   known_from_photos?: string[];
   selected_question_ids?: string[];
+  custom_questions?: Array<{
+    question?: string;
+    question_type?: string;
+    options?: string[];
+    display_order?: number;
+  }>;
   photo_clarification_needed?: boolean;
-  photo_clarification_question?: string;
+  photo_clarification_question?: string | null;
 };

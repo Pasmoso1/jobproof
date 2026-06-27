@@ -443,6 +443,10 @@ export interface QuoteRequest {
   description: string;
   is_urgent: boolean;
   follow_up_token: string | null;
+  ai_scope_fit: string | null;
+  ai_scope_reason: string | null;
+  ai_scope_contractor_note: string | null;
+  ai_scope_customer_clarification_needed: boolean | null;
   submitted_at: string;
   created_at: string;
   updated_at: string;

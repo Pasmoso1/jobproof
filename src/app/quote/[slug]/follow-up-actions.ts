@@ -36,6 +36,7 @@ export async function generateFollowUpQuestionsAction(
     .order("created_at", { ascending: true });
 
   const result = await generateFollowUpQuestions(admin, {
+    requestId: access.requestId,
     contractorId: access.contractorId,
     projectType: access.projectType,
     description: access.description,

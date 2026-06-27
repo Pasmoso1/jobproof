@@ -1,6 +1,14 @@
 import type { FollowUpQuestion } from "@/lib/quote-requests/follow-up-types";
+import { isFollowUpQuestionType } from "@/lib/quote-requests/follow-up-types";
 import type { LibraryQuestion } from "@/lib/quote-requests/question-library/types";
 import { sortLibraryQuestions } from "@/lib/quote-requests/question-library/sort";
+import type { ScopeFit } from "@/lib/quote-requests/scope-assessment";
+import {
+  customLimitForScope,
+  libraryLimitForScope,
+  minQuestionsForScope,
+  totalLimitForScope,
+} from "@/lib/quote-requests/scope-fallback";
 import { generateUUID } from "@/lib/utils/uuid";
 
 const MIN_QUESTIONS = 3;
@@ -113,6 +121,116 @@ export function assembleFollowUpQuestions(input: {
   }
 
   return result;
+}
+
+export function normalizeCustomQuestionsFromAi(
+  raw: Array<{
+    question?: string;
+    question_type?: string;
+    options?: string[];
+    display_order?: number;
+  }>,
+  limit: number
+): FollowUpQuestion[] {
+  const result: FollowUpQuestion[] = [];
+
+  for (const item of raw) {
+    const question = String(item.question ?? "").trim();
+    const questionType = String(item.question_type ?? "").trim();
+    if (!question || !isFollowUpQuestionType(questionType)) continue;
+
+    const options =
+      questionType === "multiple_choice" || questionType === "checkbox"
+        ? (item.options ?? []).map((o) => String(o).trim()).filter(Boolean).slice(0, 8)
+        : undefined;
+
+    if (
+      (questionType === "multiple_choice" || questionType === "checkbox") &&
+      (!options || options.length < 2)
+    ) {
+      continue;
+    }
+
+    result.push({
+      id: generateUUID(),
+      question,
+      question_type: questionType,
+      options,
+      display_order: result.length + 1,
+    });
+
+    if (result.length >= limit) break;
+  }
+
+  return result;
+}
+
+export function buildScopedFollowUpQuestions(input: {
+  scopeFit: ScopeFit;
+  libraryQuestions: LibraryQuestion[];
+  selectedIds: string[];
+  customQuestions: FollowUpQuestion[];
+  description: string;
+  knownTags?: string[];
+  clarificationQuestion?: string | null;
+}): FollowUpQuestion[] {
+  const libraryLimit = libraryLimitForScope(input.scopeFit);
+  const customLimit = customLimitForScope(input.scopeFit);
+  const totalLimit = totalLimitForScope(input.scopeFit);
+  const minQuestions = minQuestionsForScope(input.scopeFit);
+
+  const librarySlice = assembleFollowUpQuestions({
+    libraryQuestions: input.libraryQuestions,
+    selectedIds: input.selectedIds,
+    description: input.description,
+    knownTags: input.knownTags,
+    clarificationQuestion: null,
+  }).slice(0, libraryLimit);
+
+  const customSlice = input.customQuestions.slice(0, customLimit);
+
+  const result: FollowUpQuestion[] = [];
+  let order = 1;
+
+  if (input.clarificationQuestion?.trim()) {
+    result.push({
+      ...buildClarificationFollowUpQuestion(input.clarificationQuestion),
+      display_order: order,
+    });
+    order += 1;
+  }
+
+  for (const question of customSlice) {
+    if (result.length >= totalLimit) break;
+    result.push({ ...question, display_order: order });
+    order += 1;
+  }
+
+  for (const question of librarySlice) {
+    if (result.length >= totalLimit) break;
+    result.push({ ...question, display_order: order });
+    order += 1;
+  }
+
+  if (result.length < minQuestions && input.scopeFit === "within_scope") {
+    const fillers = assembleFollowUpQuestions({
+      libraryQuestions: input.libraryQuestions,
+      selectedIds: selectFallbackLibraryQuestionIds(
+        input.libraryQuestions,
+        input.description
+      ),
+      description: input.description,
+      knownTags: input.knownTags,
+    });
+    for (const question of fillers) {
+      if (result.length >= totalLimit) break;
+      if (result.some((r) => r.question === question.question)) continue;
+      result.push({ ...question, display_order: order });
+      order += 1;
+    }
+  }
+
+  return result.slice(0, totalLimit);
 }
 
 export function selectFallbackLibraryQuestionIds(
