@@ -84,3 +84,30 @@ export function resolveLibraryTrades(input: {
 
   return Array.from(trades);
 }
+
+/**
+ * Resolve library trades from the customer's problem description only —
+ * never from the contractor's profile trade.
+ */
+export function resolveProblemLibraryTrades(
+  projectType: string,
+  description: string
+): LibraryTradeKey[] {
+  const trades = new Set<LibraryTradeKey>();
+
+  const fromProject = inferTradeFromText(projectType);
+  if (fromProject) {
+    trades.add(fromProject);
+  }
+
+  const fromDescription = inferTradeFromText(description);
+  if (fromDescription) {
+    trades.add(fromDescription);
+  }
+
+  if (trades.size === 0) {
+    trades.add("other");
+  }
+
+  return Array.from(trades);
+}

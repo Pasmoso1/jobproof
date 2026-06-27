@@ -5,16 +5,37 @@ import {
   type FollowUpQuestion,
   type InterviewStepResult,
   type PreviousInterviewAnswer,
+  isFollowUpQuestionType,
 } from "@/lib/quote-requests/follow-up-types";
+import {
+  allowProblemLibrary,
+  filterProblemRelevantCatalog,
+  getInterviewQuestionLimit,
+  isBlockedCustomQuestionText,
+  isLikelyOutOfScope,
+  shouldBlockInterviewQuestion,
+  shouldStopInterview,
+} from "@/lib/quote-requests/interview-policy";
 import { libraryQuestionToFollowUp } from "@/lib/quote-requests/question-library/assemble";
 import {
   getLibraryQuestionById,
   getLibraryQuestionsForTrades,
   toCatalogEntry,
 } from "@/lib/quote-requests/question-library/registry";
-import { resolveLibraryTrades } from "@/lib/quote-requests/question-library/resolve-trade";
+import { resolveProblemLibraryTrades } from "@/lib/quote-requests/question-library/resolve-trade";
 import { sortLibraryQuestions } from "@/lib/quote-requests/question-library/sort";
-import type { LibraryQuestion } from "@/lib/quote-requests/question-library/types";
+import type {
+  AiInterviewStepResponse,
+  LibraryQuestion,
+} from "@/lib/quote-requests/question-library/types";
+import {
+  classifyCustomerProblem,
+  type CustomerProblem,
+} from "@/lib/quote-requests/problem-classification";
+import { assessScopeFit } from "@/lib/quote-requests/problem-scope";
+import {
+  getNextScopeFallbackQuestion,
+} from "@/lib/quote-requests/scope-fallback";
 import {
   isScopeFit,
   normalizeScopeAssessment,
@@ -22,80 +43,93 @@ import {
   type ScopeAssessment,
   type ScopeFit,
 } from "@/lib/quote-requests/scope-assessment";
-import {
-  getScopeFallbackCustomQuestions,
-  inferHeuristicScopeAssessment,
-} from "@/lib/quote-requests/scope-fallback";
 import { detectSpecialty } from "@/lib/quote-requests/specialty/detection";
 import {
-  filterCatalogForSpecialty,
   getSpecialtyQuestionById,
   getSpecialtyQuestions,
-  shouldBlockQuestionId,
 } from "@/lib/quote-requests/specialty/registry";
 import type { SpecialtyClassification } from "@/lib/quote-requests/specialty/types";
-import type { AiInterviewStepResponse } from "@/lib/quote-requests/question-library/types";
 import { getEffectiveQuoteTrade } from "@/lib/quote-requests/trade";
 import { generateUUID } from "@/lib/utils/uuid";
-import { isFollowUpQuestionType } from "@/lib/quote-requests/follow-up-types";
 
 const MAX_AI_PHOTOS = 4;
 
 const DEFAULT_PHOTO_CLARIFICATION =
   "The uploaded photo doesn't appear to show the project area. Could you upload another photo or briefly describe that area?";
 
-function buildInterviewSystemPrompt(
-  isFirstStep: boolean,
-  specialty: SpecialtyClassification | null
-): string {
-  const specialtyRules = specialty
+function buildInterviewSystemPrompt(input: {
+  isFirstStep: boolean;
+  customerProblem: CustomerProblem;
+  scopeFit: ScopeFit;
+  isUrgent: boolean;
+  allowTradeLibrary: boolean;
+}): string {
+  const scopeRules =
+    input.scopeFit === "outside_scope" || input.scopeFit === "possibly_out_of_scope"
+      ? `
+OUT OF SCOPE (${input.scopeFit}):
+- Ask at most 2 broad clarification questions only.
+- Do NOT use contractor trade library questions.
+- Do NOT ask landscaping/roofing/painting questions based on contractor trade.
+- Set interview_complete true after enough clarification.
+`
+      : input.scopeFit === "mixed_scope"
+        ? `
+MIXED SCOPE:
+- Ask ONE clarifying question first to learn which part of the work the customer needs from THIS contractor.
+- Do NOT use contractor trade library unless the customer's answer confirms matching work.
+- If customer confirms specialist-only work (e.g. full pool install for a landscaper), set interview_complete true.
+`
+        : `
+WITHIN SCOPE:
+- Use problem-specific specialty catalog questions FIRST when available.
+- Use question library only for the customer's actual problem — NOT the contractor's unrelated trade.
+- Do not ask low-value generic questions (yard condition, property size, someone home, timeline/readiness).
+`;
+
+  const urgentRules = input.isUrgent
     ? `
-SPECIALTY PROJECT DETECTED: ${specialty.label} (${specialty.key})
-- Ask specialty catalog questions FIRST before generic trade questions.
-- Do NOT ask generic landscaping yard condition, property size, or "what type of landscaping" questions.
-- Do NOT ask "Will someone be on site/home?" — use project-specific access questions from the specialty catalog instead.
-- Do NOT ask timeline or "how soon to move forward" as the first question${specialty.urgent ? " — this is urgent water intrusion; ask about active leaking and water source first" : ""}.
-- After specialty questions are exhausted, select remaining relevant library IDs only.
-- Branch based on answers: if customer confirms full pool installation, abandon generic landscaping questions (same pattern for foundation leaks vs yard questions).
+URGENT REQUEST (customer checked urgent):
+- Do NOT ask timing, readiness, start date, or "how soon to move forward" questions — urgent already answers that.
+- Ask about severity, safety, active damage, access for immediate assessment, or preparation instead.
 `
     : "";
 
   return `You are an experienced contractor estimator conducting an adaptive quote interview for JobProof.
-${specialtyRules}
-Ask ONE question at a time. After each customer answer, decide the single most valuable next question.
 
-Behave like a real estimator — not a long form. Questions should become more specific as the interview progresses. Natural finish is 3–5 questions. Maximum 6 total.
+INTERVIEW LOGIC ORDER (mandatory):
+1. Understand the customer's actual request (customerProblem) — NOT the contractor's trade.
+2. Compare customerProblem against the contractor's trade (scopeAssessment).
+3. Decide whether this contractor is likely a match.
+4. Only then choose the next follow-up question.
 
-After each answer determine:
-- What do I now know?
-- What information is still missing?
-- Is another question worthwhile?
-- Have I learned enough?
+Detected customer problem: ${input.customerProblem.label} (confidence: ${input.customerProblem.confidence})
+Scope fit: ${input.scopeFit}
+${scopeRules}
+${urgentRules}
 
-If you have enough information for the contractor to understand the project, prepare for a site visit, and estimate complexity: set interview_complete to true. Do NOT ask questions just to fill a quota.
+QUESTION VALUE RULE:
+Only ask a question if the answer helps the contractor: decide if they can take the job, understand severity/urgency, prepare tools/materials/crew, plan access, understand size/complexity, identify safety issues, or prepare for a first call.
+
+Ask ONE question at a time. Natural finish is 3–5 questions. Maximum ${getInterviewQuestionLimit(input.scopeFit)} for this scope fit (${MAX_FOLLOW_UP_INTERVIEW_QUESTIONS} absolute max).
 
 QUESTION SOURCES:
-1. Prefer selected_library_question_id from the remaining catalog — use library wording EXACTLY (never paraphrase).
+1. Prefer selected_library_question_id from the provided catalog — use library wording EXACTLY.
 2. If no library question fits, provide ONE custom_question with simple mobile-friendly wording.
-3. Never ask budget or pricing-range questions. No legal advice. Do not claim the contractor offers a service.
+3. Never ask budget or pricing-range questions.
 
-BRANCHING:
-- Every answer must influence the next question.
-- Remove questions already answered or no longer relevant.
-- Example: if customer chose "Full pool installation", do NOT ask generic landscaping type questions — ask pool-specific follow-ups (inground/above-ground, pool selected, machine access, timeline).
-
-${isFirstStep ? `FIRST STEP ONLY:
-- Assess scope (scopeAssessment) if not already provided in context.
-- Scope values: within_scope, mixed_scope, possibly_out_of_scope, outside_scope.
-- contractorNote is for the contractor only — do not show to customer.
-- Use photos to skip redundant questions. If photos are blurry/irrelevant/wrong area, you may ask ONE photo clarification as custom_question (only on first step).` : ""}
+${input.isFirstStep ? `FIRST STEP ONLY:
+- Confirm or refine customerProblem and scopeAssessment in your JSON response.
+- contractorNote is for the contractor only — never show to customer.
+- Use photos to skip redundant questions.` : ""}
 
 Return JSON only:
 {
   "interview_complete": false,
   "complete_reason": null,
   "known_information": ["short phrase"],
-  ${isFirstStep ? `"scopeAssessment": { "fit": "within_scope|mixed_scope|possibly_out_of_scope|outside_scope", "reason": "string", "contractorNote": "string", "customerClarificationNeeded": true },` : ""}
+  ${input.isFirstStep ? `"customerProblem": { "label": "string", "confidence": "high|medium|low", "reasoning": "string" },
+  "scopeAssessment": { "fit": "within_scope|mixed_scope|possibly_out_of_scope|outside_scope", "reason": "string", "contractorNote": "string", "customerClarificationNeeded": true },` : ""}
   "selected_library_question_id": "library_id_or_null",
   "custom_question": null,
   "photo_clarification_needed": false,
@@ -112,19 +146,23 @@ function buildInterviewUserPrompt(input: {
   tradeLabel: string | null;
   primaryTrade: string | null;
   primaryTradeOther: string | null;
+  customerProblem: CustomerProblem;
+  scopeAssessment: ScopeAssessment;
   projectType: string;
   description: string;
+  isUrgent: boolean;
   photoCount: number;
   previousAnswers: PreviousInterviewAnswer[];
   specialtyCatalogJson: string | null;
-  remainingCatalogJson: string;
-  existingScopeFit: ScopeFit | null;
+  remainingCatalogJson: string | null;
+  allowTradeLibrary: boolean;
   questionNumber: number;
+  maxQuestions: number;
   specialty: SpecialtyClassification | null;
 }): string {
   const tradeLine = input.tradeLabel
-    ? `Contractor trade: ${input.tradeLabel}`
-    : "Contractor trade: not specified";
+    ? `Contractor listed trade: ${input.tradeLabel}`
+    : "Contractor listed trade: not specified";
   const otherTrade =
     input.primaryTrade === "Other" && input.primaryTradeOther?.trim()
       ? `Custom trade label: ${input.primaryTradeOther.trim()}`
@@ -143,24 +181,30 @@ function buildInterviewUserPrompt(input: {
   return [
     tradeLine,
     otherTrade,
-    input.specialty
-      ? `Detected job specialty: ${input.specialty.label} (${input.specialty.key}, urgent=${input.specialty.urgent})`
-      : null,
-    input.existingScopeFit ? `Current scope assessment: ${input.existingScopeFit}` : null,
+    `Customer problem (detected): ${input.customerProblem.label}`,
+    `Problem confidence: ${input.customerProblem.confidence}`,
+    `Problem reasoning: ${input.customerProblem.reasoning}`,
+    `Scope assessment: ${input.scopeAssessment.fit} — ${input.scopeAssessment.reason}`,
+    input.isUrgent
+      ? "URGENT: Customer marked this request as urgent. Do not ask timing/readiness questions."
+      : "Urgent flag: not set",
     `Project type: ${input.projectType}`,
     `Customer description:\n${input.description}`,
     `Photos uploaded: ${input.photoCount}`,
-    `Questions asked so far: ${input.previousAnswers.length} (maximum ${MAX_FOLLOW_UP_INTERVIEW_QUESTIONS})`,
+    `Questions asked so far: ${input.previousAnswers.length} (maximum ${input.maxQuestions} for this scope)`,
     `Next question will be #${input.questionNumber}`,
+    input.allowTradeLibrary
+      ? "Trade library: allowed for problem-relevant questions only."
+      : "Trade library: NOT allowed — use scope clarification or specialty questions only.",
     "",
     "Interview transcript:",
     transcript,
     input.specialtyCatalogJson
-      ? `\nSpecialty question catalog (PREFER these ids first):\n${input.specialtyCatalogJson}`
+      ? `\nProblem-specific specialty catalog (PREFER these when in scope):\n${input.specialtyCatalogJson}`
       : null,
-    "",
-    "Remaining general question library catalog (select ONE id or use custom_question):",
-    input.remainingCatalogJson,
+    input.remainingCatalogJson
+      ? `\nRemaining problem-relevant library catalog:\n${input.remainingCatalogJson}`
+      : "\nNo trade library catalog available for this scope.",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -193,11 +237,13 @@ function askedLibraryIds(previousAnswers: PreviousInterviewAnswer[]): Set<string
 
 function buildCustomFollowUpQuestion(
   raw: NonNullable<AiInterviewStepResponse["custom_question"]>,
-  displayOrder: number
+  displayOrder: number,
+  isUrgent: boolean
 ): FollowUpQuestion | null {
   const question = String(raw.question ?? "").trim();
   const questionType = String(raw.question_type ?? "").trim();
   if (!question || !isFollowUpQuestionType(questionType)) return null;
+  if (isBlockedCustomQuestionText(question, isUrgent)) return null;
 
   const options =
     questionType === "multiple_choice" || questionType === "checkbox"
@@ -226,19 +272,62 @@ function resolveQuestionById(id: string): LibraryQuestion | undefined {
   return getSpecialtyQuestionById(id) ?? getLibraryQuestionById(id);
 }
 
+function normalizeCustomerProblem(
+  raw: AiInterviewStepResponse["customerProblem"] | null | undefined,
+  fallback: CustomerProblem
+): CustomerProblem {
+  const label = String(raw?.label ?? "").trim();
+  const confidenceRaw = String(raw?.confidence ?? "").trim();
+  const confidence =
+    confidenceRaw === "high" || confidenceRaw === "medium" || confidenceRaw === "low"
+      ? confidenceRaw
+      : fallback.confidence;
+  const reasoning = String(raw?.reasoning ?? "").trim();
+
+  if (!label) return fallback;
+
+  return {
+    key: fallback.key,
+    label,
+    confidence,
+    reasoning: reasoning || fallback.reasoning,
+  };
+}
+
 function getFallbackNextQuestion(input: {
+  customerProblem: CustomerProblem;
   specialty: SpecialtyClassification | null;
   scopeAssessment: ScopeAssessment;
-  libraryQuestions: ReturnType<typeof getLibraryQuestionsForTrades>;
+  allowTradeLibrary: boolean;
+  libraryQuestions: LibraryQuestion[];
   previousAnswers: PreviousInterviewAnswer[];
   projectType: string;
   description: string;
+  isUrgent: boolean;
   displayOrder: number;
   questionNumber: number;
 }): FollowUpQuestion | null {
+  if (
+    shouldStopInterview({
+      answeredCount: input.previousAnswers.length,
+      scopeFit: input.scopeAssessment.fit,
+      isUrgent: input.isUrgent,
+      previousAnswers: input.previousAnswers,
+      customerProblem: input.customerProblem,
+      specialty: input.specialty,
+    })
+  ) {
+    return null;
+  }
+
   const asked = askedLibraryIds(input.previousAnswers);
 
-  if (input.specialty) {
+  if (
+    input.specialty &&
+    !isLikelyOutOfScope(input.scopeAssessment.fit) &&
+    (input.scopeAssessment.fit === "within_scope" ||
+      (input.scopeAssessment.fit === "mixed_scope" && input.allowTradeLibrary))
+  ) {
     const specialtyQs = getSpecialtyQuestions(input.specialty);
     const nextSpecialty = specialtyQs.find((q) => !asked.has(q.id));
     if (nextSpecialty) {
@@ -247,16 +336,24 @@ function getFallbackNextQuestion(input: {
     }
   }
 
-  if (input.scopeAssessment.fit !== "within_scope" && !input.specialty) {
-    const customs = getScopeFallbackCustomQuestions(
-      input.scopeAssessment,
-      input.projectType,
-      input.description
-    );
-    const index = input.previousAnswers.length;
-    const custom = customs[index];
-    if (custom) {
-      return { ...custom, display_order: input.displayOrder, is_custom: true };
+  if (
+    input.scopeAssessment.fit !== "within_scope" ||
+    !input.allowTradeLibrary
+  ) {
+    const scopeQuestion = getNextScopeFallbackQuestion({
+      scope: input.scopeAssessment,
+      customerProblem: input.customerProblem,
+      projectType: input.projectType,
+      description: input.description,
+      isUrgent: input.isUrgent,
+      previousAnswers: input.previousAnswers,
+      displayOrder: input.displayOrder,
+    });
+    if (scopeQuestion) {
+      return scopeQuestion;
+    }
+    if (!input.allowTradeLibrary || isLikelyOutOfScope(input.scopeAssessment.fit)) {
+      return null;
     }
   }
 
@@ -264,7 +361,14 @@ function getFallbackNextQuestion(input: {
     input.libraryQuestions.filter(
       (q) =>
         !asked.has(q.id) &&
-        !shouldBlockQuestionId(q.id, input.specialty, input.questionNumber)
+        !shouldBlockInterviewQuestion({
+          questionId: q.id,
+          scopeFit: input.scopeAssessment.fit,
+          isUrgent: input.isUrgent,
+          allowTradeLibrary: input.allowTradeLibrary,
+          specialty: input.specialty,
+          questionNumber: input.questionNumber,
+        })
     )
   );
 
@@ -277,18 +381,21 @@ function getFallbackNextQuestion(input: {
   return null;
 }
 
-async function loadExistingScope(
+async function loadRequestInterviewState(
   admin: SupabaseClient,
   requestId: string
-): Promise<ScopeFit | null> {
+): Promise<{ scopeFit: ScopeFit | null; isUrgent: boolean }> {
   const { data } = await admin
     .from("quote_requests")
-    .select("ai_scope_fit")
+    .select("ai_scope_fit, is_urgent")
     .eq("id", requestId)
     .maybeSingle();
 
   const fit = String(data?.ai_scope_fit ?? "").trim();
-  return isScopeFit(fit) ? fit : null;
+  return {
+    scopeFit: isScopeFit(fit) ? fit : null,
+    isUrgent: Boolean(data?.is_urgent),
+  };
 }
 
 export type GetNextInterviewStepInput = {
@@ -306,13 +413,6 @@ export async function getNextInterviewStep(
 ): Promise<InterviewStepResult> {
   const answeredCount = input.previousAnswers.length;
 
-  if (answeredCount >= MAX_FOLLOW_UP_INTERVIEW_QUESTIONS) {
-    return { status: "complete", usedFallback: false };
-  }
-
-  const questionNumber = answeredCount + 1;
-  const displayOrder = questionNumber;
-
   const { data: profile } = await admin
     .from("profiles")
     .select("quote_primary_trade, quote_primary_trade_other")
@@ -329,49 +429,93 @@ export async function getNextInterviewStep(
     ? String(profile.quote_primary_trade_other)
     : null;
 
+  const customerProblem = classifyCustomerProblem(input.projectType, input.description);
   const specialty = detectSpecialty(input.projectType, input.description);
-
-  const libraryTrades = resolveLibraryTrades({
-    primaryTrade,
-    primaryTradeOther,
-    projectType: input.projectType,
-    description: input.description,
-  });
-
-  const libraryQuestions = getLibraryQuestionsForTrades(libraryTrades);
-  const asked = askedLibraryIds(input.previousAnswers);
-  const remainingCatalog = filterCatalogForSpecialty(
-    libraryQuestions.filter((q) => !asked.has(q.id)),
-    specialty,
-    questionNumber
-  ).map(toCatalogEntry);
-
-  const specialtyCatalogJson = specialty
-    ? JSON.stringify(
-        getSpecialtyQuestions(specialty)
-          .filter((q) => !asked.has(q.id))
-          .map(toCatalogEntry)
-      )
-    : null;
-
-  const existingScopeFit = await loadExistingScope(admin, input.requestId);
-  const isFirstStep = answeredCount === 0;
-
-  const heuristicScope = inferHeuristicScopeAssessment({
+  const heuristicScope = assessScopeFit({
+    customerProblem,
     tradeLabel,
     primaryTrade,
-    projectType: input.projectType,
-    description: input.description,
   });
+
+  const { scopeFit: existingScopeFit, isUrgent } = await loadRequestInterviewState(
+    admin,
+    input.requestId
+  );
+  const scopeAssessment = existingScopeFit
+    ? { ...heuristicScope, fit: existingScopeFit }
+    : heuristicScope;
+
+  const maxQuestions = getInterviewQuestionLimit(scopeAssessment.fit);
+  if (answeredCount >= maxQuestions || answeredCount >= MAX_FOLLOW_UP_INTERVIEW_QUESTIONS) {
+    return { status: "complete", usedFallback: false };
+  }
+
+  if (
+    shouldStopInterview({
+      answeredCount,
+      scopeFit: scopeAssessment.fit,
+      isUrgent,
+      previousAnswers: input.previousAnswers,
+      customerProblem,
+      specialty,
+    })
+  ) {
+    return { status: "complete", usedFallback: false };
+  }
+
+  const questionNumber = answeredCount + 1;
+  const displayOrder = questionNumber;
+  const isFirstStep = answeredCount === 0;
+
+  const allowTradeLibrary = allowProblemLibrary(
+    scopeAssessment.fit,
+    input.previousAnswers,
+    customerProblem
+  );
+
+  const problemTrades = resolveProblemLibraryTrades(input.projectType, input.description);
+  const libraryQuestions = allowTradeLibrary
+    ? getLibraryQuestionsForTrades(problemTrades)
+    : [];
+
+  const asked = askedLibraryIds(input.previousAnswers);
+
+  const remainingCatalog = allowTradeLibrary
+    ? filterProblemRelevantCatalog(
+        libraryQuestions.filter((q) => !asked.has(q.id)).map(toCatalogEntry),
+        {
+          scopeFit: scopeAssessment.fit,
+          isUrgent,
+          allowTradeLibrary,
+          specialty,
+          questionNumber,
+        }
+      )
+    : [];
+
+  const specialtyCatalogJson =
+    specialty &&
+    !isLikelyOutOfScope(scopeAssessment.fit) &&
+    (scopeAssessment.fit === "within_scope" ||
+      (scopeAssessment.fit === "mixed_scope" && allowTradeLibrary))
+      ? JSON.stringify(
+          getSpecialtyQuestions(specialty)
+            .filter((q) => !asked.has(q.id))
+            .map(toCatalogEntry)
+        )
+      : null;
 
   const fallbackNext = (scope: ScopeAssessment): InterviewStepResult => {
     const question = getFallbackNextQuestion({
+      customerProblem,
       specialty,
       scopeAssessment: scope,
+      allowTradeLibrary,
       libraryQuestions,
       previousAnswers: input.previousAnswers,
       projectType: input.projectType,
       description: input.description,
+      isUrgent,
       displayOrder,
       questionNumber,
     });
@@ -384,7 +528,7 @@ export async function getNextInterviewStep(
       status: "question",
       question,
       questionNumber,
-      maxQuestions: MAX_FOLLOW_UP_INTERVIEW_QUESTIONS,
+      maxQuestions,
       usedFallback: true,
     };
   };
@@ -393,9 +537,9 @@ export async function getNextInterviewStep(
   if (!apiKey) {
     console.warn("[follow-up-interview] OPENAI_API_KEY not configured");
     if (isFirstStep && !existingScopeFit) {
-      await saveQuoteRequestScopeAssessment(admin, input.requestId, heuristicScope);
+      await saveQuoteRequestScopeAssessment(admin, input.requestId, heuristicScope, customerProblem);
     }
-    return fallbackNext(heuristicScope);
+    return fallbackNext(scopeAssessment);
   }
 
   try {
@@ -403,14 +547,20 @@ export async function getNextInterviewStep(
       tradeLabel,
       primaryTrade,
       primaryTradeOther,
+      customerProblem,
+      scopeAssessment,
       projectType: input.projectType,
       description: input.description,
+      isUrgent,
       photoCount: input.attachmentPaths.length,
       previousAnswers: input.previousAnswers,
       specialtyCatalogJson,
-      remainingCatalogJson: JSON.stringify(remainingCatalog),
-      existingScopeFit,
+      remainingCatalogJson: remainingCatalog.length
+        ? JSON.stringify(remainingCatalog)
+        : null,
+      allowTradeLibrary,
       questionNumber,
+      maxQuestions,
       specialty,
     });
 
@@ -438,7 +588,16 @@ export async function getNextInterviewStep(
         max_tokens: 900,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: buildInterviewSystemPrompt(isFirstStep, specialty) },
+          {
+            role: "system",
+            content: buildInterviewSystemPrompt({
+              isFirstStep,
+              customerProblem,
+              scopeFit: scopeAssessment.fit,
+              isUrgent,
+              allowTradeLibrary,
+            }),
+          },
           { role: "user", content: userContent },
         ],
       }),
@@ -450,9 +609,9 @@ export async function getNextInterviewStep(
         message: (await response.text()).slice(0, 500),
       });
       if (isFirstStep && !existingScopeFit) {
-        await saveQuoteRequestScopeAssessment(admin, input.requestId, heuristicScope);
+        await saveQuoteRequestScopeAssessment(admin, input.requestId, heuristicScope, customerProblem);
       }
-      return fallbackNext(heuristicScope);
+      return fallbackNext(scopeAssessment);
     }
 
     const data = (await response.json()) as {
@@ -461,9 +620,9 @@ export async function getNextInterviewStep(
     const content = data.choices?.[0]?.message?.content;
     if (!content) {
       if (isFirstStep && !existingScopeFit) {
-        await saveQuoteRequestScopeAssessment(admin, input.requestId, heuristicScope);
+        await saveQuoteRequestScopeAssessment(admin, input.requestId, heuristicScope, customerProblem);
       }
-      return fallbackNext(heuristicScope);
+      return fallbackNext(scopeAssessment);
     }
 
     let parsed: AiInterviewStepResponse;
@@ -471,17 +630,28 @@ export async function getNextInterviewStep(
       parsed = JSON.parse(content) as AiInterviewStepResponse;
     } catch {
       if (isFirstStep && !existingScopeFit) {
-        await saveQuoteRequestScopeAssessment(admin, input.requestId, heuristicScope);
+        await saveQuoteRequestScopeAssessment(admin, input.requestId, heuristicScope, customerProblem);
       }
-      return fallbackNext(heuristicScope);
+      return fallbackNext(scopeAssessment);
     }
 
-    if (isFirstStep && parsed.scopeAssessment && !existingScopeFit) {
-      const scopeAssessment = normalizeScopeAssessment(
+    const resolvedProblem = normalizeCustomerProblem(parsed.customerProblem, customerProblem);
+
+    if (isFirstStep && !existingScopeFit) {
+      const scopeToSave = normalizeScopeAssessment(
         parsed.scopeAssessment,
-        heuristicScope
+        assessScopeFit({
+          customerProblem: resolvedProblem,
+          tradeLabel,
+          primaryTrade,
+        })
       );
-      await saveQuoteRequestScopeAssessment(admin, input.requestId, scopeAssessment);
+      await saveQuoteRequestScopeAssessment(
+        admin,
+        input.requestId,
+        scopeToSave,
+        resolvedProblem
+      );
     }
 
     if (parsed.interview_complete === true) {
@@ -490,7 +660,11 @@ export async function getNextInterviewStep(
 
     const scopeForFallback = normalizeScopeAssessment(
       parsed.scopeAssessment,
-      heuristicScope
+      assessScopeFit({
+        customerProblem: resolvedProblem,
+        tradeLabel,
+        primaryTrade,
+      })
     );
 
     if (
@@ -512,42 +686,52 @@ export async function getNextInterviewStep(
           is_custom: true,
         },
         questionNumber,
-        maxQuestions: MAX_FOLLOW_UP_INTERVIEW_QUESTIONS,
+        maxQuestions,
         usedFallback: false,
       };
     }
 
     const libraryId = String(parsed.selected_library_question_id ?? "").trim();
-    if (
-      libraryId &&
-      !asked.has(libraryId) &&
-      !shouldBlockQuestionId(libraryId, specialty, questionNumber)
-    ) {
-      const libraryQuestion = resolveQuestionById(libraryId);
-      if (libraryQuestion) {
-        const followUp = libraryQuestionToFollowUp(libraryQuestion, displayOrder);
-        return {
-          status: "question",
-          question: {
-            ...followUp,
-            library_question_id: libraryQuestion.id,
-            is_custom: false,
-          },
-          questionNumber,
-          maxQuestions: MAX_FOLLOW_UP_INTERVIEW_QUESTIONS,
-          usedFallback: false,
-        };
+    if (libraryId && !asked.has(libraryId)) {
+      const blocked = shouldBlockInterviewQuestion({
+        questionId: libraryId,
+        scopeFit: scopeForFallback.fit,
+        isUrgent,
+        allowTradeLibrary,
+        specialty,
+        questionNumber,
+      });
+      if (!blocked) {
+        const libraryQuestion = resolveQuestionById(libraryId);
+        if (libraryQuestion) {
+          const followUp = libraryQuestionToFollowUp(libraryQuestion, displayOrder);
+          return {
+            status: "question",
+            question: {
+              ...followUp,
+              library_question_id: libraryQuestion.id,
+              is_custom: false,
+            },
+            questionNumber,
+            maxQuestions,
+            usedFallback: false,
+          };
+        }
       }
     }
 
     if (parsed.custom_question) {
-      const custom = buildCustomFollowUpQuestion(parsed.custom_question, displayOrder);
+      const custom = buildCustomFollowUpQuestion(
+        parsed.custom_question,
+        displayOrder,
+        isUrgent
+      );
       if (custom) {
         return {
           status: "question",
           question: custom,
           questionNumber,
-          maxQuestions: MAX_FOLLOW_UP_INTERVIEW_QUESTIONS,
+          maxQuestions,
           usedFallback: false,
         };
       }
@@ -557,8 +741,8 @@ export async function getNextInterviewStep(
   } catch (err) {
     console.error("[follow-up-interview] unexpected error", err);
     if (isFirstStep && !existingScopeFit) {
-      await saveQuoteRequestScopeAssessment(admin, input.requestId, heuristicScope);
+      await saveQuoteRequestScopeAssessment(admin, input.requestId, heuristicScope, customerProblem);
     }
-    return fallbackNext(heuristicScope);
+    return fallbackNext(scopeAssessment);
   }
 }

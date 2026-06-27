@@ -11,10 +11,14 @@ export function QuoteRequestScopeNote({
   scopeFit,
   scopeReason,
   contractorNote,
+  customerProblemLabel,
+  customerProblemConfidence,
 }: {
   scopeFit: string | null;
   scopeReason: string | null;
   contractorNote: string | null;
+  customerProblemLabel?: string | null;
+  customerProblemConfidence?: string | null;
 }) {
   if (!scopeFit || !isScopeFit(scopeFit)) {
     return null;
@@ -23,8 +27,9 @@ export function QuoteRequestScopeNote({
   const badgeLabel = SCOPE_FIT_BADGE_LABEL[scopeFit];
   const badgeClass = BADGE_CLASS[scopeFit] ?? BADGE_CLASS.possibly_out_of_scope;
   const note = contractorNote?.trim() || scopeReason?.trim();
+  const problemLabel = customerProblemLabel?.trim();
 
-  if (!note) {
+  if (!note && !problemLabel) {
     return null;
   }
 
@@ -38,7 +43,16 @@ export function QuoteRequestScopeNote({
           {badgeLabel}
         </span>
       </div>
-      <p className="mt-3 text-sm text-zinc-700">{note}</p>
+      {problemLabel ? (
+        <p className="mt-3 text-sm text-zinc-800">
+          <span className="font-medium text-zinc-900">Detected customer problem: </span>
+          {problemLabel}
+          {customerProblemConfidence ? (
+            <span className="text-zinc-500"> ({customerProblemConfidence} confidence)</span>
+          ) : null}
+        </p>
+      ) : null}
+      {note ? <p className="mt-3 text-sm text-zinc-700">{note}</p> : null}
     </section>
   );
 }

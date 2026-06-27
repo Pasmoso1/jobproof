@@ -1,5 +1,8 @@
+import type { CustomerProblem, ProblemConfidence } from "@/lib/quote-requests/problem-classification";
 import type { AiQuestionSelectionResponse } from "@/lib/quote-requests/question-library/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+export type { CustomerProblem, ProblemConfidence };
 
 export const SCOPE_FIT_VALUES = [
   "within_scope",
@@ -49,17 +52,23 @@ export function normalizeScopeAssessment(
 export async function saveQuoteRequestScopeAssessment(
   admin: SupabaseClient,
   requestId: string,
-  assessment: ScopeAssessment
+  assessment: ScopeAssessment,
+  customerProblem?: CustomerProblem | null
 ): Promise<void> {
-  const { error } = await admin
-    .from("quote_requests")
-    .update({
-      ai_scope_fit: assessment.fit,
-      ai_scope_reason: assessment.reason,
-      ai_scope_contractor_note: assessment.contractorNote,
-      ai_scope_customer_clarification_needed: assessment.customerClarificationNeeded,
-    })
-    .eq("id", requestId);
+  const update: Record<string, unknown> = {
+    ai_scope_fit: assessment.fit,
+    ai_scope_reason: assessment.reason,
+    ai_scope_contractor_note: assessment.contractorNote,
+    ai_scope_customer_clarification_needed: assessment.customerClarificationNeeded,
+  };
+
+  if (customerProblem) {
+    update.ai_customer_problem_label = customerProblem.label;
+    update.ai_customer_problem_confidence = customerProblem.confidence;
+    update.ai_customer_problem_reasoning = customerProblem.reasoning;
+  }
+
+  const { error } = await admin.from("quote_requests").update(update).eq("id", requestId);
 
   if (error) {
     console.error("[scope-assessment] save failed", { requestId, message: error.message });

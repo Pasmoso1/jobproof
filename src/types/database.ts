@@ -447,6 +447,9 @@ export interface QuoteRequest {
   ai_scope_reason: string | null;
   ai_scope_contractor_note: string | null;
   ai_scope_customer_clarification_needed: boolean | null;
+  ai_customer_problem_label: string | null;
+  ai_customer_problem_confidence: string | null;
+  ai_customer_problem_reasoning: string | null;
   submitted_at: string;
   created_at: string;
   updated_at: string;

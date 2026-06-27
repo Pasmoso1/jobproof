@@ -9,6 +9,8 @@ import {
   type InterviewStepResult,
   type PreviousInterviewAnswer,
 } from "@/lib/quote-requests/follow-up-types";
+import { getInterviewQuestionLimit } from "@/lib/quote-requests/interview-policy";
+import { isScopeFit } from "@/lib/quote-requests/scope-assessment";
 import { isFollowUpQuestionType } from "@/lib/quote-requests/follow-up-types";
 
 export type FollowUpInterviewActionResult =
@@ -130,7 +132,20 @@ export async function submitFollowUpInterviewAnswerAction(
     return { success: false, error: "Could not save your answer. Please try again." };
   }
 
-  if (input.finishInterview || displayOrder >= MAX_FOLLOW_UP_INTERVIEW_QUESTIONS) {
+  if (input.finishInterview) {
+    return { success: true, status: "complete", usedFallback: false };
+  }
+
+  const { data: requestRow } = await ctx.admin
+    .from("quote_requests")
+    .select("ai_scope_fit")
+    .eq("id", access.requestId)
+    .maybeSingle();
+  const scopeFitRaw = String(requestRow?.ai_scope_fit ?? "").trim();
+  const scopeFit = isScopeFit(scopeFitRaw) ? scopeFitRaw : "within_scope";
+  const maxQuestions = getInterviewQuestionLimit(scopeFit);
+
+  if (displayOrder >= maxQuestions || displayOrder >= MAX_FOLLOW_UP_INTERVIEW_QUESTIONS) {
     return { success: true, status: "complete", usedFallback: false };
   }
 

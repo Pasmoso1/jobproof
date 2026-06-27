@@ -76,6 +76,11 @@ export type AiInterviewStepResponse = {
   interview_complete?: boolean;
   complete_reason?: string;
   known_information?: string[];
+  customerProblem?: {
+    label?: string;
+    confidence?: string;
+    reasoning?: string;
+  };
   scopeAssessment?: AiQuestionSelectionResponse["scopeAssessment"];
   selected_library_question_id?: string | null;
   custom_question?: {

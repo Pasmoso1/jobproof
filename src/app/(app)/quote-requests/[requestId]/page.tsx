@@ -52,6 +52,8 @@ export default async function QuoteRequestDetailPage({
         scopeFit={request.ai_scope_fit}
         scopeReason={request.ai_scope_reason}
         contractorNote={request.ai_scope_contractor_note}
+        customerProblemLabel={request.ai_customer_problem_label}
+        customerProblemConfidence={request.ai_customer_problem_confidence}
       />
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5">
