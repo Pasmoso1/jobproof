@@ -75,6 +75,7 @@ export type AiQuestionSelectionResponse = {
 export type AiInterviewStepResponse = {
   interview_complete?: boolean;
   complete_reason?: string;
+  resolved_conflicts?: string[];
   known_information?: string[];
   customerProblem?: {
     label?: string;

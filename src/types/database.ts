@@ -455,6 +455,16 @@ export interface QuoteRequest {
   updated_at: string;
 }
 
+export interface QuoteRequestEvent {
+  id: string;
+  quote_request_id: string;
+  contractor_id: string;
+  event_type: string;
+  event_label: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface QuoteRequestFollowUpAnswer {
   id: string;
   quote_request_id: string;

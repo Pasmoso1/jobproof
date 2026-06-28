@@ -162,9 +162,34 @@ export default async function QuoteRequestDetailPage({
       </section>
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5">
+        <h2 className="text-base font-semibold text-zinc-900">History</h2>
+        {request.events.length > 0 ? (
+          <ol className="mt-4 space-y-3">
+            {request.events.map((event) => (
+              <li
+                key={event.id}
+                className="border-b border-zinc-100 pb-3 last:border-b-0 last:pb-0"
+              >
+                <p className="text-sm font-medium text-zinc-900">{event.event_label}</p>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  {formatDateTimeEastern(event.created_at)}
+                </p>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="mt-3 text-sm text-zinc-600">No history entries yet.</p>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-zinc-200 bg-white p-5">
         <h2 className="text-base font-semibold text-zinc-900">Actions</h2>
         <div className="mt-4">
-          <QuoteRequestActionButtons requestId={request.id} />
+          <QuoteRequestActionButtons
+            requestId={request.id}
+            scopeFit={request.ai_scope_fit}
+            status={request.status}
+          />
         </div>
       </section>
     </div>

@@ -15,13 +15,27 @@ import {
 import { hoursSinceSubmission } from "@/lib/quote-requests/response-alerts";
 import { sendQuoteRequestSiteVisitCustomerEmail } from "@/lib/quote-requests/notifications";
 import { sendQuoteRequestSiteVisitCustomerSms } from "@/lib/quote-requests/sms-notifications";
-import type { QuoteRequest, QuoteRequestAttachment, QuoteRequestFollowUpAnswer } from "@/types/database";
+import {
+  DECLINE_EVENT_TYPES,
+  DECLINE_REASON_LABELS,
+  sendQuoteRequestDeclineCustomerEmail,
+  sendQuoteRequestDeclineCustomerSms,
+  type QuoteRequestDeclineReason,
+} from "@/lib/quote-requests/decline-notifications";
+import { isScopeFit } from "@/lib/quote-requests/scope-assessment";
+import type {
+  QuoteRequest,
+  QuoteRequestAttachment,
+  QuoteRequestEvent,
+  QuoteRequestFollowUpAnswer,
+} from "@/types/database";
 
 export type QuoteRequestListRow = QuoteRequest;
 
 export type QuoteRequestDetail = QuoteRequest & {
   attachments: Array<QuoteRequestAttachment & { signedUrl: string | null }>;
   followUpAnswers: QuoteRequestFollowUpAnswer[];
+  events: QuoteRequestEvent[];
 };
 
 async function requireProfileId(): Promise<string> {
@@ -97,10 +111,17 @@ export async function getQuoteRequestDetail(
     .eq("quote_request_id", requestId)
     .order("display_order", { ascending: true });
 
+  const { data: events } = await supabase
+    .from("quote_request_events")
+    .select("*")
+    .eq("quote_request_id", requestId)
+    .order("created_at", { ascending: false });
+
   return {
     ...(request as QuoteRequest),
     attachments: withUrls,
     followUpAnswers: (followUpAnswers ?? []) as QuoteRequestFollowUpAnswer[],
+    events: (events ?? []) as QuoteRequestEvent[],
   };
 }
 
@@ -347,5 +368,150 @@ export async function convertQuoteRequestPlaceholder(
   return {
     success: false,
     error: "Create customer record is coming soon. This will create a customer and job from the quote request.",
+  };
+}
+
+const DECLINE_ANALYTICS: Record<QuoteRequestDeclineReason, ProductAnalyticsEventName> = {
+  service_not_offered: PRODUCT_ANALYTICS_EVENTS.quote_request_declined_service_not_offered,
+  capacity: PRODUCT_ANALYTICS_EVENTS.quote_request_declined_capacity,
+  not_good_fit: PRODUCT_ANALYTICS_EVENTS.quote_request_declined_not_good_fit,
+};
+
+export type DeclineQuoteRequestResult =
+  | {
+      success: true;
+      emailSent: boolean;
+      smsSent: boolean;
+      emailWarning?: string;
+      smsWarning?: string;
+    }
+  | { success: false; error: string };
+
+export async function declineQuoteRequest(
+  requestId: string,
+  reason: QuoteRequestDeclineReason
+): Promise<DeclineQuoteRequestResult> {
+  const profileId = await requireProfileId();
+  const supabase = await createClient();
+
+  const { data: request } = await supabase
+    .from("quote_requests")
+    .select(
+      "id, contractor_id, customer_name, customer_email, customer_phone, project_type, status, submitted_at, ai_scope_fit, ai_customer_problem_label"
+    )
+    .eq("id", requestId)
+    .eq("contractor_id", profileId)
+    .maybeSingle();
+
+  if (!request) {
+    return { success: false, error: "Could not find this quote request." };
+  }
+
+  if (String(request.status) === "closed") {
+    return { success: false, error: "This request is already closed." };
+  }
+
+  const scopeFitRaw = String(request.ai_scope_fit ?? "").trim();
+  const scopeFit = isScopeFit(scopeFitRaw) ? scopeFitRaw : null;
+  const isOutOfScope =
+    scopeFit === "outside_scope" || scopeFit === "possibly_out_of_scope";
+
+  if (reason === "service_not_offered" && !isOutOfScope) {
+    return {
+      success: false,
+      error: "This action is only available for requests flagged as outside scope.",
+    };
+  }
+
+  if (reason === "capacity" && isOutOfScope) {
+    return {
+      success: false,
+      error: "This action is for in-scope requests when you are at capacity.",
+    };
+  }
+
+  const { error: updateError } = await supabase
+    .from("quote_requests")
+    .update({ status: "closed" })
+    .eq("id", requestId)
+    .eq("contractor_id", profileId);
+
+  if (updateError) {
+    console.error("[declineQuoteRequest] update failed", updateError);
+    return { success: false, error: "Could not update this request." };
+  }
+
+  const customerProblem = request.ai_customer_problem_label
+    ? String(request.ai_customer_problem_label)
+    : null;
+
+  const { error: eventError } = await supabase.from("quote_request_events").insert({
+    quote_request_id: requestId,
+    contractor_id: profileId,
+    event_type: DECLINE_EVENT_TYPES[reason],
+    event_label: DECLINE_REASON_LABELS[reason],
+    metadata: {
+      decline_reason: reason,
+      scope_fit: scopeFit,
+      customer_problem: customerProblem,
+      previous_status: String(request.status),
+    },
+  });
+
+  if (eventError) {
+    console.error("[declineQuoteRequest] event insert failed", eventError);
+  }
+
+  trackProductEventSafe({
+    profileId,
+    eventName: DECLINE_ANALYTICS[reason],
+    route: `/quote-requests/${requestId}`,
+    source: "quote_request_actions",
+    metadata: {
+      request_id: requestId,
+      contractor_id: profileId,
+      scope_fit: scopeFit,
+      customer_problem: customerProblem,
+      decline_reason: reason,
+    },
+  });
+
+  revalidateQuoteRequestSurfaces(requestId);
+
+  const notificationPayload = {
+    requestId,
+    contractorId: profileId,
+    customerName: String(request.customer_name),
+    customerEmail: String(request.customer_email ?? ""),
+    customerPhone: request.customer_phone ? String(request.customer_phone) : null,
+    projectType: String(request.project_type),
+    reason,
+  };
+
+  const [emailResult, smsResult] = await Promise.all([
+    sendQuoteRequestDeclineCustomerEmail(notificationPayload),
+    sendQuoteRequestDeclineCustomerSms(notificationPayload),
+  ]);
+
+  const emailWarning = emailResult.sent
+    ? undefined
+    : emailResult.reason === "no_customer_email"
+      ? "Customer email not sent (no email on file)."
+      : "Customer email could not be sent.";
+
+  const smsWarning = smsResult.sent
+    ? undefined
+    : smsResult.reason === "no_customer_phone"
+      ? "Customer text not sent (no phone on file)."
+      : smsResult.reason === "invalid_customer_phone"
+        ? "Customer text not sent (invalid phone number)."
+        : "Customer text could not be sent.";
+
+  return {
+    success: true,
+    emailSent: emailResult.sent,
+    smsSent: smsResult.sent,
+    emailWarning,
+    smsWarning,
   };
 }

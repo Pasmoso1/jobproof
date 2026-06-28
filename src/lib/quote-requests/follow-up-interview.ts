@@ -49,6 +49,7 @@ import {
   getSpecialtyQuestions,
 } from "@/lib/quote-requests/specialty/registry";
 import type { SpecialtyClassification } from "@/lib/quote-requests/specialty/types";
+import { buildUnifiedUnderstandingBlock } from "@/lib/quote-requests/interview-context";
 import { getEffectiveQuoteTrade } from "@/lib/quote-requests/trade";
 import { generateUUID } from "@/lib/utils/uuid";
 
@@ -111,6 +112,21 @@ ${urgentRules}
 QUESTION VALUE RULE:
 Only ask a question if the answer helps the contractor: decide if they can take the job, understand severity/urgency, prepare tools/materials/crew, plan access, understand size/complexity, identify safety issues, or prepare for a first call.
 
+INFORMATION SYNTHESIS (every step):
+Before selecting ANY question, synthesize ALL inputs in this priority order:
+1. Customer description (highest — overrides Project Type when they conflict)
+2. Uploaded photos
+3. Previous interview answers
+4. Project Type (lowest text priority)
+5. Urgent flag (timing only — not project details)
+
+Ask yourself: "Do I already know this with reasonable confidence?"
+- If YES → do not ask; move to the next unknown or set interview_complete.
+- If inputs conflict → resolve in known_information / resolved_conflicts before asking.
+- If uncertainty remains → ask ONE targeted clarification only.
+
+Populate known_information with everything already established from description, photos, and prior answers. Carry photo observations forward on every step.
+
 Ask ONE question at a time. Natural finish is 3–5 questions. Maximum ${getInterviewQuestionLimit(input.scopeFit)} for this scope fit (${MAX_FOLLOW_UP_INTERVIEW_QUESTIONS} absolute max).
 
 QUESTION SOURCES:
@@ -128,6 +144,7 @@ Return JSON only:
   "interview_complete": false,
   "complete_reason": null,
   "known_information": ["short phrase"],
+  "resolved_conflicts": ["optional — how you reconciled conflicting inputs"],
   ${input.isFirstStep ? `"customerProblem": { "label": "string", "confidence": "high|medium|low", "reasoning": "string" },
   "scopeAssessment": { "fit": "within_scope|mixed_scope|possibly_out_of_scope|outside_scope", "reason": "string", "contractorNote": "string", "customerClarificationNeeded": true },` : ""}
   "selected_library_question_id": "library_id_or_null",
@@ -178,7 +195,18 @@ function buildInterviewUserPrompt(input: {
           )
           .join("\n\n");
 
+  const unifiedUnderstanding = buildUnifiedUnderstandingBlock({
+    description: input.description,
+    projectType: input.projectType,
+    isUrgent: input.isUrgent,
+    photoCount: input.photoCount,
+    previousAnswers: input.previousAnswers,
+    customerProblem: input.customerProblem,
+  });
+
   return [
+    unifiedUnderstanding,
+    "",
     tradeLine,
     otherTrade,
     `Customer problem (detected): ${input.customerProblem.label}`,
@@ -188,9 +216,7 @@ function buildInterviewUserPrompt(input: {
     input.isUrgent
       ? "URGENT: Customer marked this request as urgent. Do not ask timing/readiness questions."
       : "Urgent flag: not set",
-    `Project type: ${input.projectType}`,
-    `Customer description:\n${input.description}`,
-    `Photos uploaded: ${input.photoCount}`,
+    `Photos uploaded: ${input.photoCount}${input.photoCount > 0 ? " (attached for your review)" : ""}`,
     `Questions asked so far: ${input.previousAnswers.length} (maximum ${input.maxQuestions} for this scope)`,
     `Next question will be #${input.questionNumber}`,
     input.allowTradeLibrary
@@ -569,7 +595,7 @@ export async function getNextInterviewStep(
       | { type: "image_url"; image_url: { url: string; detail: "low" } }
     > = [{ type: "text", text: userText }];
 
-    if (isFirstStep && input.attachmentPaths.length > 0) {
+    if (input.attachmentPaths.length > 0) {
       const imageUrls = await signAttachmentUrls(admin, input.attachmentPaths);
       for (const url of imageUrls) {
         userContent.push({ type: "image_url", image_url: { url, detail: "low" } });
