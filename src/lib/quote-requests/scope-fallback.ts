@@ -23,6 +23,8 @@ export function inferHeuristicScopeAssessment(input: {
     customerProblem,
     tradeLabel: input.tradeLabel,
     primaryTrade: input.primaryTrade,
+    projectType: input.projectType,
+    description: input.description,
   });
 }
 

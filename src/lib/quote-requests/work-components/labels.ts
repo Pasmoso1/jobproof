@@ -1,0 +1,68 @@
+import type { WorkComponentKey } from "@/lib/quote-requests/work-components/types";
+
+export const WORK_COMPONENT_LABELS: Record<WorkComponentKey, string> = {
+  demolition: "Demolition",
+  removal: "Removal / haul-away",
+  excavation: "Excavation",
+  grading: "Grading",
+  drainage: "Drainage",
+  framing: "Framing",
+  concrete: "Concrete / flatwork",
+  masonry: "Masonry",
+  painting: "Painting",
+  drywall: "Drywall",
+  plumbing: "Plumbing",
+  electrical: "Electrical",
+  hvac: "HVAC",
+  roofing: "Roofing",
+  flooring: "Flooring",
+  waterproofing: "Waterproofing / foundation repair",
+  landscaping: "Landscaping",
+  fencing: "Fencing",
+  decking: "Decking",
+  finish_carpentry: "Finish carpentry",
+  pool_installation: "Pool installation",
+  kitchen_renovation: "Kitchen renovation",
+  bathroom_renovation: "Bathroom renovation",
+  windows_doors: "Windows / doors",
+  tile: "Tile work",
+  cabinetry: "Cabinetry",
+  insulation: "Insulation",
+  general_renovation: "General renovation",
+};
+
+/** Trade that typically leads each work component */
+export const COMPONENT_TYPICAL_SPECIALIST: Partial<Record<WorkComponentKey, string>> = {
+  demolition: "General contractor / demolition",
+  removal: "General contractor / haul-away",
+  excavation: "Excavation contractor",
+  grading: "Landscaper / grading contractor",
+  drainage: "Landscaper / drainage specialist",
+  framing: "Carpenter / general contractor",
+  concrete: "Concrete contractor",
+  masonry: "Mason / concrete contractor",
+  painting: "Painter",
+  drywall: "Drywall contractor / renovator",
+  plumbing: "Plumber",
+  electrical: "Electrician",
+  hvac: "HVAC technician",
+  roofing: "Roofer",
+  flooring: "Flooring installer",
+  waterproofing: "Waterproofing / foundation specialist",
+  landscaping: "Landscaper",
+  fencing: "Fence contractor / landscaper",
+  decking: "Deck builder / carpenter",
+  finish_carpentry: "Finish carpenter",
+  pool_installation: "Pool installer",
+  kitchen_renovation: "Kitchen renovator",
+  bathroom_renovation: "Bathroom renovator",
+  windows_doors: "Window / door installer",
+  tile: "Tile installer",
+  cabinetry: "Cabinet installer / kitchen renovator",
+  insulation: "Insulation contractor",
+  general_renovation: "General contractor / renovator",
+};
+
+export function workComponentLabel(key: WorkComponentKey): string {
+  return WORK_COMPONENT_LABELS[key];
+}

@@ -32,7 +32,7 @@ import {
   classifyCustomerProblem,
   type CustomerProblem,
 } from "@/lib/quote-requests/problem-classification";
-import { assessScopeFit } from "@/lib/quote-requests/problem-scope";
+import { assessScopeFromWork, workScopeToScopeAssessment } from "@/lib/quote-requests/work-components/scope-engine";
 import {
   getNextScopeFallbackQuestion,
 } from "@/lib/quote-requests/scope-fallback";
@@ -99,10 +99,23 @@ URGENT REQUEST (customer checked urgent):
   return `You are an experienced contractor estimator conducting an adaptive quote interview for JobProof.
 
 INTERVIEW LOGIC ORDER (mandatory):
-1. Understand the customer's actual request (customerProblem) — NOT the contractor's trade.
-2. Compare customerProblem against the contractor's trade (scopeAssessment).
-3. Decide whether this contractor is likely a match.
-4. Only then choose the next follow-up question.
+1. Understand the customer's actual request — synthesize description, photos, prior answers (NOT project type alone).
+2. Decompose required WORK COMPONENTS (demolition, plumbing, waterproofing, landscaping, etc.) — what work is needed to complete this project?
+3. Compare each work component against contractor capabilities — clearly performs / may perform / unlikely.
+4. Assign scopeAssessment based on the COMBINATION of work components, not a single trade label.
+5. Only then choose the next follow-up question.
+
+SCOPE ASSESSMENT (first step):
+Think like an experienced estimator: "What work is required?" not "Does this match the contractor trade?"
+- Decompose work from description (primary), photos, interview answers, then project type (hint only).
+- Default to mixed_scope when some components match and others need specialists.
+- Reserve within_scope for high confidence when ALL required work clearly aligns.
+- Lower confidence when: multiple trades, description vs project type conflict, ambiguity, specialist work.
+- contractorNote format (contractor-facing only):
+  Detected project: [label]
+  Work likely involved: [components]
+  Why this may or may not match: [summary]
+  Confidence: [high/medium/low]
 
 Detected customer problem: ${input.customerProblem.label} (confidence: ${input.customerProblem.confidence})
 Scope fit: ${input.scopeFit}
@@ -146,7 +159,15 @@ Return JSON only:
   "known_information": ["short phrase"],
   "resolved_conflicts": ["optional — how you reconciled conflicting inputs"],
   ${input.isFirstStep ? `"customerProblem": { "label": "string", "confidence": "high|medium|low", "reasoning": "string" },
-  "scopeAssessment": { "fit": "within_scope|mixed_scope|possibly_out_of_scope|outside_scope", "reason": "string", "contractorNote": "string", "customerClarificationNeeded": true },` : ""}
+  "scopeAssessment": {
+    "fit": "within_scope|mixed_scope|possibly_out_of_scope|outside_scope",
+    "reason": "string",
+    "contractorNote": "string (use Detected project / Work likely involved / Why / Confidence format)",
+    "customerClarificationNeeded": true,
+    "confidence": "high|medium|low",
+    "workComponents": [{ "key": "string", "label": "string", "capability": "clearly_performs|may_perform|unlikely_to_perform", "typicalSpecialist": "optional" }],
+    "specialistTrades": ["string"]
+  },` : ""}
   "selected_library_question_id": "library_id_or_null",
   "custom_question": null,
   "photo_clarification_needed": false,
@@ -457,11 +478,17 @@ export async function getNextInterviewStep(
 
   const customerProblem = classifyCustomerProblem(input.projectType, input.description);
   const specialty = detectSpecialty(input.projectType, input.description);
-  const heuristicScope = assessScopeFit({
-    customerProblem,
-    tradeLabel,
-    primaryTrade,
-  });
+  const heuristicScope = workScopeToScopeAssessment(
+    assessScopeFromWork({
+      customerProblem,
+      tradeLabel,
+      primaryTrade,
+      primaryTradeOther,
+      projectType: input.projectType,
+      description: input.description,
+      previousAnswers: input.previousAnswers,
+    })
+  );
 
   const { scopeFit: existingScopeFit, isUrgent } = await loadRequestInterviewState(
     admin,
@@ -666,11 +693,17 @@ export async function getNextInterviewStep(
     if (isFirstStep && !existingScopeFit) {
       const scopeToSave = normalizeScopeAssessment(
         parsed.scopeAssessment,
-        assessScopeFit({
-          customerProblem: resolvedProblem,
-          tradeLabel,
-          primaryTrade,
-        })
+        workScopeToScopeAssessment(
+          assessScopeFromWork({
+            customerProblem: resolvedProblem,
+            tradeLabel,
+            primaryTrade,
+            primaryTradeOther,
+            projectType: input.projectType,
+            description: input.description,
+            previousAnswers: input.previousAnswers,
+          })
+        )
       );
       await saveQuoteRequestScopeAssessment(
         admin,
@@ -686,11 +719,17 @@ export async function getNextInterviewStep(
 
     const scopeForFallback = normalizeScopeAssessment(
       parsed.scopeAssessment,
-      assessScopeFit({
-        customerProblem: resolvedProblem,
-        tradeLabel,
-        primaryTrade,
-      })
+      workScopeToScopeAssessment(
+        assessScopeFromWork({
+          customerProblem: resolvedProblem,
+          tradeLabel,
+          primaryTrade,
+          primaryTradeOther,
+          projectType: input.projectType,
+          description: input.description,
+          previousAnswers: input.previousAnswers,
+        })
+      )
     );
 
     if (

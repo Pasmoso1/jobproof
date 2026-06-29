@@ -1,5 +1,7 @@
 import type { CustomerProblem, ProblemConfidence } from "@/lib/quote-requests/problem-classification";
 import type { AiQuestionSelectionResponse } from "@/lib/quote-requests/question-library/types";
+import type { StoredWorkComponent } from "@/lib/quote-requests/work-components/types";
+import { isScopeConfidence } from "@/lib/quote-requests/work-components/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type { CustomerProblem, ProblemConfidence };
@@ -18,6 +20,9 @@ export type ScopeAssessment = {
   reason: string;
   contractorNote: string;
   customerClarificationNeeded: boolean;
+  confidence?: ProblemConfidence;
+  workComponents?: StoredWorkComponent[];
+  specialistTrades?: string[];
 };
 
 export function isScopeFit(value: string): value is ScopeFit {
@@ -31,22 +36,79 @@ export const SCOPE_FIT_BADGE_LABEL: Record<ScopeFit, string> = {
   outside_scope: "May be outside scope",
 };
 
+type RawScopeAssessment = AiQuestionSelectionResponse["scopeAssessment"] & {
+  confidence?: string;
+  workComponents?: Array<{
+    key?: string;
+    label?: string;
+    capability?: string;
+    typicalSpecialist?: string;
+  }>;
+  specialistTrades?: string[];
+};
+
 export function normalizeScopeAssessment(
-  raw: AiQuestionSelectionResponse["scopeAssessment"] | null | undefined,
+  raw: RawScopeAssessment | null | undefined,
   fallback: ScopeAssessment
 ): ScopeAssessment {
   const fitRaw = String(raw?.fit ?? "").trim();
   const fit = isScopeFit(fitRaw) ? fitRaw : fallback.fit;
 
+  const confidenceRaw = String(raw?.confidence ?? "").trim();
+  const confidence = isScopeConfidence(confidenceRaw)
+    ? confidenceRaw
+    : fallback.confidence;
+
+  const workComponents = parseWorkComponents(raw?.workComponents, fallback.workComponents);
+  const specialistTrades =
+    Array.isArray(raw?.specialistTrades) && raw.specialistTrades.length > 0
+      ? raw.specialistTrades.map((t) => String(t).trim()).filter(Boolean)
+      : fallback.specialistTrades;
+
+  const contractorNote =
+    String(raw?.contractorNote ?? fallback.contractorNote).trim() ||
+    fallback.contractorNote;
+
   return {
     fit,
     reason: String(raw?.reason ?? fallback.reason).trim() || fallback.reason,
-    contractorNote:
-      String(raw?.contractorNote ?? fallback.contractorNote).trim() ||
-      fallback.contractorNote,
+    contractorNote,
     customerClarificationNeeded:
       raw?.customerClarificationNeeded ?? fallback.customerClarificationNeeded,
+    confidence,
+    workComponents,
+    specialistTrades,
   };
+}
+
+function parseWorkComponents(
+  raw: RawScopeAssessment["workComponents"],
+  fallback?: StoredWorkComponent[]
+): StoredWorkComponent[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return fallback;
+  const parsed: StoredWorkComponent[] = [];
+  for (const item of raw) {
+    const key = String(item.key ?? "").trim();
+    const label = String(item.label ?? "").trim();
+    const capability = String(item.capability ?? "").trim();
+    if (!label) continue;
+    if (
+      capability !== "clearly_performs" &&
+      capability !== "may_perform" &&
+      capability !== "unlikely_to_perform"
+    ) {
+      continue;
+    }
+    parsed.push({
+      key: key as StoredWorkComponent["key"],
+      label,
+      capability,
+      typicalSpecialist: item.typicalSpecialist
+        ? String(item.typicalSpecialist).trim()
+        : undefined,
+    });
+  }
+  return parsed.length > 0 ? parsed : fallback;
 }
 
 export async function saveQuoteRequestScopeAssessment(
@@ -60,6 +122,9 @@ export async function saveQuoteRequestScopeAssessment(
     ai_scope_reason: assessment.reason,
     ai_scope_contractor_note: assessment.contractorNote,
     ai_scope_customer_clarification_needed: assessment.customerClarificationNeeded,
+    ai_scope_confidence: assessment.confidence ?? null,
+    ai_work_components: assessment.workComponents ?? null,
+    ai_specialist_trades: assessment.specialistTrades ?? null,
   };
 
   if (customerProblem) {

@@ -54,6 +54,9 @@ export default async function QuoteRequestDetailPage({
         contractorNote={request.ai_scope_contractor_note}
         customerProblemLabel={request.ai_customer_problem_label}
         customerProblemConfidence={request.ai_customer_problem_confidence}
+        scopeConfidence={request.ai_scope_confidence}
+        workComponents={request.ai_work_components}
+        specialistTrades={request.ai_specialist_trades}
       />
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5">

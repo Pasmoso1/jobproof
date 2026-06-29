@@ -450,6 +450,14 @@ export interface QuoteRequest {
   ai_customer_problem_label: string | null;
   ai_customer_problem_confidence: string | null;
   ai_customer_problem_reasoning: string | null;
+  ai_scope_confidence: string | null;
+  ai_work_components: Array<{
+    key: string;
+    label: string;
+    capability: string;
+    typicalSpecialist?: string;
+  }> | null;
+  ai_specialist_trades: string[] | null;
   submitted_at: string;
   created_at: string;
   updated_at: string;

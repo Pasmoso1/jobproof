@@ -58,6 +58,14 @@ export type AiQuestionSelectionResponse = {
     reason?: string;
     contractorNote?: string;
     customerClarificationNeeded?: boolean;
+    confidence?: string;
+    workComponents?: Array<{
+      key?: string;
+      label?: string;
+      capability?: string;
+      typicalSpecialist?: string;
+    }>;
+    specialistTrades?: string[];
   };
   known_from_description?: string[];
   known_from_photos?: string[];
