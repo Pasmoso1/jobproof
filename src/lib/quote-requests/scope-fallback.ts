@@ -15,6 +15,8 @@ const POOL_PATTERN = /\bpool\b|\bswimming pool\b|\binground pool\b|\babove[- ]gr
 export function inferHeuristicScopeAssessment(input: {
   tradeLabel: string | null;
   primaryTrade: string | null;
+  primaryTradeOther?: string | null;
+  extraCapabilities?: string | null;
   projectType: string;
   description: string;
 }): ScopeAssessment {
@@ -23,6 +25,8 @@ export function inferHeuristicScopeAssessment(input: {
     customerProblem,
     tradeLabel: input.tradeLabel,
     primaryTrade: input.primaryTrade,
+    primaryTradeOther: input.primaryTradeOther ?? null,
+    extraCapabilities: input.extraCapabilities ?? null,
     projectType: input.projectType,
     description: input.description,
   });

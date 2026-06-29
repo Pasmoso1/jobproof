@@ -9,6 +9,7 @@ import {
   isBusinessProfileCompleteForApp,
   validateBusinessProfileFields,
 } from "@/lib/validation/business-profile";
+import { parseContractorExtraCapabilities } from "@/lib/validation/contractor-extra-capabilities";
 import {
   contractSigningScheduleErrorMessage,
   parsePositiveContractPrice,
@@ -254,6 +255,19 @@ export async function updateProfileBusinessInfo(formData: FormData) {
     };
   }
 
+  let contractorExtraCapabilities: string | null | undefined;
+  if (formData.has("contractor_extra_capabilities")) {
+    const parsed = parseContractorExtraCapabilities(
+      String(formData.get("contractor_extra_capabilities") ?? "")
+    );
+    if (parsed.error) {
+      return {
+        fieldErrors: { contractor_extra_capabilities: parsed.error },
+      };
+    }
+    contractorExtraCapabilities = parsed.value;
+  }
+
   const parseDayField = (name: string, fallback: number) => {
     const raw = String(formData.get(name) ?? "").trim();
     const n = Number.parseInt(raw, 10);
@@ -298,6 +312,9 @@ export async function updateProfileBusinessInfo(formData: FormData) {
       city,
       province,
       postal_code: postalCode,
+      ...(contractorExtraCapabilities !== undefined
+        ? { contractor_extra_capabilities: contractorExtraCapabilities }
+        : {}),
       default_contract_payment_terms: defaultPaymentTerms,
       default_contract_terms_and_conditions: defaultTermsAndConditions,
       default_contract_warranty_note: defaultWarranty,

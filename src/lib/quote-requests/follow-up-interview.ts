@@ -462,7 +462,7 @@ export async function getNextInterviewStep(
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("quote_primary_trade, quote_primary_trade_other")
+    .select("quote_primary_trade, quote_primary_trade_other, contractor_extra_capabilities")
     .eq("id", input.contractorId)
     .maybeSingle();
 
@@ -475,6 +475,9 @@ export async function getNextInterviewStep(
   const primaryTradeOther = profile?.quote_primary_trade_other
     ? String(profile.quote_primary_trade_other)
     : null;
+  const extraCapabilities = profile?.contractor_extra_capabilities
+    ? String(profile.contractor_extra_capabilities)
+    : null;
 
   const customerProblem = classifyCustomerProblem(input.projectType, input.description);
   const specialty = detectSpecialty(input.projectType, input.description);
@@ -484,6 +487,7 @@ export async function getNextInterviewStep(
       tradeLabel,
       primaryTrade,
       primaryTradeOther,
+      extraCapabilities,
       projectType: input.projectType,
       description: input.description,
       previousAnswers: input.previousAnswers,
@@ -699,6 +703,7 @@ export async function getNextInterviewStep(
             tradeLabel,
             primaryTrade,
             primaryTradeOther,
+            extraCapabilities,
             projectType: input.projectType,
             description: input.description,
             previousAnswers: input.previousAnswers,
@@ -725,6 +730,7 @@ export async function getNextInterviewStep(
           tradeLabel,
           primaryTrade,
           primaryTradeOther,
+          extraCapabilities,
           projectType: input.projectType,
           description: input.description,
           previousAnswers: input.previousAnswers,

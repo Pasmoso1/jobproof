@@ -54,6 +54,8 @@ export type ContractorCapabilityProfile = {
   certifications?: string[];
   /** Future: specialty focus areas */
   specialties?: string[];
+  /** Contractor free-text: additional services beyond primary trade */
+  extraCapabilities?: string | null;
 };
 
 export type WorkComponentMatch = {

@@ -7,6 +7,7 @@ import {
   pricingProfileLabel,
 } from "@/lib/quote-requests/constants";
 import { suggestQuoteSlugFromBusinessName } from "@/lib/quote-requests/slug";
+import { ContractorExtraCapabilitiesField } from "@/components/contractor/contractor-extra-capabilities-field";
 import { updateQuoteRequestSettings } from "./actions";
 
 const FIELD_INPUT_CLASS =
@@ -22,6 +23,7 @@ type ProfileFields = {
   quote_pricing_profile?: string | null;
   quote_primary_trade?: string | null;
   quote_primary_trade_other?: string | null;
+  contractor_extra_capabilities?: string | null;
 };
 
 export function QuoteRequestSettingsForm({
@@ -41,6 +43,9 @@ export function QuoteRequestSettingsForm({
   const [primaryTrade, setPrimaryTrade] = useState(profile?.quote_primary_trade ?? "");
   const [primaryTradeOther, setPrimaryTradeOther] = useState(
     profile?.quote_primary_trade_other ?? ""
+  );
+  const [contractorExtraCapabilities, setContractorExtraCapabilities] = useState(
+    profile?.contractor_extra_capabilities ?? ""
   );
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -245,6 +250,12 @@ export function QuoteRequestSettingsForm({
             ) : null}
           </label>
         ) : null}
+
+        <ContractorExtraCapabilitiesField
+          value={contractorExtraCapabilities}
+          onChange={setContractorExtraCapabilities}
+          fieldError={fieldErrors.contractorExtraCapabilities}
+        />
       </div>
 
       <button

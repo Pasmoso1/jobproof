@@ -16,7 +16,7 @@ export default async function QuoteRequestSettingsPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "quote_slug, business_name, phone, quote_logo_url, quote_pricing_profile, quote_primary_trade, quote_primary_trade_other"
+      "quote_slug, business_name, phone, quote_logo_url, quote_pricing_profile, quote_primary_trade, quote_primary_trade_other, contractor_extra_capabilities"
     )
     .eq("user_id", user.id)
     .single();

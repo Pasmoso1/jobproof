@@ -28,6 +28,7 @@ export type AssessScopeInput = {
   tradeLabel: string | null;
   primaryTrade: string | null;
   primaryTradeOther: string | null;
+  extraCapabilities?: string | null;
   projectType: string;
   description: string;
   previousAnswers?: PreviousInterviewAnswer[];
@@ -196,6 +197,7 @@ export function assessScopeFromWork(input: AssessScopeInput): WorkScopeAnalysis 
     tradeLabel: input.tradeLabel,
     primaryTrade: input.primaryTrade,
     primaryTradeOther: input.primaryTradeOther,
+    extraCapabilities: input.extraCapabilities,
   });
 
   const componentKeys = decomposeWorkComponents({
@@ -264,6 +266,7 @@ export function assessScopeFit(input: {
   tradeLabel: string | null;
   primaryTrade: string | null;
   primaryTradeOther?: string | null;
+  extraCapabilities?: string | null;
   projectType?: string;
   description?: string;
   previousAnswers?: PreviousInterviewAnswer[];
@@ -273,6 +276,7 @@ export function assessScopeFit(input: {
     tradeLabel: input.tradeLabel,
     primaryTrade: input.primaryTrade,
     primaryTradeOther: input.primaryTradeOther ?? null,
+    extraCapabilities: input.extraCapabilities ?? null,
     projectType: input.projectType ?? "",
     description: input.description ?? "",
     previousAnswers: input.previousAnswers,

@@ -3,6 +3,7 @@ import type {
   ContractorCapabilityProfile,
   WorkComponentKey,
 } from "@/lib/quote-requests/work-components/types";
+import { applyExtraCapabilitiesToMap } from "@/lib/quote-requests/work-components/extra-capabilities";
 
 type CapabilityMap = Partial<Record<WorkComponentKey, ComponentCapability>>;
 
@@ -192,6 +193,8 @@ function resolveCapabilityMap(profile: ContractorCapabilityProfile): CapabilityM
     }
   }
 
+  map = applyExtraCapabilitiesToMap(map, profile.extraCapabilities);
+
   return map;
 }
 
@@ -207,10 +210,12 @@ export function contractorProfileFromTrade(input: {
   tradeLabel: string | null;
   primaryTrade: string | null;
   primaryTradeOther: string | null;
+  extraCapabilities?: string | null;
 }): ContractorCapabilityProfile {
   return {
     primaryTrade: input.primaryTrade,
     primaryTradeOther: input.primaryTradeOther,
     tradeLabel: input.tradeLabel,
+    extraCapabilities: input.extraCapabilities?.trim() || null,
   };
 }

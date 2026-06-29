@@ -5,6 +5,7 @@ import {
   type QuotePrimaryTrade,
 } from "@/lib/quote-requests/constants";
 import { validateQuoteSlug } from "@/lib/quote-requests/slug";
+import { parseContractorExtraCapabilities } from "@/lib/validation/contractor-extra-capabilities";
 
 const MAX_PRIMARY_TRADE_OTHER_LENGTH = 80;
 
@@ -28,6 +29,7 @@ export function validateQuoteRequestSettings(input: {
   pricingProfile: string;
   primaryTrade: string;
   primaryTradeOther: string;
+  contractorExtraCapabilities: string;
 }): { ok: true; data: {
   quoteSlug: string;
   businessName: string;
@@ -36,6 +38,7 @@ export function validateQuoteRequestSettings(input: {
   pricingProfile: QuotePricingProfile;
   primaryTrade: QuotePrimaryTrade;
   primaryTradeOther: string | null;
+  contractorExtraCapabilities: string | null;
 } } | { ok: false; fieldErrors: Record<string, string> } {
   const fieldErrors: Record<string, string> = {};
 
@@ -91,11 +94,19 @@ export function validateQuoteRequestSettings(input: {
     }
   }
 
+  const extraCapabilitiesResult = parseContractorExtraCapabilities(
+    input.contractorExtraCapabilities
+  );
+  if (extraCapabilitiesResult.error) {
+    fieldErrors.contractorExtraCapabilities = extraCapabilitiesResult.error;
+  }
+
   if (
     Object.keys(fieldErrors).length > 0 ||
     !slugResult.ok ||
     !pricingProfile ||
-    !primaryTrade
+    !primaryTrade ||
+    extraCapabilitiesResult.error
   ) {
     return { ok: false, fieldErrors };
   }
@@ -110,6 +121,7 @@ export function validateQuoteRequestSettings(input: {
       pricingProfile,
       primaryTrade,
       primaryTradeOther,
+      contractorExtraCapabilities: extraCapabilitiesResult.value,
     },
   };
 }

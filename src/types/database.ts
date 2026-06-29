@@ -104,6 +104,7 @@ export interface Profile {
   quote_pricing_profile?: "budget" | "average" | "premium" | null;
   quote_primary_trade?: string | null;
   quote_primary_trade_other?: string | null;
+  contractor_extra_capabilities?: string | null;
   created_at: string;
   updated_at: string;
 }

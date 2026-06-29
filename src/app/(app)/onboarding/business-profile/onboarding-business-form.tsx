@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateProfileBusinessInfo } from "@/app/(app)/actions";
 import { validateBusinessProfileFields } from "@/lib/validation/business-profile";
+import { ContractorExtraCapabilitiesField } from "@/components/contractor/contractor-extra-capabilities-field";
 
 type Profile = {
   id: string;
@@ -16,6 +17,7 @@ type Profile = {
   province: string | null;
   postal_code: string | null;
   business_contact_email?: string | null;
+  contractor_extra_capabilities?: string | null;
 } | null;
 
 export function OnboardingBusinessForm({
@@ -43,6 +45,9 @@ export function OnboardingBusinessForm({
   const [city, setCity] = useState(profile?.city ?? "");
   const [province, setProvince] = useState(profile?.province ?? "");
   const [postalCode, setPostalCode] = useState(profile?.postal_code ?? "");
+  const [contractorExtraCapabilities, setContractorExtraCapabilities] = useState(
+    profile?.contractor_extra_capabilities ?? ""
+  );
 
   function clearFieldError(key: string) {
     setFieldErrors((prev) => {
@@ -82,6 +87,7 @@ export function OnboardingBusinessForm({
     formData.set("city", city.trim());
     formData.set("province", province.trim());
     formData.set("postal_code", postalCode.trim());
+    formData.set("contractor_extra_capabilities", contractorExtraCapabilities);
 
     const result = await updateProfileBusinessInfo(formData);
 
@@ -313,6 +319,21 @@ export function OnboardingBusinessForm({
               </p>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="border-t border-zinc-200 pt-6">
+        <h2 className="text-sm font-semibold text-zinc-900">Quote matching</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          Optional — helps JobProof match incoming quote requests to the work you actually do.
+        </p>
+        <div className="mt-4">
+          <ContractorExtraCapabilitiesField
+            value={contractorExtraCapabilities}
+            onChange={setContractorExtraCapabilities}
+            fieldError={fieldErrors.contractor_extra_capabilities}
+            inputClassName="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+          />
         </div>
       </div>
 
