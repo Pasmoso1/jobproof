@@ -28,6 +28,11 @@ export const QUOTE_PRIMARY_TRADES = [
 
 export type QuotePrimaryTrade = (typeof QUOTE_PRIMARY_TRADES)[number];
 
+/** Trades available for multi-select additional trades (excludes Other). */
+export const QUOTE_ADDITIONAL_TRADE_OPTIONS = QUOTE_PRIMARY_TRADES.filter(
+  (trade) => trade !== "Other"
+);
+
 export const QUOTE_REQUEST_STORAGE_BUCKET = "quote-request-attachments";
 
 export const MAX_QUOTE_REQUEST_PHOTOS = 10;

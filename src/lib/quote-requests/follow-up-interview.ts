@@ -50,7 +50,7 @@ import {
 } from "@/lib/quote-requests/specialty/registry";
 import type { SpecialtyClassification } from "@/lib/quote-requests/specialty/types";
 import { buildUnifiedUnderstandingBlock } from "@/lib/quote-requests/interview-context";
-import { getEffectiveQuoteTrade } from "@/lib/quote-requests/trade";
+import { getEffectiveQuoteTrade, normalizeAdditionalTrades } from "@/lib/quote-requests/trade";
 import { generateUUID } from "@/lib/utils/uuid";
 
 const MAX_AI_PHOTOS = 4;
@@ -184,6 +184,7 @@ function buildInterviewUserPrompt(input: {
   tradeLabel: string | null;
   primaryTrade: string | null;
   primaryTradeOther: string | null;
+  additionalTrades: string[];
   customerProblem: CustomerProblem;
   scopeAssessment: ScopeAssessment;
   projectType: string;
@@ -199,8 +200,12 @@ function buildInterviewUserPrompt(input: {
   specialty: SpecialtyClassification | null;
 }): string {
   const tradeLine = input.tradeLabel
-    ? `Contractor listed trade: ${input.tradeLabel}`
-    : "Contractor listed trade: not specified";
+    ? `Contractor primary trade: ${input.tradeLabel}`
+    : "Contractor primary trade: not specified";
+  const additionalTradesLine =
+    input.additionalTrades.length > 0
+      ? `Additional trades: ${input.additionalTrades.join(", ")}`
+      : null;
   const otherTrade =
     input.primaryTrade === "Other" && input.primaryTradeOther?.trim()
       ? `Custom trade label: ${input.primaryTradeOther.trim()}`
@@ -229,6 +234,7 @@ function buildInterviewUserPrompt(input: {
     unifiedUnderstanding,
     "",
     tradeLine,
+    additionalTradesLine,
     otherTrade,
     `Customer problem (detected): ${input.customerProblem.label}`,
     `Problem confidence: ${input.customerProblem.confidence}`,
@@ -462,7 +468,7 @@ export async function getNextInterviewStep(
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("quote_primary_trade, quote_primary_trade_other, contractor_extra_capabilities")
+    .select("quote_primary_trade, quote_primary_trade_other, quote_additional_trades, contractor_extra_capabilities")
     .eq("id", input.contractorId)
     .maybeSingle();
 
@@ -475,6 +481,7 @@ export async function getNextInterviewStep(
   const primaryTradeOther = profile?.quote_primary_trade_other
     ? String(profile.quote_primary_trade_other)
     : null;
+  const additionalTrades = normalizeAdditionalTrades(profile?.quote_additional_trades);
   const extraCapabilities = profile?.contractor_extra_capabilities
     ? String(profile.contractor_extra_capabilities)
     : null;
@@ -487,6 +494,7 @@ export async function getNextInterviewStep(
       tradeLabel,
       primaryTrade,
       primaryTradeOther,
+      additionalTrades,
       extraCapabilities,
       projectType: input.projectType,
       description: input.description,
@@ -604,6 +612,7 @@ export async function getNextInterviewStep(
       tradeLabel,
       primaryTrade,
       primaryTradeOther,
+      additionalTrades,
       customerProblem,
       scopeAssessment,
       projectType: input.projectType,

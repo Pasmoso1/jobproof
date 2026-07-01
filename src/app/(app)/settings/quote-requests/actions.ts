@@ -36,6 +36,7 @@ export async function updateQuoteRequestSettings(
     pricingProfile: String(formData.get("pricingProfile") ?? ""),
     primaryTrade: String(formData.get("primaryTrade") ?? ""),
     primaryTradeOther: String(formData.get("primaryTradeOther") ?? ""),
+    additionalTrades: formData.getAll("additionalTrades").map(String),
     contractorExtraCapabilities: String(formData.get("contractor_extra_capabilities") ?? ""),
   });
 
@@ -44,7 +45,7 @@ export async function updateQuoteRequestSettings(
     return { success: false, error: firstError, fieldErrors: validation.fieldErrors };
   }
 
-  const { quoteSlug, businessName, businessPhone, logoUrl, pricingProfile, primaryTrade, primaryTradeOther, contractorExtraCapabilities } =
+  const { quoteSlug, businessName, businessPhone, logoUrl, pricingProfile, primaryTrade, primaryTradeOther, additionalTrades, contractorExtraCapabilities } =
     validation.data;
 
   if (profile.quote_slug && profile.quote_slug.toLowerCase() !== quoteSlug) {
@@ -89,6 +90,7 @@ export async function updateQuoteRequestSettings(
       quote_pricing_profile: pricingProfile,
       quote_primary_trade: primaryTrade,
       quote_primary_trade_other: primaryTradeOther,
+      quote_additional_trades: additionalTrades,
       contractor_extra_capabilities: contractorExtraCapabilities,
     })
     .eq("id", profile.id)

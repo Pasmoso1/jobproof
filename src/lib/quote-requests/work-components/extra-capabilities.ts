@@ -68,7 +68,8 @@ const EXTRA_CAPABILITY_RULES: ExtraCapabilityRule[] = [
 /** Apply contractor-provided extra capabilities as conservative capability upgrades. */
 export function applyExtraCapabilitiesToMap(
   map: CapabilityMap,
-  extraCapabilitiesText: string | null | undefined
+  extraCapabilitiesText: string | null | undefined,
+  options?: { supportingOnly?: boolean }
 ): CapabilityMap {
   const text = extraCapabilitiesText?.trim();
   if (!text) return map;
@@ -77,7 +78,10 @@ export function applyExtraCapabilitiesToMap(
 
   for (const rule of EXTRA_CAPABILITY_RULES) {
     if (!rule.pattern.test(text)) continue;
-    const strength = rule.strength ?? "may_perform";
+    let strength = rule.strength ?? "may_perform";
+    if (options?.supportingOnly && strength === "clearly_performs") {
+      strength = "may_perform";
+    }
     for (const key of rule.keys) {
       result[key] = upgradeCapability(result[key], strength);
     }

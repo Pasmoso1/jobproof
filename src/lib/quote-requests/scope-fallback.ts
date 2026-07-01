@@ -16,6 +16,7 @@ export function inferHeuristicScopeAssessment(input: {
   tradeLabel: string | null;
   primaryTrade: string | null;
   primaryTradeOther?: string | null;
+  additionalTrades?: string[] | null;
   extraCapabilities?: string | null;
   projectType: string;
   description: string;
@@ -26,6 +27,7 @@ export function inferHeuristicScopeAssessment(input: {
     tradeLabel: input.tradeLabel,
     primaryTrade: input.primaryTrade,
     primaryTradeOther: input.primaryTradeOther ?? null,
+    additionalTrades: input.additionalTrades ?? null,
     extraCapabilities: input.extraCapabilities ?? null,
     projectType: input.projectType,
     description: input.description,

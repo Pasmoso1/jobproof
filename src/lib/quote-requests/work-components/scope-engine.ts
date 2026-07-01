@@ -28,6 +28,7 @@ export type AssessScopeInput = {
   tradeLabel: string | null;
   primaryTrade: string | null;
   primaryTradeOther: string | null;
+  additionalTrades?: string[] | null;
   extraCapabilities?: string | null;
   projectType: string;
   description: string;
@@ -197,6 +198,7 @@ export function assessScopeFromWork(input: AssessScopeInput): WorkScopeAnalysis 
     tradeLabel: input.tradeLabel,
     primaryTrade: input.primaryTrade,
     primaryTradeOther: input.primaryTradeOther,
+    additionalTrades: input.additionalTrades,
     extraCapabilities: input.extraCapabilities,
   });
 
@@ -266,6 +268,7 @@ export function assessScopeFit(input: {
   tradeLabel: string | null;
   primaryTrade: string | null;
   primaryTradeOther?: string | null;
+  additionalTrades?: string[] | null;
   extraCapabilities?: string | null;
   projectType?: string;
   description?: string;
@@ -276,6 +279,7 @@ export function assessScopeFit(input: {
     tradeLabel: input.tradeLabel,
     primaryTrade: input.primaryTrade,
     primaryTradeOther: input.primaryTradeOther ?? null,
+    additionalTrades: input.additionalTrades ?? null,
     extraCapabilities: input.extraCapabilities ?? null,
     projectType: input.projectType ?? "",
     description: input.description ?? "",

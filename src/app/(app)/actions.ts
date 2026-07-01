@@ -10,6 +10,7 @@ import {
   validateBusinessProfileFields,
 } from "@/lib/validation/business-profile";
 import { parseContractorExtraCapabilities } from "@/lib/validation/contractor-extra-capabilities";
+import { validateContractorTradesFields } from "@/lib/validation/contractor-trades";
 import {
   contractSigningScheduleErrorMessage,
   parsePositiveContractPrice,
@@ -268,6 +269,28 @@ export async function updateProfileBusinessInfo(formData: FormData) {
     contractorExtraCapabilities = parsed.value;
   }
 
+  let tradeUpdates: {
+    quote_primary_trade?: string | null;
+    quote_primary_trade_other?: string | null;
+    quote_additional_trades?: string[];
+  } = {};
+  if (formData.has("primaryTrade")) {
+    const tradesResult = validateContractorTradesFields({
+      primaryTrade: String(formData.get("primaryTrade") ?? ""),
+      primaryTradeOther: String(formData.get("primaryTradeOther") ?? ""),
+      additionalTrades: formData.getAll("additionalTrades").map(String),
+      primaryTradeRequired: false,
+    });
+    if (!tradesResult.ok) {
+      return { fieldErrors: tradesResult.fieldErrors };
+    }
+    tradeUpdates = {
+      quote_primary_trade: tradesResult.data.primaryTrade,
+      quote_primary_trade_other: tradesResult.data.primaryTradeOther,
+      quote_additional_trades: tradesResult.data.additionalTrades,
+    };
+  }
+
   const parseDayField = (name: string, fallback: number) => {
     const raw = String(formData.get(name) ?? "").trim();
     const n = Number.parseInt(raw, 10);
@@ -315,6 +338,7 @@ export async function updateProfileBusinessInfo(formData: FormData) {
       ...(contractorExtraCapabilities !== undefined
         ? { contractor_extra_capabilities: contractorExtraCapabilities }
         : {}),
+      ...tradeUpdates,
       default_contract_payment_terms: defaultPaymentTerms,
       default_contract_terms_and_conditions: defaultTermsAndConditions,
       default_contract_warranty_note: defaultWarranty,

@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateProfileBusinessInfo } from "@/app/(app)/actions";
 import { validateBusinessProfileFields } from "@/lib/validation/business-profile";
-import { ContractorExtraCapabilitiesField } from "@/components/contractor/contractor-extra-capabilities-field";
+import { normalizeAdditionalTrades } from "@/lib/quote-requests/trade";
+import { ContractorTradesServicesFields } from "@/components/contractor/contractor-trades-services-fields";
 
 type Profile = {
   id: string;
@@ -17,6 +18,9 @@ type Profile = {
   province: string | null;
   postal_code: string | null;
   business_contact_email?: string | null;
+  quote_primary_trade?: string | null;
+  quote_primary_trade_other?: string | null;
+  quote_additional_trades?: string[] | null;
   contractor_extra_capabilities?: string | null;
 } | null;
 
@@ -45,6 +49,13 @@ export function OnboardingBusinessForm({
   const [city, setCity] = useState(profile?.city ?? "");
   const [province, setProvince] = useState(profile?.province ?? "");
   const [postalCode, setPostalCode] = useState(profile?.postal_code ?? "");
+  const [primaryTrade, setPrimaryTrade] = useState(profile?.quote_primary_trade ?? "");
+  const [primaryTradeOther, setPrimaryTradeOther] = useState(
+    profile?.quote_primary_trade_other ?? ""
+  );
+  const [additionalTrades, setAdditionalTrades] = useState<string[]>(
+    normalizeAdditionalTrades(profile?.quote_additional_trades)
+  );
   const [contractorExtraCapabilities, setContractorExtraCapabilities] = useState(
     profile?.contractor_extra_capabilities ?? ""
   );
@@ -87,6 +98,11 @@ export function OnboardingBusinessForm({
     formData.set("city", city.trim());
     formData.set("province", province.trim());
     formData.set("postal_code", postalCode.trim());
+    formData.set("primaryTrade", primaryTrade.trim());
+    formData.set("primaryTradeOther", primaryTradeOther.trim());
+    for (const trade of additionalTrades) {
+      formData.append("additionalTrades", trade);
+    }
     formData.set("contractor_extra_capabilities", contractorExtraCapabilities);
 
     const result = await updateProfileBusinessInfo(formData);
@@ -323,18 +339,20 @@ export function OnboardingBusinessForm({
       </div>
 
       <div className="border-t border-zinc-200 pt-6">
-        <h2 className="text-sm font-semibold text-zinc-900">Quote matching</h2>
-        <p className="mt-1 text-sm text-zinc-600">
-          Optional — helps JobProof match incoming quote requests to the work you actually do.
-        </p>
-        <div className="mt-4">
-          <ContractorExtraCapabilitiesField
-            value={contractorExtraCapabilities}
-            onChange={setContractorExtraCapabilities}
-            fieldError={fieldErrors.contractor_extra_capabilities}
-            inputClassName="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-          />
-        </div>
+        <ContractorTradesServicesFields
+          primaryTrade={primaryTrade}
+          primaryTradeOther={primaryTradeOther}
+          additionalTrades={additionalTrades}
+          contractorExtraCapabilities={contractorExtraCapabilities}
+          onPrimaryTradeChange={setPrimaryTrade}
+          onPrimaryTradeOtherChange={setPrimaryTradeOther}
+          onAdditionalTradesChange={setAdditionalTrades}
+          onContractorExtraCapabilitiesChange={setContractorExtraCapabilities}
+          fieldErrors={fieldErrors}
+          primaryTradeRequired={false}
+          inputClassName="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+          selectClassName="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+        />
       </div>
 
       <div className="border-t border-zinc-200 pt-6">

@@ -168,6 +168,7 @@ export default async function AdminUserDetailPage({
       quote_slug,
       quote_primary_trade,
       quote_primary_trade_other,
+      quote_additional_trades,
       quote_pricing_profile
     `
     )
@@ -511,6 +512,14 @@ export default async function AdminUserDetailPage({
                     },
                   ]
                 : []),
+              {
+                label: "Additional trades",
+                value:
+                  Array.isArray(profile.quote_additional_trades) &&
+                  profile.quote_additional_trades.length > 0
+                    ? profile.quote_additional_trades.join(", ")
+                    : "—",
+              },
               {
                 label: "Pricing profile",
                 value: toMaybeString(profile.quote_pricing_profile) ?? "—",

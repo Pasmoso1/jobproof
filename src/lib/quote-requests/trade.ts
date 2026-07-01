@@ -1,7 +1,15 @@
 export type QuoteTradeProfileFields = {
   quote_primary_trade?: string | null;
   quote_primary_trade_other?: string | null;
+  quote_additional_trades?: string[] | null;
 };
+
+export function normalizeAdditionalTrades(
+  value: string[] | null | undefined
+): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((trade) => typeof trade === "string" && trade.trim().length > 0);
+}
 
 /**
  * Human-readable trade for display and future AI features.

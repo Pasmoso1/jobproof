@@ -9,6 +9,20 @@ type CapabilityMap = Partial<Record<WorkComponentKey, ComponentCapability>>;
 
 const DEFAULT_UNLISTED: ComponentCapability = "unlikely_to_perform";
 
+const CAPABILITY_RANK: Record<ComponentCapability, number> = {
+  unlikely_to_perform: 0,
+  may_perform: 1,
+  clearly_performs: 2,
+};
+
+function upgradeCapability(
+  current: ComponentCapability | undefined,
+  target: ComponentCapability
+): ComponentCapability {
+  const cur = current ?? "unlikely_to_perform";
+  return CAPABILITY_RANK[target] > CAPABILITY_RANK[cur] ? target : cur;
+}
+
 const TRADE_CAPABILITY_MAP: Record<string, CapabilityMap> = {
   Landscaper: {
     landscaping: "clearly_performs",
@@ -136,7 +150,18 @@ const CUSTOM_TRADE_INFERENCE: Array<{ pattern: RegExp; map: CapabilityMap }> = [
   },
 ];
 
-function resolveCapabilityMap(profile: ContractorCapabilityProfile): CapabilityMap {
+function mergeTradeMapInto(base: CapabilityMap, trade: string): CapabilityMap {
+  const tradeMap = TRADE_CAPABILITY_MAP[trade];
+  if (!tradeMap) return base;
+
+  const result: CapabilityMap = { ...base };
+  for (const [key, cap] of Object.entries(tradeMap) as [WorkComponentKey, ComponentCapability][]) {
+    result[key] = upgradeCapability(result[key], cap);
+  }
+  return result;
+}
+
+function resolvePrimaryTradeMap(profile: ContractorCapabilityProfile): CapabilityMap {
   const primary = profile.primaryTrade?.trim() ?? "";
   let map: CapabilityMap = { ...(TRADE_CAPABILITY_MAP[primary] ?? {}) };
 
@@ -144,12 +169,36 @@ function resolveCapabilityMap(profile: ContractorCapabilityProfile): CapabilityM
     const custom = (profile.primaryTradeOther ?? profile.tradeLabel ?? "").trim();
     for (const rule of CUSTOM_TRADE_INFERENCE) {
       if (rule.pattern.test(custom)) {
-        map = { ...map, ...rule.map };
+        for (const [key, cap] of Object.entries(rule.map) as [
+          WorkComponentKey,
+          ComponentCapability,
+        ][]) {
+          map[key] = upgradeCapability(map[key], cap);
+        }
       }
     }
     if (Object.keys(map).length === 0) {
       map = { general_renovation: "may_perform" };
     }
+  }
+
+  return map;
+}
+
+function resolveCapabilityMap(profile: ContractorCapabilityProfile): CapabilityMap {
+  let map = resolvePrimaryTradeMap(profile);
+
+  const additionalTrades = [
+    ...(profile.additionalTrades ?? []),
+  ];
+
+  const seenTrades = new Set<string>();
+  for (const trade of additionalTrades) {
+    const trimmed = trade.trim();
+    if (!trimmed || seenTrades.has(trimmed)) continue;
+    if (trimmed === profile.primaryTrade?.trim()) continue;
+    seenTrades.add(trimmed);
+    map = mergeTradeMapInto(map, trimmed);
   }
 
   if (profile.servicesOffered?.length) {
@@ -175,25 +224,7 @@ function resolveCapabilityMap(profile: ContractorCapabilityProfile): CapabilityM
     }
   }
 
-  if (profile.secondaryTrades?.length) {
-    for (const secondary of profile.secondaryTrades) {
-      const secondaryMap = TRADE_CAPABILITY_MAP[secondary];
-      if (secondaryMap) {
-        for (const [key, cap] of Object.entries(secondaryMap) as [
-          WorkComponentKey,
-          ComponentCapability,
-        ][]) {
-          if (cap === "clearly_performs" && map[key as WorkComponentKey] !== "clearly_performs") {
-            const existing = map[key as WorkComponentKey];
-            map[key as WorkComponentKey] =
-              existing === "unlikely_to_perform" ? "may_perform" : existing;
-          }
-        }
-      }
-    }
-  }
-
-  map = applyExtraCapabilitiesToMap(map, profile.extraCapabilities);
+  map = applyExtraCapabilitiesToMap(map, profile.extraCapabilities, { supportingOnly: true });
 
   return map;
 }
@@ -210,12 +241,18 @@ export function contractorProfileFromTrade(input: {
   tradeLabel: string | null;
   primaryTrade: string | null;
   primaryTradeOther: string | null;
+  additionalTrades?: string[] | null;
   extraCapabilities?: string | null;
 }): ContractorCapabilityProfile {
+  const additionalTrades = (input.additionalTrades ?? []).filter(
+    (trade) => trade.trim() && trade !== input.primaryTrade
+  );
+
   return {
     primaryTrade: input.primaryTrade,
     primaryTradeOther: input.primaryTradeOther,
     tradeLabel: input.tradeLabel,
+    additionalTrades,
     extraCapabilities: input.extraCapabilities?.trim() || null,
   };
 }

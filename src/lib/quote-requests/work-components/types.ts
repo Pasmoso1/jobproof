@@ -39,13 +39,15 @@ export type ComponentCapability =
   | "may_perform"
   | "unlikely_to_perform";
 
-/** Future-ready contractor profile for scope matching */
+/**
+ * Contractor business profile for scope matching and AI context.
+ * Extend with service radius, commercial/residential flags, licensed trades, etc.
+ */
 export type ContractorCapabilityProfile = {
   primaryTrade: string | null;
   primaryTradeOther: string | null;
   tradeLabel: string | null;
-  /** Future: secondary trades the contractor also performs */
-  secondaryTrades?: string[];
+  additionalTrades?: string[];
   /** Future: explicit services offered */
   servicesOffered?: string[];
   /** Future: explicit services not offered */
@@ -54,7 +56,8 @@ export type ContractorCapabilityProfile = {
   certifications?: string[];
   /** Future: specialty focus areas */
   specialties?: string[];
-  /** Contractor free-text: additional services beyond primary trade */
+  /** Future: service radius, commercial-only, residential-only, emergency service */
+  /** Contractor free-text: supporting services beyond listed trades */
   extraCapabilities?: string | null;
 };
 

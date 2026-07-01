@@ -3,11 +3,11 @@
 import { useState } from "react";
 import {
   QUOTE_PRICING_PROFILES,
-  QUOTE_PRIMARY_TRADES,
   pricingProfileLabel,
 } from "@/lib/quote-requests/constants";
 import { suggestQuoteSlugFromBusinessName } from "@/lib/quote-requests/slug";
-import { ContractorExtraCapabilitiesField } from "@/components/contractor/contractor-extra-capabilities-field";
+import { normalizeAdditionalTrades } from "@/lib/quote-requests/trade";
+import { ContractorTradesServicesFields } from "@/components/contractor/contractor-trades-services-fields";
 import { updateQuoteRequestSettings } from "./actions";
 
 const FIELD_INPUT_CLASS =
@@ -23,6 +23,7 @@ type ProfileFields = {
   quote_pricing_profile?: string | null;
   quote_primary_trade?: string | null;
   quote_primary_trade_other?: string | null;
+  quote_additional_trades?: string[] | null;
   contractor_extra_capabilities?: string | null;
 };
 
@@ -44,6 +45,9 @@ export function QuoteRequestSettingsForm({
   const [primaryTradeOther, setPrimaryTradeOther] = useState(
     profile?.quote_primary_trade_other ?? ""
   );
+  const [additionalTrades, setAdditionalTrades] = useState<string[]>(
+    normalizeAdditionalTrades(profile?.quote_additional_trades)
+  );
   const [contractorExtraCapabilities, setContractorExtraCapabilities] = useState(
     profile?.contractor_extra_capabilities ?? ""
   );
@@ -55,13 +59,6 @@ export function QuoteRequestSettingsForm({
   function suggestSlug() {
     if (businessName.trim()) {
       setQuoteSlug(suggestQuoteSlugFromBusinessName(businessName));
-    }
-  }
-
-  function onPrimaryTradeChange(value: string) {
-    setPrimaryTrade(value);
-    if (value !== "Other") {
-      setPrimaryTradeOther("");
     }
   }
 
@@ -206,57 +203,18 @@ export function QuoteRequestSettingsForm({
         ) : null}
       </label>
 
-      <div className="space-y-3">
-        <label className="block">
-          <span className="text-sm font-medium text-zinc-800">Primary trade</span>
-          <select
-            name="primaryTrade"
-            value={primaryTrade}
-            onChange={(e) => onPrimaryTradeChange(e.target.value)}
-            required
-            className={FIELD_SELECT_CLASS}
-          >
-            <option value="" className="text-zinc-900">
-              Select a trade…
-            </option>
-            {QUOTE_PRIMARY_TRADES.map((t) => (
-              <option key={t} value={t} className="text-zinc-900">
-                {t}
-              </option>
-            ))}
-          </select>
-          {fieldErrors.primaryTrade ? (
-            <p className="mt-1 text-xs text-red-600">{fieldErrors.primaryTrade}</p>
-          ) : null}
-        </label>
-
-        {primaryTrade === "Other" ? (
-          <label className="block">
-            <span className="text-sm font-medium text-zinc-800">Please specify your trade</span>
-            <input
-              name="primaryTradeOther"
-              value={primaryTradeOther}
-              onChange={(e) => setPrimaryTradeOther(e.target.value)}
-              required
-              maxLength={80}
-              placeholder="Custom Home Builder, Masonry, Pool Installer…"
-              className={FIELD_INPUT_CLASS}
-            />
-            <p className="mt-1 text-xs text-zinc-500">
-              This helps JobProof provide better tools and AI insights for your trade.
-            </p>
-            {fieldErrors.primaryTradeOther ? (
-              <p className="mt-1 text-xs text-red-600">{fieldErrors.primaryTradeOther}</p>
-            ) : null}
-          </label>
-        ) : null}
-
-        <ContractorExtraCapabilitiesField
-          value={contractorExtraCapabilities}
-          onChange={setContractorExtraCapabilities}
-          fieldError={fieldErrors.contractorExtraCapabilities}
-        />
-      </div>
+      <ContractorTradesServicesFields
+        primaryTrade={primaryTrade}
+        primaryTradeOther={primaryTradeOther}
+        additionalTrades={additionalTrades}
+        contractorExtraCapabilities={contractorExtraCapabilities}
+        onPrimaryTradeChange={setPrimaryTrade}
+        onPrimaryTradeOtherChange={setPrimaryTradeOther}
+        onAdditionalTradesChange={setAdditionalTrades}
+        onContractorExtraCapabilitiesChange={setContractorExtraCapabilities}
+        fieldErrors={fieldErrors}
+        primaryTradeRequired
+      />
 
       <button
         type="submit"
