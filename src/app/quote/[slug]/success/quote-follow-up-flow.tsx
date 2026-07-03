@@ -13,18 +13,43 @@ type FlowStep = "prompt" | "loading" | "question" | "complete" | "declined";
 const INPUT_CLASS =
   "mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-base text-zinc-900 placeholder:text-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB] sm:text-sm";
 
+const OTHER_OPTION = "Other";
+
+function OtherDetailsField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={INPUT_CLASS}
+      placeholder="Add details (optional)"
+      autoFocus
+    />
+  );
+}
+
 function QuestionFields({
   question,
   answer,
   checkboxValues,
+  otherDetails,
   onAnswerChange,
   onCheckboxToggle,
+  onOtherDetailsChange,
 }: {
   question: FollowUpQuestion;
   answer: string;
   checkboxValues: string[];
+  otherDetails: string;
   onAnswerChange: (value: string) => void;
   onCheckboxToggle: (option: string) => void;
+  onOtherDetailsChange: (value: string) => void;
 }) {
   if (question.question_type === "short_text") {
     return (
@@ -111,6 +136,9 @@ function QuestionFields({
             {option}
           </label>
         ))}
+        {answer === OTHER_OPTION ? (
+          <OtherDetailsField value={otherDetails} onChange={onOtherDetailsChange} />
+        ) : null}
       </div>
     );
   }
@@ -139,6 +167,9 @@ function QuestionFields({
             </label>
           );
         })}
+        {checkboxValues.includes(OTHER_OPTION) ? (
+          <OtherDetailsField value={otherDetails} onChange={onOtherDetailsChange} />
+        ) : null}
       </div>
     );
   }
@@ -161,6 +192,7 @@ export function QuoteFollowUpFlow({
   const [usedFallback, setUsedFallback] = useState(false);
   const [answer, setAnswer] = useState("");
   const [checkboxValues, setCheckboxValues] = useState<string[]>([]);
+  const [otherDetails, setOtherDetails] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -170,15 +202,23 @@ export function QuoteFollowUpFlow({
       : 0;
 
   const currentAnswer = useMemo(() => {
+    const details = otherDetails.trim();
+    const withDetails = (option: string) =>
+      option === OTHER_OPTION && details ? `${OTHER_OPTION}: ${details}` : option;
+
     if (currentQuestion?.question_type === "checkbox") {
-      return checkboxValues.join("|");
+      return checkboxValues.map(withDetails).join("|");
+    }
+    if (currentQuestion?.question_type === "multiple_choice") {
+      return answer ? withDetails(answer) : answer;
     }
     return answer;
-  }, [answer, checkboxValues, currentQuestion]);
+  }, [answer, checkboxValues, otherDetails, currentQuestion]);
 
   function resetAnswerState() {
     setAnswer("");
     setCheckboxValues([]);
+    setOtherDetails("");
   }
 
   function applyQuestionResult(
@@ -365,12 +405,14 @@ export function QuoteFollowUpFlow({
           question={currentQuestion}
           answer={answer}
           checkboxValues={checkboxValues}
+          otherDetails={otherDetails}
           onAnswerChange={setAnswer}
           onCheckboxToggle={(option) => {
             setCheckboxValues((prev) =>
               prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]
             );
           }}
+          onOtherDetailsChange={setOtherDetails}
         />
       </div>
 

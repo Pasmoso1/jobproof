@@ -143,9 +143,16 @@ Populate known_information with everything already established from description,
 Ask ONE question at a time. Natural finish is 3–5 questions. Maximum ${getInterviewQuestionLimit(input.scopeFit)} for this scope fit (${MAX_FOLLOW_UP_INTERVIEW_QUESTIONS} absolute max).
 
 QUESTION SOURCES:
-1. Prefer selected_library_question_id from the provided catalog — use library wording EXACTLY.
+1. Prefer selected_library_question_id from the provided catalog — use library wording and its choices EXACTLY. Never rewrite a library question as free text.
 2. If no library question fits, provide ONE custom_question with simple mobile-friendly wording.
 3. Never ask budget or pricing-range questions.
+
+QUESTION FORMAT (critical — customers answer on mobile by tapping):
+- STRONGLY PREFER tappable formats: "multiple_choice", "checkbox", "yes_no", or "date".
+- AVOID "short_text" unless the answer genuinely cannot be captured with choices (a true open clarification).
+- Every "multiple_choice" MUST include 2-5 useful concrete options. Do NOT include "Not sure" or "Other" yourself — the system appends them automatically.
+- Use "checkbox" when multiple options can apply; "yes_no" for simple confirmations; "date" for timing.
+- Prefer a multiple_choice with sensible ranges/buckets over asking the customer to type a number.
 
 ${input.isFirstStep ? `FIRST STEP ONLY:
 - Confirm or refine customerProblem and scopeAssessment in your JSON response.
@@ -176,8 +183,8 @@ Return JSON only:
 
 When interview_complete is true, omit selected_library_question_id and custom_question.
 
-For custom_question when needed:
-{ "question": "string", "question_type": "multiple_choice|checkbox|short_text|number|date|yes_no", "options": ["optional"] }`;
+For custom_question when needed (prefer multiple_choice/checkbox/yes_no/date; use short_text only as a last resort):
+{ "question": "string", "question_type": "multiple_choice|checkbox|yes_no|date|short_text|number", "options": ["required for multiple_choice/checkbox — 2 to 5 concrete choices, without Not sure/Other"] }`;
 }
 
 function buildInterviewUserPrompt(input: {
@@ -300,12 +307,14 @@ function buildCustomFollowUpQuestion(
 
   const options =
     questionType === "multiple_choice" || questionType === "checkbox"
-      ? (raw.options ?? []).map((o) => String(o).trim()).filter(Boolean).slice(0, 8)
+      ? withNotSureAndOther(
+          (raw.options ?? []).map((o) => String(o).trim()).filter(Boolean).slice(0, 6)
+        )
       : undefined;
 
   if (
     (questionType === "multiple_choice" || questionType === "checkbox") &&
-    (!options || options.length < 2)
+    (!options || options.length < 3)
   ) {
     return null;
   }
@@ -319,6 +328,22 @@ function buildCustomFollowUpQuestion(
     library_question_id: null,
     is_custom: true,
   };
+}
+
+const NOT_SURE_OPTION = "Not sure";
+const OTHER_OPTION = "Other";
+
+/**
+ * Ensures multiple-choice / checkbox questions always offer a fallback the
+ * customer can tap: "Not sure" and "Other" (which reveals an optional detail
+ * field client-side). Existing equivalents are not duplicated.
+ */
+function withNotSureAndOther(options: string[]): string[] {
+  const result = options.filter(
+    (o) => o.toLowerCase() !== NOT_SURE_OPTION.toLowerCase() && o.toLowerCase() !== OTHER_OPTION.toLowerCase()
+  );
+  result.push(NOT_SURE_OPTION, OTHER_OPTION);
+  return result;
 }
 
 function resolveQuestionById(id: string): LibraryQuestion | undefined {

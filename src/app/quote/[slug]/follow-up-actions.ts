@@ -18,6 +18,21 @@ export type FollowUpInterviewActionResult =
   | ({ success: true } & InterviewStepResult)
   | { success: false; error: string };
 
+/**
+ * Fire-and-forget Project Brief generation, only invoked when the interview
+ * completes. Never awaited on the customer path so it cannot slow down the
+ * next-question response.
+ */
+function triggerProjectBriefOnComplete(
+  admin: ReturnType<typeof createServiceRoleClient>,
+  requestId: string
+): void {
+  if (!admin) return;
+  void maybeGenerateProjectBrief(admin, requestId, "interview_complete", true).catch((err) => {
+    console.error("[follow-up] project brief completion failed", err);
+  });
+}
+
 async function loadInterviewContext(requestId: string) {
   const admin = createServiceRoleClient();
   if (!admin) return null;
@@ -76,14 +91,7 @@ export async function startFollowUpInterviewAction(
   });
 
   if (step.status === "complete") {
-    void maybeGenerateProjectBrief(
-      ctx.admin,
-      access.requestId,
-      "interview_complete",
-      true
-    ).catch((err) => {
-      console.error("[startFollowUpInterviewAction] project brief completion failed", err);
-    });
+    triggerProjectBriefOnComplete(ctx.admin, access.requestId);
   }
 
   return { success: true, ...step };
@@ -144,24 +152,10 @@ export async function submitFollowUpInterviewAnswerAction(
     return { success: false, error: "Could not save your answer. Please try again." };
   }
 
-  void maybeGenerateProjectBrief(
-    ctx.admin,
-    access.requestId,
-    "interview_answer",
-    false
-  ).catch((err) => {
-    console.error("[submitFollowUpInterviewAnswerAction] project brief generation failed", err);
-  });
-
+  // Project Brief is generated only at interview completion (see below) to keep
+  // per-answer question generation fast — never on every answer.
   if (input.finishInterview) {
-    void maybeGenerateProjectBrief(
-      ctx.admin,
-      access.requestId,
-      "interview_complete",
-      true
-    ).catch((err) => {
-      console.error("[submitFollowUpInterviewAnswerAction] project brief completion failed", err);
-    });
+    triggerProjectBriefOnComplete(ctx.admin, access.requestId);
     return { success: true, status: "complete", usedFallback: false };
   }
 
@@ -175,14 +169,7 @@ export async function submitFollowUpInterviewAnswerAction(
   const maxQuestions = getInterviewQuestionLimit(scopeFit);
 
   if (displayOrder >= maxQuestions || displayOrder >= MAX_FOLLOW_UP_INTERVIEW_QUESTIONS) {
-    void maybeGenerateProjectBrief(
-      ctx.admin,
-      access.requestId,
-      "interview_complete",
-      true
-    ).catch((err) => {
-      console.error("[submitFollowUpInterviewAnswerAction] project brief completion failed", err);
-    });
+    triggerProjectBriefOnComplete(ctx.admin, access.requestId);
     return { success: true, status: "complete", usedFallback: false };
   }
 
@@ -207,14 +194,7 @@ export async function submitFollowUpInterviewAnswerAction(
   });
 
   if (step.status === "complete") {
-    void maybeGenerateProjectBrief(
-      ctx.admin,
-      access.requestId,
-      "interview_complete",
-      true
-    ).catch((err) => {
-      console.error("[submitFollowUpInterviewAnswerAction] project brief completion failed", err);
-    });
+    triggerProjectBriefOnComplete(ctx.admin, access.requestId);
   }
 
   return { success: true, ...step };
