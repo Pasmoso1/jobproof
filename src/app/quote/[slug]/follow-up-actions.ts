@@ -3,6 +3,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { verifyFollowUpAccess } from "@/lib/quote-requests/follow-up-access";
 import { getNextInterviewStep } from "@/lib/quote-requests/follow-up-interview";
+import { maybeGenerateProjectBrief } from "@/lib/quote-requests/project-brief/persist";
 import {
   MAX_FOLLOW_UP_INTERVIEW_QUESTIONS,
   type FollowUpQuestion,
@@ -74,6 +75,17 @@ export async function startFollowUpInterviewAction(
     previousAnswers: ctx.previousAnswers,
   });
 
+  if (step.status === "complete") {
+    void maybeGenerateProjectBrief(
+      ctx.admin,
+      access.requestId,
+      "interview_complete",
+      true
+    ).catch((err) => {
+      console.error("[startFollowUpInterviewAction] project brief completion failed", err);
+    });
+  }
+
   return { success: true, ...step };
 }
 
@@ -132,7 +144,24 @@ export async function submitFollowUpInterviewAnswerAction(
     return { success: false, error: "Could not save your answer. Please try again." };
   }
 
+  void maybeGenerateProjectBrief(
+    ctx.admin,
+    access.requestId,
+    "interview_answer",
+    false
+  ).catch((err) => {
+    console.error("[submitFollowUpInterviewAnswerAction] project brief generation failed", err);
+  });
+
   if (input.finishInterview) {
+    void maybeGenerateProjectBrief(
+      ctx.admin,
+      access.requestId,
+      "interview_complete",
+      true
+    ).catch((err) => {
+      console.error("[submitFollowUpInterviewAnswerAction] project brief completion failed", err);
+    });
     return { success: true, status: "complete", usedFallback: false };
   }
 
@@ -146,6 +175,14 @@ export async function submitFollowUpInterviewAnswerAction(
   const maxQuestions = getInterviewQuestionLimit(scopeFit);
 
   if (displayOrder >= maxQuestions || displayOrder >= MAX_FOLLOW_UP_INTERVIEW_QUESTIONS) {
+    void maybeGenerateProjectBrief(
+      ctx.admin,
+      access.requestId,
+      "interview_complete",
+      true
+    ).catch((err) => {
+      console.error("[submitFollowUpInterviewAnswerAction] project brief completion failed", err);
+    });
     return { success: true, status: "complete", usedFallback: false };
   }
 
@@ -168,6 +205,17 @@ export async function submitFollowUpInterviewAnswerAction(
     attachmentPaths: ctx.attachmentPaths,
     previousAnswers,
   });
+
+  if (step.status === "complete") {
+    void maybeGenerateProjectBrief(
+      ctx.admin,
+      access.requestId,
+      "interview_complete",
+      true
+    ).catch((err) => {
+      console.error("[submitFollowUpInterviewAnswerAction] project brief completion failed", err);
+    });
+  }
 
   return { success: true, ...step };
 }

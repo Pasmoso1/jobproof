@@ -9,7 +9,9 @@ import {
   QuoteRequestUrgentDetailBadge,
   QuoteRequestUrgentListBadge,
 } from "@/components/quote-request-urgency";
+import { QuoteRequestProjectBrief } from "@/components/quote-request-project-brief";
 import { QuoteRequestScopeNote } from "@/components/quote-request-scope-note";
+import { parseProjectBrief } from "@/lib/quote-requests/project-brief/types";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 import { quoteRequestStatusLabel } from "@/lib/quote-requests/constants";
 import { formatFollowUpAnswerDisplay } from "@/lib/quote-requests/follow-up-types";
@@ -26,6 +28,8 @@ export default async function QuoteRequestDetailPage({
   const { requestId } = await params;
   const request = await getQuoteRequestDetail(requestId);
   if (!request) notFound();
+
+  const projectBrief = parseProjectBrief(request.project_brief);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -47,6 +51,8 @@ export default async function QuoteRequestDetailPage({
           Status: {quoteRequestStatusLabel(request.status)}
         </p>
       </div>
+
+      <QuoteRequestProjectBrief brief={projectBrief} />
 
       <QuoteRequestScopeNote
         scopeFit={request.ai_scope_fit}

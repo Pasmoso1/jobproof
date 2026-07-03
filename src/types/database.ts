@@ -1,3 +1,5 @@
+import type { ProjectBrief } from "@/lib/quote-requests/project-brief/types";
+
 export type Json =
   | string
   | number
@@ -460,6 +462,9 @@ export interface QuoteRequest {
     typicalSpecialist?: string;
   }> | null;
   ai_specialist_trades: string[] | null;
+  project_brief: ProjectBrief | null;
+  project_brief_generated_at: string | null;
+  project_brief_input_hash: string | null;
   submitted_at: string;
   created_at: string;
   updated_at: string;

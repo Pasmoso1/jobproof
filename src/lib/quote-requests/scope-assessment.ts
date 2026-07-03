@@ -3,6 +3,7 @@ import type { AiQuestionSelectionResponse } from "@/lib/quote-requests/question-
 import type { StoredWorkComponent } from "@/lib/quote-requests/work-components/types";
 import { isScopeConfidence } from "@/lib/quote-requests/work-components/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { maybeGenerateProjectBrief } from "@/lib/quote-requests/project-brief/persist";
 
 export type { CustomerProblem, ProblemConfidence };
 
@@ -137,5 +138,10 @@ export async function saveQuoteRequestScopeAssessment(
 
   if (error) {
     console.error("[scope-assessment] save failed", { requestId, message: error.message });
+    return;
   }
+
+  void maybeGenerateProjectBrief(admin, requestId, "scope_update", false).catch((err) => {
+    console.error("[scope-assessment] project brief generation failed", err);
+  });
 }
