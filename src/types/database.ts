@@ -467,6 +467,11 @@ export interface QuoteRequest {
   project_brief_input_hash: string | null;
   quote_checklist_generated_at: string | null;
   quote_checklist_input_hash: string | null;
+  quote_builder_status?: "empty" | "draft" | "ready";
+  quote_builder_generated_at?: string | null;
+  quote_builder_input_hash?: string | null;
+  quote_builder_version?: number;
+  quote_builder_site_visit_banner?: boolean;
   submitted_at: string;
   created_at: string;
   updated_at: string;
@@ -552,4 +557,20 @@ export interface QuoteRequestSiteVisitVoiceNoteRow {
   transcription: string;
   source: "browser_speech" | "audio_upload";
   created_at: string;
+}
+
+export interface QuoteRequestBuilderSectionRow {
+  id: string;
+  quote_request_id: string;
+  contractor_id: string;
+  section_key: string;
+  title: string;
+  content: Record<string, unknown>;
+  display_order: number;
+  source: "generated" | "contractor";
+  contractor_edited: boolean;
+  contractor_edited_at: string | null;
+  generated_at: string | null;
+  created_at: string;
+  updated_at: string;
 }

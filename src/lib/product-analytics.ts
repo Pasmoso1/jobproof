@@ -44,6 +44,10 @@ export const PRODUCT_ANALYTICS_EVENTS = {
   checklist_updated: "checklist_updated",
   checklist_item_completed: "checklist_item_completed",
   checklist_completion_percentage: "checklist_completion_percentage",
+  quote_draft_generated: "quote_draft_generated",
+  quote_draft_regenerated: "quote_draft_regenerated",
+  quote_section_edited: "quote_section_edited",
+  quote_marked_ready: "quote_marked_ready",
 } as const;
 
 export type ProductAnalyticsEventName =

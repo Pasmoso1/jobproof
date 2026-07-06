@@ -1,0 +1,33 @@
+import type { ProjectBrief } from "@/lib/quote-requests/project-brief/types";
+import type { PreviousInterviewAnswer } from "@/lib/quote-requests/follow-up-types";
+import type { QuoteChecklistItem } from "@/lib/quote-requests/quote-checklist/types";
+import type { QuoteBuilderSiteVisitInput } from "@/lib/quote-requests/site-visit-notes/quote-builder-input";
+import type { StoredWorkComponent } from "@/lib/quote-requests/work-components/types";
+
+export type QuoteBuilderContext = {
+  requestId: string;
+  contractorId: string;
+  customerName: string;
+  projectType: string;
+  description: string;
+  propertyAddress: string;
+  isUrgent: boolean;
+  photoCount: number;
+  followUpAnswers: PreviousInterviewAnswer[];
+  projectBrief: ProjectBrief | null;
+  checklistItems: QuoteChecklistItem[];
+  siteVisit: QuoteBuilderSiteVisitInput | null;
+  scopeFit: string | null;
+  scopeReason: string | null;
+  contractorNote: string | null;
+  customerProblemLabel: string | null;
+  workComponents: StoredWorkComponent[] | null;
+  specialistTrades: string[] | null;
+  primaryTrade: string | null;
+  additionalTrades: string[];
+  extraCapabilities: string | null;
+  businessName: string | null;
+  pricingProfile: string | null;
+  defaultWarrantyNote: string | null;
+  siteVisitHasCustomerChanges: boolean;
+};

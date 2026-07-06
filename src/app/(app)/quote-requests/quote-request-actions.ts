@@ -25,6 +25,8 @@ import {
 import { isScopeFit } from "@/lib/quote-requests/scope-assessment";
 import { mapChecklistRow, type QuoteChecklistItem } from "@/lib/quote-requests/quote-checklist/types";
 import { loadSiteVisitNotesRecord } from "@/app/(app)/quote-requests/[requestId]/site-visit-notes-actions";
+import { loadQuoteBuilderForRequest } from "@/app/(app)/quote-requests/[requestId]/builder-actions";
+import type { QuoteBuilderDraft } from "@/lib/quote-requests/quote-builder/types";
 import type {
   QuoteRequest,
   QuoteRequestAttachment,
@@ -40,6 +42,7 @@ export type QuoteRequestDetail = QuoteRequest & {
   events: QuoteRequestEvent[];
   checklistItems: QuoteChecklistItem[];
   siteVisitNotes: import("@/lib/quote-requests/site-visit-notes/types").SiteVisitNotesRecord;
+  quoteBuilder: QuoteBuilderDraft;
 };
 
 async function requireProfileId(): Promise<string> {
@@ -129,6 +132,7 @@ export async function getQuoteRequestDetail(
     .order("display_order", { ascending: true });
 
   const siteVisitNotes = await loadSiteVisitNotesRecord(supabase, requestId);
+  const quoteBuilder = await loadQuoteBuilderForRequest(supabase, requestId);
 
   return {
     ...(request as QuoteRequest),
@@ -137,6 +141,7 @@ export async function getQuoteRequestDetail(
     events: (events ?? []) as QuoteRequestEvent[],
     checklistItems: (checklistRows ?? []).map(mapChecklistRow),
     siteVisitNotes,
+    quoteBuilder,
   };
 }
 

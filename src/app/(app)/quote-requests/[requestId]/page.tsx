@@ -13,6 +13,7 @@ import { QuoteRequestProjectBrief } from "@/components/quote-request-project-bri
 import { QuoteRequestProgress } from "@/components/quote-request-progress";
 import { QuotePreparationChecklist } from "@/components/quote-preparation-checklist";
 import { QuoteRequestSiteVisitNotes } from "@/components/quote-request-site-visit-notes";
+import { QuoteRequestBuilder } from "@/components/quote-request-builder";
 import { QuoteRequestScopeNote } from "@/components/quote-request-scope-note";
 import { buildQuoteProgress } from "@/lib/quote-requests/quote-progress";
 import { parseProjectBrief } from "@/lib/quote-requests/project-brief/types";
@@ -76,6 +77,8 @@ export default async function QuoteRequestDetailPage({
         requestId={request.id}
         initialRecord={request.siteVisitNotes}
       />
+
+      <QuoteRequestBuilder requestId={request.id} initialDraft={request.quoteBuilder} />
 
       <QuoteRequestScopeNote
         scopeFit={request.ai_scope_fit}
