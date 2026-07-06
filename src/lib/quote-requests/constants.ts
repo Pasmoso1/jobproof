@@ -38,6 +38,10 @@ export const QUOTE_REQUEST_STORAGE_BUCKET = "quote-request-attachments";
 export const MAX_QUOTE_REQUEST_PHOTOS = 10;
 export const MAX_QUOTE_REQUEST_PHOTO_BYTES = 10 * 1024 * 1024;
 
+export const MAX_SITE_VISIT_PHOTOS = 20;
+export const MAX_SITE_VISIT_PHOTO_BYTES = 10 * 1024 * 1024;
+export const MAX_SITE_VISIT_VOICE_BYTES = 25 * 1024 * 1024;
+
 export function quoteRequestStatusLabel(status: string): string {
   switch (status) {
     case "new":

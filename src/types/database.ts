@@ -520,3 +520,36 @@ export interface QuoteRequestChecklistItemRow {
   created_at: string;
   updated_at: string;
 }
+
+export interface QuoteRequestSiteVisitNotesRow {
+  id: string;
+  quote_request_id: string;
+  contractor_id: string;
+  quick_notes: string;
+  organized_notes: Record<string, unknown> | null;
+  organized_notes_generated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteRequestSiteVisitPhotoRow {
+  id: string;
+  quote_request_id: string;
+  contractor_id: string;
+  file_path: string;
+  caption: string | null;
+  display_order: number;
+  created_at: string;
+}
+
+export interface QuoteRequestSiteVisitVoiceNoteRow {
+  id: string;
+  quote_request_id: string;
+  contractor_id: string;
+  audio_file_path: string;
+  mime_type: string;
+  duration_seconds: number | null;
+  transcription: string;
+  source: "browser_speech" | "audio_upload";
+  created_at: string;
+}
