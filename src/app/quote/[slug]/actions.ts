@@ -15,6 +15,7 @@ import {
 import { getContractorByQuoteSlug } from "@/lib/quote-requests/public";
 import { sendQuoteRequestReceivedEmail } from "@/lib/quote-requests/notifications";
 import { maybeGenerateProjectBrief } from "@/lib/quote-requests/project-brief/persist";
+import { triggerQuoteChecklistGeneration } from "@/lib/quote-requests/quote-checklist/persist";
 import {
   PRODUCT_ANALYTICS_EVENTS,
   trackProductEventSafe,
@@ -210,9 +211,13 @@ export async function submitPublicQuoteRequest(
     photoCount += 1;
   }
 
-  void maybeGenerateProjectBrief(admin, requestId, "submission", false).catch((err) => {
-    console.error("[submitPublicQuoteRequest] project brief generation failed", err);
-  });
+  void maybeGenerateProjectBrief(admin, requestId, "submission", false)
+    .catch((err) => {
+      console.error("[submitPublicQuoteRequest] project brief generation failed", err);
+    })
+    .finally(() => {
+      triggerQuoteChecklistGeneration(admin, requestId, "submission", false);
+    });
 
   const notificationPayload = {
     contractorId: contractor.id,

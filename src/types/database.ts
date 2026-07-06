@@ -465,6 +465,8 @@ export interface QuoteRequest {
   project_brief: ProjectBrief | null;
   project_brief_generated_at: string | null;
   project_brief_input_hash: string | null;
+  quote_checklist_generated_at: string | null;
+  quote_checklist_input_hash: string | null;
   submitted_at: string;
   created_at: string;
   updated_at: string;
@@ -496,4 +498,25 @@ export interface QuoteRequestAttachment {
   quote_request_id: string;
   file_path: string;
   created_at: string;
+}
+
+/** Row from quote_request_checklist_items */
+export interface QuoteRequestChecklistItemRow {
+  id: string;
+  quote_request_id: string;
+  contractor_id: string;
+  stable_key: string;
+  category: string;
+  title: string;
+  description: string;
+  priority: string;
+  display_order: number;
+  completed: boolean;
+  completed_at: string | null;
+  completed_by: string | null;
+  generated_from: string;
+  ai_reason: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }

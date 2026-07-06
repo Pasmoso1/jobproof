@@ -10,6 +10,7 @@ import {
   QuoteRequestUrgentListBadge,
 } from "@/components/quote-request-urgency";
 import { QuoteRequestProjectBrief } from "@/components/quote-request-project-brief";
+import { QuotePreparationChecklist } from "@/components/quote-preparation-checklist";
 import { QuoteRequestScopeNote } from "@/components/quote-request-scope-note";
 import { parseProjectBrief } from "@/lib/quote-requests/project-brief/types";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
@@ -53,6 +54,12 @@ export default async function QuoteRequestDetailPage({
       </div>
 
       <QuoteRequestProjectBrief brief={projectBrief} />
+
+      <QuotePreparationChecklist
+        requestId={request.id}
+        items={request.checklistItems}
+        generatedAt={request.quote_checklist_generated_at}
+      />
 
       <QuoteRequestScopeNote
         scopeFit={request.ai_scope_fit}

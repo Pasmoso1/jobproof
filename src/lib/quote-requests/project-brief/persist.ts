@@ -168,7 +168,8 @@ export async function saveProjectBrief(
   admin: SupabaseClient,
   requestId: string,
   brief: ProjectBrief,
-  inputHash: string
+  inputHash: string,
+  interviewCompleted = false
 ): Promise<void> {
   const { error } = await admin
     .from("quote_requests")
@@ -181,7 +182,13 @@ export async function saveProjectBrief(
 
   if (error) {
     console.error("[project-brief] save failed", { requestId, message: error.message });
+    return;
   }
+
+  const { triggerChecklistAfterBrief } = await import(
+    "@/lib/quote-requests/quote-checklist/persist"
+  );
+  triggerChecklistAfterBrief(admin, requestId, interviewCompleted);
 }
 
 /**
@@ -213,6 +220,6 @@ export async function maybeGenerateProjectBrief(
   }
 
   const brief = await generateProjectBriefFromContext(admin, context);
-  await saveProjectBrief(admin, requestId, brief, inputHash);
+  await saveProjectBrief(admin, requestId, brief, inputHash, interviewCompleted);
   return brief;
 }

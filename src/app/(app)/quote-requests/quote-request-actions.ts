@@ -23,6 +23,7 @@ import {
   type QuoteRequestDeclineReason,
 } from "@/lib/quote-requests/decline-notifications";
 import { isScopeFit } from "@/lib/quote-requests/scope-assessment";
+import { mapChecklistRow, type QuoteChecklistItem } from "@/lib/quote-requests/quote-checklist/types";
 import type {
   QuoteRequest,
   QuoteRequestAttachment,
@@ -36,6 +37,7 @@ export type QuoteRequestDetail = QuoteRequest & {
   attachments: Array<QuoteRequestAttachment & { signedUrl: string | null }>;
   followUpAnswers: QuoteRequestFollowUpAnswer[];
   events: QuoteRequestEvent[];
+  checklistItems: QuoteChecklistItem[];
 };
 
 async function requireProfileId(): Promise<string> {
@@ -117,11 +119,19 @@ export async function getQuoteRequestDetail(
     .eq("quote_request_id", requestId)
     .order("created_at", { ascending: false });
 
+  const { data: checklistRows } = await supabase
+    .from("quote_request_checklist_items")
+    .select("*")
+    .eq("quote_request_id", requestId)
+    .eq("is_active", true)
+    .order("display_order", { ascending: true });
+
   return {
     ...(request as QuoteRequest),
     attachments: withUrls,
     followUpAnswers: (followUpAnswers ?? []) as QuoteRequestFollowUpAnswer[],
     events: (events ?? []) as QuoteRequestEvent[],
+    checklistItems: (checklistRows ?? []).map(mapChecklistRow),
   };
 }
 
