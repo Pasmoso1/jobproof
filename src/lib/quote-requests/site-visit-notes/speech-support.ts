@@ -69,8 +69,25 @@ export function isLiveDictationFallbackError(errorCode: string | undefined): boo
 export const LIVE_DICTATION_UNAVAILABLE_MESSAGE =
   "Live dictation is not available on this browser. You can record an audio note instead.";
 
-export const MIC_BLOCKED_MESSAGE =
-  "Microphone access was blocked. You can type notes manually or upload an audio file.";
+export const MIC_PERMISSION_DENIED_MESSAGE =
+  "Microphone access is turned off. You can enable it in your browser settings, type your notes manually, or upload an audio recording.";
+
+/** @deprecated Use MIC_PERMISSION_DENIED_MESSAGE */
+export const MIC_BLOCKED_MESSAGE = MIC_PERMISSION_DENIED_MESSAGE;
+
+export const RECORDING_FAILED_MESSAGE =
+  "We couldn't record that voice note. Please try again or upload an audio file instead.";
+
+export const TRANSCRIPTION_FAILED_MESSAGE =
+  "We couldn't transcribe that recording. Your audio has been saved and you can try again later.";
+
+export const VOICE_NOTE_SUCCESS_MESSAGE = "Voice note added to Quick Notes.";
+
+export function formatRecordingTimer(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
 
 export function pickAudioRecorderMimeType(): string {
   if (typeof MediaRecorder === "undefined") return "audio/webm";
