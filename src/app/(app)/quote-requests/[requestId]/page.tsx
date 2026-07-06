@@ -10,8 +10,10 @@ import {
   QuoteRequestUrgentListBadge,
 } from "@/components/quote-request-urgency";
 import { QuoteRequestProjectBrief } from "@/components/quote-request-project-brief";
+import { QuoteRequestProgress } from "@/components/quote-request-progress";
 import { QuotePreparationChecklist } from "@/components/quote-preparation-checklist";
 import { QuoteRequestScopeNote } from "@/components/quote-request-scope-note";
+import { buildQuoteProgress } from "@/lib/quote-requests/quote-progress";
 import { parseProjectBrief } from "@/lib/quote-requests/project-brief/types";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
 import { quoteRequestStatusLabel } from "@/lib/quote-requests/constants";
@@ -31,6 +33,12 @@ export default async function QuoteRequestDetailPage({
   if (!request) notFound();
 
   const projectBrief = parseProjectBrief(request.project_brief);
+  const quoteProgress = buildQuoteProgress({
+    status: request.status,
+    projectBrief,
+    projectBriefRaw: request.project_brief,
+    events: request.events,
+  });
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -54,6 +62,8 @@ export default async function QuoteRequestDetailPage({
       </div>
 
       <QuoteRequestProjectBrief brief={projectBrief} />
+
+      <QuoteRequestProgress progress={quoteProgress} />
 
       <QuotePreparationChecklist
         requestId={request.id}
