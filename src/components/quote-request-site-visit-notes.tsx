@@ -22,32 +22,17 @@ import {
   type SiteVisitPhoto,
 } from "@/lib/quote-requests/site-visit-notes/types";
 
-type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;
-
-type SpeechRecognitionInstance = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
-type SpeechRecognitionResultEvent = {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
-};
-
-function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
-  if (typeof window === "undefined") return null;
-  const w = window as Window & {
-    SpeechRecognition?: SpeechRecognitionCtor;
-    webkitSpeechRecognition?: SpeechRecognitionCtor;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
+import {
+  getSpeechRecognitionCtor,
+  isLiveDictationFallbackError,
+  isLiveDictationSupported,
+  isMediaRecorderSupported,
+  LIVE_DICTATION_UNAVAILABLE_MESSAGE,
+  MIC_BLOCKED_MESSAGE,
+  pickAudioRecorderMimeType,
+  type SpeechRecognitionInstance,
+  type SpeechRecognitionResultEvent,
+} from "@/lib/quote-requests/site-visit-notes/speech-support";
 
 function CollapsibleSection({
   title,
@@ -154,16 +139,29 @@ export function QuoteRequestSiteVisitNotes({
   const [voiceNotes] = useState(initialRecord.voiceNotes);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [voiceInfo, setVoiceInfo] = useState<string | null>(null);
   const [previewOrganized, setPreviewOrganized] = useState<OrganizedSiteVisitNotes | null>(null);
   const [isDictating, setIsDictating] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [liveDictationSupported, setLiveDictationSupported] = useState(false);
+  const [mediaRecorderSupported, setMediaRecorderSupported] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const quickNotesRef = useRef(quickNotes);
+  const dictationHadResultsRef = useRef(false);
+  const dictationStartedRef = useRef(false);
+  const dictationFailureHandledRef = useRef(false);
+
+  useEffect(() => {
+    setLiveDictationSupported(isLiveDictationSupported());
+    setMediaRecorderSupported(isMediaRecorderSupported());
+  }, []);
 
   useEffect(() => {
     quickNotesRef.current = quickNotes;
@@ -313,11 +311,44 @@ export function QuoteRequestSiteVisitNotes({
     setIsDictating(false);
   }
 
+  function handleLiveDictationFailure(errorCode: string | undefined, hadResults: boolean) {
+    if (dictationFailureHandledRef.current) return;
+    dictationFailureHandledRef.current = true;
+
+    stopDictation();
+    dictationStartedRef.current = false;
+
+    if (errorCode === "aborted") return;
+
+    if (errorCode === "not-allowed" || errorCode === "service-not-allowed") {
+      setVoiceInfo(MIC_BLOCKED_MESSAGE);
+      return;
+    }
+
+    if (isLiveDictationFallbackError(errorCode) || !hadResults) {
+      setLiveDictationSupported(false);
+      setVoiceInfo(LIVE_DICTATION_UNAVAILABLE_MESSAGE);
+      return;
+    }
+
+    if (hadResults) {
+      setVoiceInfo("Live dictation ended. You can keep typing or record another audio note.");
+    }
+  }
+
   function startBrowserDictation() {
     const Ctor = getSpeechRecognitionCtor();
-    if (!Ctor) return false;
+    if (!Ctor) {
+      setVoiceInfo(LIVE_DICTATION_UNAVAILABLE_MESSAGE);
+      return;
+    }
 
     setError(null);
+    setVoiceInfo(null);
+    dictationHadResultsRef.current = false;
+    dictationStartedRef.current = false;
+    dictationFailureHandledRef.current = false;
+
     const recognition = new Ctor();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -325,70 +356,83 @@ export function QuoteRequestSiteVisitNotes({
 
     let sessionText = "";
 
-    recognition.onresult = (event) => {
-      let interim = "";
+    recognition.onstart = () => {
+      dictationStartedRef.current = true;
+    };
+
+    recognition.onresult = (event: SpeechRecognitionResultEvent) => {
+      dictationHadResultsRef.current = true;
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0]?.transcript ?? "";
         if (event.results[i].isFinal) {
           sessionText += `${transcript} `;
-        } else {
-          interim += transcript;
         }
       }
       if (sessionText.trim()) {
         appendToQuickNotes(sessionText.trim());
         sessionText = "";
       }
-      if (interim.trim()) {
-        // interim only — final chunks are appended
-      }
     };
 
     recognition.onerror = (event) => {
-      if (event.error !== "aborted") {
-        setError("Dictation stopped. You can type or record audio instead.");
-      }
-      stopDictation();
+      handleLiveDictationFailure(event.error, dictationHadResultsRef.current);
     };
 
     recognition.onend = () => {
       if (sessionText.trim()) {
         appendToQuickNotes(sessionText.trim());
+        dictationHadResultsRef.current = true;
+      }
+      if (
+        !dictationFailureHandledRef.current &&
+        dictationStartedRef.current &&
+        !dictationHadResultsRef.current
+      ) {
+        handleLiveDictationFailure("network", false);
       }
       setIsDictating(false);
       recognitionRef.current = null;
+      dictationStartedRef.current = false;
     };
 
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsDictating(true);
-    return true;
+    try {
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsDictating(true);
+    } catch {
+      handleLiveDictationFailure("service-not-allowed", false);
+    }
   }
 
-  function handleDictateClick() {
+  function handleRecordAudioClick() {
     if (isRecording) {
       stopAudioRecording();
       return;
     }
+    void startAudioRecording();
+  }
+
+  function handleLiveDictationClick() {
     if (isDictating) {
       stopDictation();
       return;
     }
-    if (startBrowserDictation()) return;
-    void startAudioRecording();
+    startBrowserDictation();
   }
 
   async function startAudioRecording() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setError("Voice dictation is not supported in this browser.");
+    if (!isMediaRecorderSupported()) {
+      setVoiceInfo(LIVE_DICTATION_UNAVAILABLE_MESSAGE);
       return;
     }
 
+    setError(null);
+    setVoiceInfo(null);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "audio/mp4";
+      mediaStreamRef.current = stream;
+      const mimeType = pickAudioRecorderMimeType();
       const recorder = new MediaRecorder(stream, { mimeType });
       audioChunksRef.current = [];
 
@@ -398,20 +442,27 @@ export function QuoteRequestSiteVisitNotes({
 
       recorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
         void processRecordedAudio(mimeType);
       };
 
       mediaRecorderRef.current = recorder;
       recorder.start();
       setIsRecording(true);
-      setError(null);
-    } catch {
-      setError("Microphone access was denied.");
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setVoiceInfo(MIC_BLOCKED_MESSAGE);
+      } else {
+        setVoiceInfo(LIVE_DICTATION_UNAVAILABLE_MESSAGE);
+      }
     }
   }
 
   function stopAudioRecording() {
-    mediaRecorderRef.current?.stop();
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
     mediaRecorderRef.current = null;
     setIsRecording(false);
   }
@@ -419,46 +470,52 @@ export function QuoteRequestSiteVisitNotes({
   async function processRecordedAudio(mimeType: string) {
     const blob = new Blob(audioChunksRef.current, { type: mimeType });
     if (blob.size === 0) {
-      setError("No audio captured.");
+      setVoiceInfo("No audio captured. Try recording again or upload an audio file.");
       return;
     }
 
     setError(null);
+    setIsTranscribing(true);
     startTransition(async () => {
-      const register = await registerSiteVisitVoiceUpload(requestId, {
-        mimeType,
-        byteSize: blob.size,
-      });
-      if (!register.success) {
-        setError(register.error);
-        return;
-      }
-
-      const supabase = createClient();
-      const { error: uploadError } = await supabase.storage
-        .from(QUOTE_REQUEST_STORAGE_BUCKET)
-        .upload(register.path, blob, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: mimeType,
+      try {
+        const register = await registerSiteVisitVoiceUpload(requestId, {
+          mimeType,
+          byteSize: blob.size,
         });
+        if (!register.success) {
+          setError(register.error);
+          return;
+        }
 
-      if (uploadError) {
-        setError(`Audio upload failed: ${uploadError.message}`);
-        return;
-      }
+        const supabase = createClient();
+        const { error: uploadError } = await supabase.storage
+          .from(QUOTE_REQUEST_STORAGE_BUCKET)
+          .upload(register.path, blob, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: mimeType,
+          });
 
-      const result = await transcribeSiteVisitVoiceUpload(
-        requestId,
-        register.voiceId,
-        register.path,
-        { mimeType, byteSize: blob.size }
-      );
+        if (uploadError) {
+          setError(`Audio upload failed: ${uploadError.message}`);
+          return;
+        }
 
-      if (result.success) {
-        appendToQuickNotes(result.transcription);
-      } else {
-        setError(result.error);
+        const result = await transcribeSiteVisitVoiceUpload(
+          requestId,
+          register.voiceId,
+          register.path,
+          { mimeType, byteSize: blob.size }
+        );
+
+        if (result.success) {
+          appendToQuickNotes(result.transcription);
+          setVoiceInfo("Transcription added to Quick Notes. Edit before organizing.");
+        } else {
+          setError(result.error);
+        }
+      } finally {
+        setIsTranscribing(false);
       }
     });
   }
@@ -468,47 +525,56 @@ export function QuoteRequestSiteVisitNotes({
     if (!file) return;
 
     setError(null);
+    setVoiceInfo(null);
+    setIsTranscribing(true);
     startTransition(async () => {
-      const register = await registerSiteVisitVoiceUpload(requestId, {
-        mimeType: file.type || "audio/webm",
-        byteSize: file.size,
-      });
-      if (!register.success) {
-        setError(register.error);
-        return;
-      }
-
-      const supabase = createClient();
-      const { error: uploadError } = await supabase.storage
-        .from(QUOTE_REQUEST_STORAGE_BUCKET)
-        .upload(register.path, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type || "audio/webm",
+      try {
+        const register = await registerSiteVisitVoiceUpload(requestId, {
+          mimeType: file.type || "audio/webm",
+          byteSize: file.size,
         });
+        if (!register.success) {
+          setError(register.error);
+          return;
+        }
 
-      if (uploadError) {
-        setError(`Audio upload failed: ${uploadError.message}`);
-        return;
-      }
+        const supabase = createClient();
+        const { error: uploadError } = await supabase.storage
+          .from(QUOTE_REQUEST_STORAGE_BUCKET)
+          .upload(register.path, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type || "audio/webm",
+          });
 
-      const result = await transcribeSiteVisitVoiceUpload(
-        requestId,
-        register.voiceId,
-        register.path,
-        { mimeType: file.type || "audio/webm", byteSize: file.size }
-      );
+        if (uploadError) {
+          setError(`Audio upload failed: ${uploadError.message}`);
+          return;
+        }
 
-      if (result.success) {
-        appendToQuickNotes(result.transcription);
-      } else {
-        setError(result.error);
+        const result = await transcribeSiteVisitVoiceUpload(
+          requestId,
+          register.voiceId,
+          register.path,
+          { mimeType: file.type || "audio/webm", byteSize: file.size }
+        );
+
+        if (result.success) {
+          appendToQuickNotes(result.transcription);
+          setVoiceInfo("Transcription added to Quick Notes. Edit before organizing.");
+        } else {
+          setError(result.error);
+        }
+      } finally {
+        setIsTranscribing(false);
       }
     });
   }
 
-  const speechAvailable = typeof window !== "undefined" && Boolean(getSpeechRecognitionCtor());
+  const voiceBusy = pending || isTranscribing;
   const organizedCount = organizedNotes ? nonEmptyOrganizedSections(organizedNotes).length : 0;
+  const showLiveDictationUnavailable =
+    !liveDictationSupported && mediaRecorderSupported;
 
   return (
     <section className="rounded-xl border border-zinc-200 bg-white p-5">
@@ -661,42 +727,72 @@ export function QuoteRequestSiteVisitNotes({
           defaultOpen={false}
           badge={voiceNotes.length > 0 ? `${voiceNotes.length}` : undefined}
         >
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleDictateClick}
-              disabled={pending}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                isDictating || isRecording
-                  ? "bg-red-600 text-white hover:bg-red-700"
-                  : "bg-[#2436BB] text-white hover:bg-[#1e2d9a]"
-              } disabled:opacity-50`}
-            >
-              {isDictating || isRecording ? "Stop dictation" : "Dictate Notes"}
-            </button>
-            {!speechAvailable ? (
-              <label className="inline-flex cursor-pointer items-center rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
-                <input
-                  type="file"
-                  accept="audio/*"
-                  className="sr-only"
-                  onChange={(e) => {
-                    void handleAudioFileSelected(e.target.files);
-                    e.target.value = "";
-                  }}
-                />
-                Upload audio
-              </label>
-            ) : null}
-          </div>
-          <p className="mt-2 text-xs text-zinc-500">
-            {speechAvailable
-              ? "Speech is transcribed into Quick Notes. Edit before organizing."
-              : "Record or upload audio — transcription is added to Quick Notes for you to review."}
-          </p>
-          {isRecording ? (
-            <p className="mt-2 text-sm text-red-600">Recording… tap Stop when finished.</p>
+          {showLiveDictationUnavailable && !voiceInfo ? (
+            <p className="mb-3 text-sm text-zinc-600">{LIVE_DICTATION_UNAVAILABLE_MESSAGE}</p>
           ) : null}
+
+          {voiceInfo ? (
+            <p className="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+              {voiceInfo}
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            {mediaRecorderSupported ? (
+              <button
+                type="button"
+                onClick={handleRecordAudioClick}
+                disabled={voiceBusy || isDictating}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                  isRecording
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : "bg-[#2436BB] text-white hover:bg-[#1e2d9a]"
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {isRecording ? "Stop recording" : "Record audio note"}
+              </button>
+            ) : null}
+
+            {liveDictationSupported ? (
+              <button
+                type="button"
+                onClick={handleLiveDictationClick}
+                disabled={voiceBusy || isRecording}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                  isDictating
+                    ? "border-red-300 bg-red-50 text-red-800 hover:bg-red-100"
+                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
+                } disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {isDictating ? "Stop live dictation" : "Live dictation"}
+              </button>
+            ) : null}
+
+            <label className="inline-flex cursor-pointer items-center rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50">
+              <input
+                type="file"
+                accept="audio/*"
+                className="sr-only"
+                disabled={voiceBusy || isRecording || isDictating}
+                onChange={(e) => {
+                  void handleAudioFileSelected(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              Upload audio
+            </label>
+          </div>
+
+          <p className="mt-2 text-xs text-zinc-500">
+            {isTranscribing
+              ? "Transcribing your audio…"
+              : isRecording
+                ? "Recording… tap Stop recording when finished."
+                : liveDictationSupported
+                  ? "Record audio or use live dictation. Transcription is added to Quick Notes for you to edit."
+                  : "Record or upload audio — transcription is added to Quick Notes for you to edit."}
+          </p>
+
           {voiceNotes.length > 0 ? (
             <ul className="mt-3 space-y-2">
               {voiceNotes.slice(0, 3).map((note) => (
