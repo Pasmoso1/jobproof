@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import {
   isScopeFit,
   SCOPE_FIT_BADGE_LABEL,
@@ -39,6 +42,7 @@ type QuoteRequestScopeNoteProps = {
     typicalSpecialist?: string;
   }> | null;
   specialistTrades?: string[] | null;
+  embedded?: boolean;
 };
 
 function formatConfidence(value: string | null | undefined): string | null {
@@ -65,6 +69,36 @@ function parseStructuredNote(note: string): {
   };
 }
 
+function firstSentence(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  const match = trimmed.match(/^(.+?[.!?])(?:\s|$)/);
+  if (match?.[1] && match[1].length <= 240) return match[1].trim();
+  if (trimmed.length <= 240) return trimmed;
+  return `${trimmed.slice(0, 237).trim()}…`;
+}
+
+function scopeConciseSummary(
+  scopeFit: ScopeFit,
+  scopeReason: string | null,
+  matchReason: string | null,
+  note: string | null
+): string {
+  if (matchReason) return firstSentence(matchReason);
+  if (scopeReason?.trim()) return firstSentence(scopeReason);
+  if (note?.trim()) return firstSentence(note);
+  switch (scopeFit) {
+    case "within_scope":
+      return "This request appears to match your typical scope of work.";
+    case "mixed_scope":
+      return "Some parts of this project may match your services; review details before committing.";
+    case "possibly_out_of_scope":
+      return "This project may fall outside your usual scope — review before responding.";
+    case "outside_scope":
+      return "This project likely falls outside your usual scope of work.";
+  }
+}
+
 export function QuoteRequestScopeNote({
   scopeFit,
   scopeReason,
@@ -74,7 +108,10 @@ export function QuoteRequestScopeNote({
   scopeConfidence,
   workComponents,
   specialistTrades,
+  embedded = false,
 }: QuoteRequestScopeNoteProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   if (!scopeFit || !isScopeFit(scopeFit)) {
     return null;
   }
@@ -99,52 +136,83 @@ export function QuoteRequestScopeNote({
     return null;
   }
 
-  return (
-    <section className="rounded-xl border border-zinc-200 bg-white p-5">
+  const summary = scopeConciseSummary(scopeFit, scopeReason, matchReason, note ?? null);
+
+  const content = (
+    <>
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-base font-semibold text-zinc-900">Scope note</h2>
+        {!embedded ? (
+          <h2 className="text-base font-semibold text-zinc-900">Scope Assessment</h2>
+        ) : null}
         <span
           className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${badgeClass}`}
         >
           {badgeLabel}
         </span>
-        {confidence ? (
+        {confidence && !embedded ? (
           <span className="text-xs text-zinc-500">{confidence} confidence</span>
         ) : null}
       </div>
 
-      <dl className="mt-4 space-y-3 text-sm">
-        {detectedProject ? (
-          <div>
-            <dt className="font-medium text-zinc-900">Detected project</dt>
-            <dd className="mt-0.5 text-zinc-700">{detectedProject}</dd>
-          </div>
-        ) : null}
-        {workInvolved ? (
-          <div>
-            <dt className="font-medium text-zinc-900">Work likely involved</dt>
-            <dd className="mt-0.5 text-zinc-700">{workInvolved}</dd>
-          </div>
-        ) : null}
-        {matchReason ? (
-          <div>
-            <dt className="font-medium text-zinc-900">Why this may or may not match</dt>
-            <dd className="mt-0.5 text-zinc-700">{matchReason}</dd>
-          </div>
-        ) : null}
-        {!matchReason && note ? (
-          <div>
-            <dt className="font-medium text-zinc-900">Assessment</dt>
-            <dd className="mt-0.5 whitespace-pre-wrap text-zinc-700">{note}</dd>
-          </div>
-        ) : null}
-        {specialistTrades && specialistTrades.length > 0 ? (
-          <div>
-            <dt className="font-medium text-zinc-900">Specialist trades that may be involved</dt>
-            <dd className="mt-0.5 text-zinc-700">{specialistTrades.join(", ")}</dd>
-          </div>
-        ) : null}
-      </dl>
+      <p className="mt-2 text-sm text-zinc-700">{summary}</p>
+
+      <button
+        type="button"
+        onClick={() => setDetailsOpen((v) => !v)}
+        className="mt-2 text-xs font-medium text-[#2436BB] hover:underline"
+        aria-expanded={detailsOpen}
+      >
+        {detailsOpen ? "Hide details" : "View details"}
+      </button>
+
+      {detailsOpen ? (
+        <dl className="mt-3 space-y-3 border-t border-zinc-100 pt-3 text-sm">
+          {detectedProject ? (
+            <div>
+              <dt className="font-medium text-zinc-900">Detected project</dt>
+              <dd className="mt-0.5 text-zinc-700">{detectedProject}</dd>
+            </div>
+          ) : null}
+          {workInvolved ? (
+            <div>
+              <dt className="font-medium text-zinc-900">Work likely involved</dt>
+              <dd className="mt-0.5 text-zinc-700">{workInvolved}</dd>
+            </div>
+          ) : null}
+          {matchReason ? (
+            <div>
+              <dt className="font-medium text-zinc-900">Why this may or may not match</dt>
+              <dd className="mt-0.5 text-zinc-700">{matchReason}</dd>
+            </div>
+          ) : null}
+          {!matchReason && note ? (
+            <div>
+              <dt className="font-medium text-zinc-900">Assessment</dt>
+              <dd className="mt-0.5 whitespace-pre-wrap text-zinc-700">{note}</dd>
+            </div>
+          ) : null}
+          {specialistTrades && specialistTrades.length > 0 ? (
+            <div>
+              <dt className="font-medium text-zinc-900">Specialist trades that may be involved</dt>
+              <dd className="mt-0.5 text-zinc-700">{specialistTrades.join(", ")}</dd>
+            </div>
+          ) : null}
+          {confidence ? (
+            <div>
+              <dt className="font-medium text-zinc-900">Confidence</dt>
+              <dd className="mt-0.5 text-zinc-700">{confidence}</dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <section className="rounded-xl border border-zinc-200 bg-white p-5">
+      {content}
     </section>
   );
 }

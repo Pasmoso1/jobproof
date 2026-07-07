@@ -101,16 +101,40 @@ function SnapshotGrid({ brief }: { brief: ProjectBrief }) {
   );
 }
 
-export function QuoteRequestProjectBrief({ brief }: { brief: ProjectBrief | null }) {
+export function QuoteRequestProjectBrief({
+  brief,
+  embedded = false,
+}: {
+  brief: ProjectBrief | null;
+  embedded?: boolean;
+}) {
   if (!brief) return null;
 
   const hasRisks = brief.potentialRisks.length > 0;
+  const HeadingTag = embedded ? "h3" : "h2";
 
-  return (
-    <section className="rounded-xl border border-zinc-200 bg-white p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-base font-semibold text-zinc-900">Project Brief</h2>
-        <div className="flex items-center gap-3 text-xs text-zinc-500">
+  const content = (
+    <>
+      {!embedded ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <HeadingTag className="text-base font-semibold text-zinc-900">Project Brief</HeadingTag>
+          <div className="flex items-center gap-3 text-xs text-zinc-500">
+            <span className="inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+              Confirmed
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden />
+              Likely
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-zinc-300" aria-hidden />
+              Verify
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-2 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
           <span className="inline-flex items-center gap-1">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
             Confirmed
@@ -124,9 +148,9 @@ export function QuoteRequestProjectBrief({ brief }: { brief: ProjectBrief | null
             Verify
           </span>
         </div>
-      </div>
+      )}
 
-      <div className="mt-2">
+      <div className={embedded ? "" : "mt-2"}>
         <CollapsibleSection title="Overview" defaultOpen>
           <div className="space-y-2">
             {brief.overview.map((item, index) => (
@@ -165,6 +189,14 @@ export function QuoteRequestProjectBrief({ brief }: { brief: ProjectBrief | null
           </div>
         </CollapsibleSection>
       </div>
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <section className="rounded-xl border border-zinc-200 bg-white p-5">
+      {content}
     </section>
   );
 }

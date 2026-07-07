@@ -150,10 +150,12 @@ export function QuotePreparationChecklist({
   requestId,
   items: initialItems,
   generatedAt,
+  embedded = false,
 }: {
   requestId: string;
   items: QuoteChecklistItem[];
   generatedAt: string | null;
+  embedded?: boolean;
 }) {
   const [items, setItems] = useState(initialItems);
 
@@ -181,33 +183,44 @@ export function QuotePreparationChecklist({
     return null;
   }
 
-  return (
-    <section className="rounded-xl border border-zinc-200 bg-white p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-zinc-900">Quote Preparation Checklist</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            Private workflow — actions to prepare your quote, site visit, and first call.
-          </p>
+  const inner = (
+    <>
+      {!embedded ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-zinc-900">Quote Preparation Checklist</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              Private workflow — actions to prepare your quote, site visit, and first call.
+            </p>
+          </div>
+          <div className="text-right text-xs text-zinc-600">
+            <p className="font-medium text-zinc-900">
+              {completedCount} of {totalCount} complete ({progress}%)
+            </p>
+            {generatedAt ? (
+              <p className="mt-0.5 text-zinc-500">Updated {new Date(generatedAt).toLocaleString()}</p>
+            ) : null}
+          </div>
         </div>
-        <div className="text-right text-xs text-zinc-600">
+      ) : (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-600">
           <p className="font-medium text-zinc-900">
             {completedCount} of {totalCount} complete ({progress}%)
           </p>
           {generatedAt ? (
-            <p className="mt-0.5 text-zinc-500">Updated {new Date(generatedAt).toLocaleString()}</p>
+            <p className="text-zinc-500">Updated {new Date(generatedAt).toLocaleString()}</p>
           ) : null}
         </div>
-      </div>
+      )}
 
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+      <div className={`${embedded ? "" : "mt-3"} h-1.5 w-full overflow-hidden rounded-full bg-zinc-100`}>
         <div
           className="h-full rounded-full bg-[#2436BB] transition-all"
           style={{ width: `${progress}%` }}
         />
       </div>
 
-      <div className="mt-2">
+      <div className={embedded ? "mt-2" : "mt-2"}>
         {CHECKLIST_CATEGORIES.map((category) => (
           <CollapsibleCategory
             key={category}
@@ -218,6 +231,14 @@ export function QuotePreparationChecklist({
           />
         ))}
       </div>
+    </>
+  );
+
+  if (embedded) return inner;
+
+  return (
+    <section className="rounded-xl border border-zinc-200 bg-white p-5">
+      {inner}
     </section>
   );
 }

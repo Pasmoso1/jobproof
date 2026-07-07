@@ -9,12 +9,11 @@ import {
   QuoteRequestUrgentDetailBadge,
   QuoteRequestUrgentListBadge,
 } from "@/components/quote-request-urgency";
-import { QuoteRequestProjectBrief } from "@/components/quote-request-project-brief";
 import { QuoteRequestProgress } from "@/components/quote-request-progress";
-import { QuotePreparationChecklist } from "@/components/quote-preparation-checklist";
 import { QuoteRequestSiteVisitNotes } from "@/components/quote-request-site-visit-notes";
 import { QuoteRequestBuilder } from "@/components/quote-request-builder";
-import { QuoteRequestScopeNote } from "@/components/quote-request-scope-note";
+import { QuoteRequestProjectAssistant } from "@/components/quote-request-project-assistant";
+import { QuoteRequestHistory } from "@/components/quote-request-history";
 import { buildQuoteProgress } from "@/lib/quote-requests/quote-progress";
 import { parseProjectBrief } from "@/lib/quote-requests/project-brief/types";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
@@ -63,40 +62,23 @@ export default async function QuoteRequestDetailPage({
         </p>
       </div>
 
-      <QuoteRequestProjectBrief brief={projectBrief} />
-
-      <QuoteRequestProgress progress={quoteProgress} />
-
-      <QuotePreparationChecklist
-        requestId={request.id}
-        items={request.checklistItems}
-        generatedAt={request.quote_checklist_generated_at}
-      />
-
-      <QuoteRequestSiteVisitNotes
-        requestId={request.id}
-        initialRecord={request.siteVisitNotes}
-      />
-
-      <QuoteRequestBuilder requestId={request.id} initialDraft={request.quoteBuilder} />
-
-      <QuoteRequestScopeNote
-        scopeFit={request.ai_scope_fit}
-        scopeReason={request.ai_scope_reason}
-        contractorNote={request.ai_scope_contractor_note}
-        customerProblemLabel={request.ai_customer_problem_label}
-        customerProblemConfidence={request.ai_customer_problem_confidence}
-        scopeConfidence={request.ai_scope_confidence}
-        workComponents={request.ai_work_components}
-        specialistTrades={request.ai_specialist_trades}
-      />
-
       <section className="rounded-xl border border-zinc-200 bg-white p-5">
         <h2 className="text-base font-semibold text-zinc-900">Customer information</h2>
         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-zinc-500">Name</dt>
-            <dd className="font-medium text-zinc-900">{request.customer_name}</dd>
+            <dt className="text-zinc-500">Phone</dt>
+            <dd className="font-medium text-zinc-900">
+              {request.customer_phone ? (
+                <a
+                  href={`tel:${request.customer_phone.replace(/\s/g, "")}`}
+                  className="text-lg text-[#2436BB] hover:underline"
+                >
+                  {request.customer_phone}
+                </a>
+              ) : (
+                "—"
+              )}
+            </dd>
           </div>
           <div>
             <dt className="text-zinc-500">Email</dt>
@@ -104,18 +86,6 @@ export default async function QuoteRequestDetailPage({
               <a href={`mailto:${request.customer_email}`} className="text-[#2436BB] hover:underline">
                 {request.customer_email}
               </a>
-            </dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">Phone</dt>
-            <dd className="font-medium text-zinc-900">
-              {request.customer_phone ? (
-                <a href={`tel:${request.customer_phone.replace(/\s/g, "")}`} className="text-[#2436BB] hover:underline">
-                  {request.customer_phone}
-                </a>
-              ) : (
-                "—"
-              )}
             </dd>
           </div>
           <div className="sm:col-span-2">
@@ -147,7 +117,7 @@ export default async function QuoteRequestDetailPage({
 
       {request.attachments.length > 0 ? (
         <section className="rounded-xl border border-zinc-200 bg-white p-5">
-          <h2 className="text-base font-semibold text-zinc-900">Photos</h2>
+          <h2 className="text-base font-semibold text-zinc-900">Customer photos</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {request.attachments.map((att) =>
               att.signedUrl ? (
@@ -179,7 +149,7 @@ export default async function QuoteRequestDetailPage({
       ) : null}
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-zinc-900">Additional information</h2>
+        <h2 className="text-base font-semibold text-zinc-900">Follow-up answers</h2>
         {request.followUpAnswers.length > 0 ? (
           <dl className="mt-4 space-y-4">
             {request.followUpAnswers.map((item) => (
@@ -197,33 +167,52 @@ export default async function QuoteRequestDetailPage({
       </section>
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-zinc-900">History</h2>
-        {request.events.length > 0 ? (
-          <ol className="mt-4 space-y-3">
-            {request.events.map((event) => (
-              <li
-                key={event.id}
-                className="border-b border-zinc-100 pb-3 last:border-b-0 last:pb-0"
-              >
-                <p className="text-sm font-medium text-zinc-900">{event.event_label}</p>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  {formatDateTimeEastern(event.created_at)}
-                </p>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="mt-3 text-sm text-zinc-600">No history entries yet.</p>
-        )}
-      </section>
-
-      <section className="rounded-xl border border-zinc-200 bg-white p-5">
         <h2 className="text-base font-semibold text-zinc-900">Actions</h2>
         <div className="mt-4">
           <QuoteRequestActionButtons
             requestId={request.id}
             scopeFit={request.ai_scope_fit}
             status={request.status}
+            variant="primary"
+          />
+        </div>
+      </section>
+
+      <QuoteRequestProjectAssistant
+        projectBrief={projectBrief}
+        scopeFit={request.ai_scope_fit}
+        scopeReason={request.ai_scope_reason}
+        contractorNote={request.ai_scope_contractor_note}
+        customerProblemLabel={request.ai_customer_problem_label}
+        customerProblemConfidence={request.ai_customer_problem_confidence}
+        scopeConfidence={request.ai_scope_confidence}
+        workComponents={request.ai_work_components}
+        specialistTrades={request.ai_specialist_trades}
+        requestId={request.id}
+        checklistItems={request.checklistItems}
+        checklistGeneratedAt={request.quote_checklist_generated_at}
+        status={request.status}
+      />
+
+      <QuoteRequestProgress progress={quoteProgress} />
+
+      <QuoteRequestSiteVisitNotes
+        requestId={request.id}
+        initialRecord={request.siteVisitNotes}
+      />
+
+      <QuoteRequestBuilder requestId={request.id} initialDraft={request.quoteBuilder} />
+
+      <QuoteRequestHistory events={request.events} />
+
+      <section className="rounded-xl border border-zinc-200 bg-white p-5">
+        <h2 className="text-base font-semibold text-zinc-900">Quick decline</h2>
+        <div className="mt-4">
+          <QuoteRequestActionButtons
+            requestId={request.id}
+            scopeFit={request.ai_scope_fit}
+            status={request.status}
+            variant="decline"
           />
         </div>
       </section>
