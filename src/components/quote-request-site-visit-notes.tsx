@@ -164,9 +164,12 @@ export function QuoteRequestSiteVisitNotes({
     () => typeof window !== "undefined" && isMediaRecorderSupported()
   );
   const [pending, startTransition] = useTransition();
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const quickNotesTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -265,47 +268,71 @@ export function QuoteRequestSiteVisitNotes({
     });
   }
 
+  async function uploadSiteVisitPhoto(file: File): Promise<boolean> {
+    const supabase = createClient();
+    const mimeType = file.type || "image/jpeg";
+
+    const register = await registerSiteVisitPhotoUpload(requestId, {
+      mimeType,
+      byteSize: file.size,
+    });
+    if (!register.success) {
+      setError(register.error);
+      return false;
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from(QUOTE_REQUEST_STORAGE_BUCKET)
+      .upload(register.path, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: mimeType,
+      });
+
+    if (uploadError) {
+      setError(`Photo upload failed: ${uploadError.message}`);
+      return false;
+    }
+
+    const confirm = await confirmSiteVisitPhotoUpload(
+      requestId,
+      register.photoId,
+      register.path,
+      { mimeType, byteSize: file.size }
+    );
+
+    if (confirm.success) {
+      setPhotos((prev) => [...prev, confirm.photo]);
+      return true;
+    }
+
+    setError(confirm.error);
+    return false;
+  }
+
+  async function handleCameraPhotoSelected(fileList: FileList | null) {
+    const file = fileList?.[0];
+    if (!file) return;
+    setError(null);
+    setPhotoUploading(true);
+    try {
+      await uploadSiteVisitPhoto(file);
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
   async function handlePhotoSelected(fileList: FileList | null) {
     if (!fileList?.length) return;
     setError(null);
-    const supabase = createClient();
-
-    for (const file of Array.from(fileList)) {
-      const register = await registerSiteVisitPhotoUpload(requestId, {
-        mimeType: file.type,
-        byteSize: file.size,
-      });
-      if (!register.success) {
-        setError(register.error);
-        return;
+    setPhotoUploading(true);
+    try {
+      for (const file of Array.from(fileList)) {
+        const ok = await uploadSiteVisitPhoto(file);
+        if (!ok) return;
       }
-
-      const { error: uploadError } = await supabase.storage
-        .from(QUOTE_REQUEST_STORAGE_BUCKET)
-        .upload(register.path, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type,
-        });
-
-      if (uploadError) {
-        setError(`Photo upload failed: ${uploadError.message}`);
-        return;
-      }
-
-      const confirm = await confirmSiteVisitPhotoUpload(
-        requestId,
-        register.photoId,
-        register.path,
-        { mimeType: file.type, byteSize: file.size }
-      );
-
-      if (confirm.success) {
-        setPhotos((prev) => [...prev, confirm.photo]);
-      } else {
-        setError(confirm.error);
-        return;
-      }
+    } finally {
+      setPhotoUploading(false);
     }
   }
 
@@ -753,7 +780,8 @@ export function QuoteRequestSiteVisitNotes({
           badge={photos.length > 0 ? `${photos.length}` : undefined}
         >
           <p className="mb-3 text-xs text-zinc-500">
-            Separate from customer-uploaded photos. These will feed future AI features.
+            Take photos during the visit or upload existing photos. These are private and not
+            visible to the customer.
           </p>
           {photos.length > 0 ? (
             <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -769,7 +797,7 @@ export function QuoteRequestSiteVisitNotes({
                     <button
                       type="button"
                       onClick={() => handleDeletePhoto(photo)}
-                      className="absolute right-1 top-1 rounded bg-black/60 px-2 py-0.5 text-xs text-white opacity-0 transition group-hover:opacity-100"
+                      className="absolute right-1 top-1 rounded bg-black/60 px-2 py-0.5 text-xs text-white sm:opacity-0 sm:transition sm:group-hover:opacity-100"
                     >
                       Remove
                     </button>
@@ -778,19 +806,48 @@ export function QuoteRequestSiteVisitNotes({
               )}
             </div>
           ) : null}
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50">
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif"
-              multiple
-              className="sr-only"
-              onChange={(e) => {
-                void handlePhotoSelected(e.target.files);
-                e.target.value = "";
-              }}
-            />
-            Upload photos
-          </label>
+          <div className="flex flex-wrap gap-2">
+            <label
+              className={`inline-flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm font-medium text-white ${
+                photoUploading
+                  ? "cursor-not-allowed bg-[#2436BB]/60"
+                  : "bg-[#2436BB] hover:bg-[#1e2d9a]"
+              }`}
+            >
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                disabled={photoUploading}
+                onChange={(e) => {
+                  void handleCameraPhotoSelected(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              {photoUploading ? "Uploading…" : "Take photo"}
+            </label>
+            <label
+              className={`inline-flex cursor-pointer items-center rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 ${
+                photoUploading ? "cursor-not-allowed opacity-60" : ""
+              }`}
+            >
+              <input
+                ref={uploadInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif"
+                multiple
+                className="sr-only"
+                disabled={photoUploading}
+                onChange={(e) => {
+                  void handlePhotoSelected(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              Upload photos
+            </label>
+          </div>
         </CollapsibleSection>
 
         <CollapsibleSection
