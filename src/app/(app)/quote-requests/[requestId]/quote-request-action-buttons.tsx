@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   closeQuoteRequest,
-  convertQuoteRequestPlaceholder,
+  addCustomerFromQuoteRequest,
   declineQuoteRequest,
   markQuoteRequestResponded,
   markQuoteRequestReviewed,
@@ -15,11 +16,13 @@ import type { QuoteRequestDeclineReason } from "@/lib/quote-requests/decline-not
 export function QuoteRequestActionButtons({
   requestId,
   status,
+  customerId,
   variant = "all",
 }: {
   requestId: string;
   scopeFit?: string | null;
   status: string;
+  customerId?: string | null;
   variant?: "primary" | "decline" | "all";
 }) {
   const router = useRouter();
@@ -192,16 +195,28 @@ export function QuoteRequestActionButtons({
           >
             {busy === "Request site visit" ? "Saving…" : "Request site visit"}
           </button>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() =>
-              void run("Create customer record", () => convertQuoteRequestPlaceholder(requestId))
-            }
-            className="rounded-lg border border-[#2436BB]/30 bg-[#2436BB]/5 px-3 py-2 text-sm font-medium text-[#2436BB] hover:bg-[#2436BB]/10 disabled:opacity-60"
-          >
-            Create customer record (coming soon)
-          </button>
+          {customerId ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800">
+                ✓ Customer Added
+              </span>
+              <Link
+                href={`/customers/${customerId}`}
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                View Customer
+              </Link>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => void run("Add Customer", () => addCustomerFromQuoteRequest(requestId))}
+              className="rounded-lg border border-[#2436BB]/30 bg-[#2436BB]/5 px-3 py-2 text-sm font-medium text-[#2436BB] hover:bg-[#2436BB]/10 disabled:opacity-60"
+            >
+              {busy === "Add Customer" ? "Saving…" : "Add Customer"}
+            </button>
+          )}
           <button
             type="button"
             disabled={disabled}

@@ -75,9 +75,9 @@ export type QuoteProgressInput = {
   projectBrief: ProjectBrief | null;
   projectBriefRaw: unknown;
   events: QuoteRequestEvent[];
-  /** Future: link to estimate when quote request → estimate exists */
+  /** Quote builder has a draft ready or estimate linked */
   hasLinkedEstimate?: boolean;
-  /** Future: estimate sent to customer */
+  /** Quote delivered to customer */
   estimateSent?: boolean;
 };
 

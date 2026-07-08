@@ -27,6 +27,13 @@ import { mapChecklistRow, type QuoteChecklistItem } from "@/lib/quote-requests/q
 import { loadSiteVisitNotesRecord } from "@/app/(app)/quote-requests/[requestId]/site-visit-notes-actions";
 import { loadQuoteBuilderForRequest } from "@/app/(app)/quote-requests/[requestId]/builder-actions";
 import type { QuoteBuilderDraft } from "@/lib/quote-requests/quote-builder/types";
+import { findExistingCustomerForQuoteRequest } from "@/lib/quote-requests/customer-match";
+import { parseQuoteRequestPropertyAddress } from "@/lib/quote-requests/parse-property-address";
+import { getSubscriptionAccess, READ_ONLY_MODE_ACTION_ERROR } from "@/lib/subscription-access";
+import {
+  validateCustomerEmail,
+  validateCustomerPhone,
+} from "@/lib/validation/job-create";
 import type {
   QuoteRequest,
   QuoteRequestAttachment,
@@ -379,16 +386,175 @@ export async function closeQuoteRequest(requestId: string) {
   return updateQuoteRequestStatus(requestId, "closed");
 }
 
-export async function convertQuoteRequestPlaceholder(
+export type AddCustomerFromQuoteRequestResult =
+  | { success: true; customerId: string; linked: boolean }
+  | { success: false; error: string };
+
+function buildCustomerNotesFromQuoteRequest(request: {
+  project_type: string;
+  description: string;
+}): string {
+  const lines = [
+    `Project type: ${request.project_type.trim()}`,
+    "",
+    request.description.trim(),
+    "",
+    "Added from quote request.",
+  ];
+  return lines.join("\n").trim();
+}
+
+export async function addCustomerFromQuoteRequest(
   requestId: string
-): Promise<UpdateQuoteRequestStatusResult> {
+): Promise<AddCustomerFromQuoteRequestResult> {
   const profileId = await requireProfileId();
-  void profileId;
-  void requestId;
-  return {
-    success: false,
-    error: "Create customer record is coming soon. This will create a customer and job from the quote request.",
-  };
+  const supabase = await createClient();
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "id, province, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+    )
+    .eq("id", profileId)
+    .single();
+
+  if (!profile) {
+    return { success: false, error: "Profile not found." };
+  }
+
+  const access = getSubscriptionAccess(profile);
+  if (access.isReadOnlyMode) {
+    return { success: false, error: access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
+
+  const { data: request } = await supabase
+    .from("quote_requests")
+    .select(
+      "id, contractor_id, customer_id, customer_name, customer_email, customer_phone, property_address, project_type, description"
+    )
+    .eq("id", requestId)
+    .eq("contractor_id", profileId)
+    .maybeSingle();
+
+  if (!request) {
+    return { success: false, error: "Quote request not found." };
+  }
+
+  if (request.customer_id) {
+    return { success: true, customerId: String(request.customer_id), linked: true };
+  }
+
+  const email = String(request.customer_email ?? "").trim();
+  const phone = String(request.customer_phone ?? "").trim() || null;
+  const fullName = String(request.customer_name ?? "").trim();
+
+  if (!fullName) {
+    return { success: false, error: "Customer name is required." };
+  }
+
+  const emailErr = validateCustomerEmail(email);
+  if (emailErr) return { success: false, error: emailErr };
+
+  if (phone) {
+    const phoneErr = validateCustomerPhone(phone);
+    if (phoneErr) return { success: false, error: phoneErr };
+  }
+
+  const existing = await findExistingCustomerForQuoteRequest(
+    supabase,
+    profileId,
+    email,
+    phone
+  );
+
+  let customerId: string;
+  let linked: boolean;
+  let eventType: string;
+  let eventLabel: string;
+
+  if (existing) {
+    customerId = existing.id;
+    linked = true;
+    eventType = "customer_linked";
+    eventLabel =
+      existing.matchedBy === "email"
+        ? "Customer linked (matched by email)"
+        : "Customer linked (matched by phone)";
+  } else {
+    const address = parseQuoteRequestPropertyAddress(
+      String(request.property_address ?? ""),
+      (profile.province as string | null) ?? null
+    );
+
+    const { data: created, error: createError } = await supabase
+      .from("customers")
+      .insert({
+        profile_id: profileId,
+        full_name: fullName,
+        email,
+        phone,
+        address_line_1: address.propertyAddressLine1,
+        city: address.propertyCity,
+        province: address.propertyProvince,
+        postal_code: address.propertyPostalCode,
+        notes: buildCustomerNotesFromQuoteRequest(request),
+      })
+      .select("id")
+      .single();
+
+    if (createError || !created?.id) {
+      console.error("[addCustomerFromQuoteRequest]", createError);
+      return { success: false, error: "Could not create customer." };
+    }
+
+    customerId = String(created.id);
+    linked = false;
+    eventType = "customer_created";
+    eventLabel = "Customer added (new record)";
+  }
+
+  const { error: linkError } = await supabase
+    .from("quote_requests")
+    .update({ customer_id: customerId })
+    .eq("id", requestId)
+    .eq("contractor_id", profileId);
+
+  if (linkError) {
+    console.error("[addCustomerFromQuoteRequest link]", linkError);
+    return { success: false, error: "Could not link customer to this request." };
+  }
+
+  const { error: eventError } = await supabase.from("quote_request_events").insert({
+    quote_request_id: requestId,
+    contractor_id: profileId,
+    event_type: eventType,
+    event_label: eventLabel,
+    metadata: {
+      customer_id: customerId,
+      matched_existing: linked,
+    },
+  });
+
+  if (eventError) {
+    console.error("[addCustomerFromQuoteRequest event]", eventError);
+  }
+
+  trackProductEventSafe({
+    profileId,
+    eventName: linked
+      ? PRODUCT_ANALYTICS_EVENTS.quote_customer_linked
+      : PRODUCT_ANALYTICS_EVENTS.quote_customer_added,
+    route: `/quote-requests/${requestId}`,
+    source: "quote_request_actions",
+    metadata: {
+      request_id: requestId,
+      customer_id: customerId,
+      matched_existing: linked,
+    },
+  });
+
+  revalidateQuoteRequestSurfaces(requestId);
+  return { success: true, customerId, linked };
 }
 
 const DECLINE_ANALYTICS: Record<QuoteRequestDeclineReason, ProductAnalyticsEventName> = {

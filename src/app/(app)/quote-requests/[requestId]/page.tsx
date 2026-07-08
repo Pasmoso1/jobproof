@@ -39,6 +39,11 @@ export default async function QuoteRequestDetailPage({
     projectBrief,
     projectBriefRaw: request.project_brief,
     events: request.events,
+    hasLinkedEstimate:
+      Boolean(request.estimate_id) ||
+      (request.quoteBuilder.sections.length > 0 &&
+        request.quoteBuilder.status !== "empty"),
+    estimateSent: request.quoteBuilder.status === "sent",
   });
 
   return (
@@ -173,6 +178,7 @@ export default async function QuoteRequestDetailPage({
             requestId={request.id}
             scopeFit={request.ai_scope_fit}
             status={request.status}
+            customerId={request.customer_id}
             variant="primary"
           />
         </div>
@@ -201,7 +207,12 @@ export default async function QuoteRequestDetailPage({
         initialRecord={request.siteVisitNotes}
       />
 
-      <QuoteRequestBuilder requestId={request.id} initialDraft={request.quoteBuilder} />
+      <QuoteRequestBuilder
+        requestId={request.id}
+        initialDraft={request.quoteBuilder}
+        customerId={request.customer_id}
+        estimateId={request.estimate_id}
+      />
 
       <QuoteRequestHistory events={request.events} />
 

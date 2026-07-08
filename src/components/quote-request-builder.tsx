@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import {
   generateQuoteBuilderDraftAction,
-  markQuoteBuilderReady,
   saveQuoteBuilderDraft,
   saveQuoteBuilderSection,
+  sendQuoteFromBuilder,
 } from "@/app/(app)/quote-requests/[requestId]/builder-actions";
 import {
   listItemsToText,
@@ -58,16 +59,19 @@ function ListSectionEditor({
   section,
   onChange,
   onSaveState,
+  disabled,
 }: {
   section: QuoteBuilderSection;
   onChange: (content: QuoteBuilderListContent) => void;
   onSaveState: (state: "saving" | "saved" | "error") => void;
+  disabled?: boolean;
 }) {
   const content = section.content as QuoteBuilderListContent;
   const [text, setText] = useState(() => listItemsToText(content.items));
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleChange(value: string) {
+    if (disabled) return;
     setText(value);
     const items = textToListItems(value);
     onChange({ version: 1, items });
@@ -80,6 +84,7 @@ function ListSectionEditor({
     <textarea
       value={text}
       onChange={(e) => handleChange(e.target.value)}
+      disabled={disabled}
       rows={Math.max(4, Math.min(12, text.split("\n").length + 1))}
       placeholder="One item per line"
       className="w-full resize-y rounded-lg border border-zinc-200 px-3 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
@@ -91,16 +96,19 @@ function TimelineSectionEditor({
   section,
   onChange,
   onSaveState,
+  disabled,
 }: {
   section: QuoteBuilderSection;
   onChange: (content: QuoteBuilderTimelineContent) => void;
   onSaveState: (state: "saving" | "saved" | "error") => void;
+  disabled?: boolean;
 }) {
   const content = section.content as QuoteBuilderTimelineContent;
   const [text, setText] = useState(() => content.text);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleChange(value: string) {
+    if (disabled) return;
     setText(value);
     onChange({ version: 1, text: value });
     onSaveState("saving");
@@ -112,7 +120,9 @@ function TimelineSectionEditor({
     <textarea
       value={text}
       onChange={(e) => handleChange(e.target.value)}
+      disabled={disabled}
       rows={3}
+      placeholder="Describe the expected timeline"
       className="w-full resize-y rounded-lg border border-zinc-200 px-3 py-2.5 text-sm text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
     />
   );
@@ -133,15 +143,18 @@ function PricingSectionEditor({
   section,
   onChange,
   onSaveState,
+  disabled,
 }: {
   section: QuoteBuilderSection;
   onChange: (content: QuoteBuilderPricingContent) => void;
   onSaveState: (state: "saving" | "saved" | "error") => void;
+  disabled?: boolean;
 }) {
   const content = section.content as QuoteBuilderPricingContent;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function updateField(key: keyof QuoteBuilderPricingContent, value: string) {
+    if (disabled) return;
     const next = { ...content, [key]: value };
     onChange(next);
     onSaveState("saving");
@@ -161,6 +174,7 @@ function PricingSectionEditor({
               inputMode="decimal"
               value={content[key]}
               onChange={(e) => updateField(key, e.target.value)}
+              disabled={disabled}
               placeholder="0.00"
               className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
             />
@@ -175,10 +189,12 @@ function SectionEditor({
   section,
   requestId,
   onUpdated,
+  readOnly,
 }: {
   section: QuoteBuilderSection;
   requestId: string;
   onUpdated: (section: QuoteBuilderSection) => void;
+  readOnly: boolean;
 }) {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [pending, startTransition] = useTransition();
@@ -187,6 +203,7 @@ function SectionEditor({
 
   const persist = useCallback(
     (content: QuoteBuilderSectionContent) => {
+      if (readOnly) return;
       pendingContentRef.current = content;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
@@ -204,7 +221,7 @@ function SectionEditor({
         });
       }, 1200);
     },
-    [requestId, section.sectionKey, onUpdated]
+    [requestId, section.sectionKey, onUpdated, readOnly]
   );
 
   const defaultOpen =
@@ -222,6 +239,7 @@ function SectionEditor({
           section={section}
           onChange={persist}
           onSaveState={(s) => setSaveState(s === "saved" ? "saved" : "saving")}
+          disabled={readOnly}
         />
       ) : section.sectionKey === "suggested_timeline" ? (
         <TimelineSectionEditor
@@ -229,6 +247,7 @@ function SectionEditor({
           section={section}
           onChange={persist}
           onSaveState={(s) => setSaveState(s === "saved" ? "saved" : "saving")}
+          disabled={readOnly}
         />
       ) : (
         <ListSectionEditor
@@ -236,17 +255,20 @@ function SectionEditor({
           section={section}
           onChange={persist}
           onSaveState={(s) => setSaveState(s === "saved" ? "saved" : "saving")}
+          disabled={readOnly}
         />
       )}
-      <p className="mt-2 text-xs text-zinc-500">
-        {saveState === "saving" || pending
-          ? "Saving…"
-          : saveState === "saved"
-            ? "Saved"
-            : saveState === "error"
-              ? "Save failed"
-              : "Auto-saves as you edit"}
-      </p>
+      {!readOnly ? (
+        <p className="mt-2 text-xs text-zinc-500">
+          {saveState === "saving" || pending
+            ? "Saving…"
+            : saveState === "saved"
+              ? "Saved"
+              : saveState === "error"
+                ? "Save failed"
+                : "Auto-saves as you edit"}
+        </p>
+      ) : null}
     </CollapsibleSection>
   );
 }
@@ -254,16 +276,24 @@ function SectionEditor({
 export function QuoteRequestBuilder({
   requestId,
   initialDraft,
+  customerId,
+  estimateId,
 }: {
   requestId: string;
   initialDraft: QuoteBuilderDraft;
+  customerId?: string | null;
+  estimateId?: string | null;
 }) {
   const [draft, setDraft] = useState(initialDraft);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const hasSections = draft.sections.length > 0;
+  const isSent = draft.status === "sent";
+  const createButtonLabel =
+    draft.generatedAt || draft.status !== "empty" ? "Update Quote" : "Create Quote";
 
   const sortedSections = useMemo(
     () => [...draft.sections].sort((a, b) => a.displayOrder - b.displayOrder),
@@ -273,11 +303,12 @@ export function QuoteRequestBuilder({
   function handleGenerate(regenerate: boolean) {
     setError(null);
     setMessage(null);
+    setWarning(null);
     startTransition(async () => {
       const result = await generateQuoteBuilderDraftAction(requestId, regenerate);
       if (result.success) {
         setDraft(result.draft);
-        setMessage(regenerate ? "Draft regenerated." : "Draft generated.");
+        setMessage(regenerate ? "Suggestions regenerated." : "Quote created.");
       } else {
         setError(result.error);
       }
@@ -289,7 +320,7 @@ export function QuoteRequestBuilder({
     startTransition(async () => {
       const result = await saveQuoteBuilderDraft(requestId);
       if (result.success) {
-        setDraft((d) => ({ ...d, status: "draft" }));
+        setDraft((d) => ({ ...d, status: d.status === "sent" ? "sent" : "draft" }));
         setMessage("Draft saved.");
       } else {
         setError(result.error);
@@ -297,15 +328,43 @@ export function QuoteRequestBuilder({
     });
   }
 
-  function handleMarkReady() {
+  function handleSendQuote() {
     setError(null);
+    setMessage(null);
+    setWarning(null);
+    if (!customerId) {
+      setError("Add the customer before sending the quote.");
+      return;
+    }
     startTransition(async () => {
-      const result = await markQuoteBuilderReady(requestId);
-      if (result.success) {
-        setDraft((d) => ({ ...d, status: "ready" }));
-        setMessage("Marked ready to send. Nothing has been emailed to the customer.");
-      } else {
+      const result = await sendQuoteFromBuilder(requestId);
+      if (!result.success) {
         setError(result.error);
+        return;
+      }
+
+      const sentParts: string[] = [];
+      const warningParts: string[] = [];
+
+      if (result.emailSent) sentParts.push("email");
+      else if (result.emailWarning) warningParts.push(result.emailWarning);
+
+      if (result.smsSent) sentParts.push("text");
+      else if (result.smsWarning) warningParts.push(result.smsWarning);
+
+      if (result.emailSent) {
+        setDraft((d) => ({ ...d, status: "sent" }));
+        if (sentParts.length > 0) {
+          setMessage(`Quote sent. Customer notified by ${sentParts.join(" and ")}.`);
+        } else {
+          setMessage("Quote sent.");
+        }
+      } else {
+        setMessage("Estimate prepared. Email could not be sent — try again from Estimates.");
+      }
+
+      if (warningParts.length > 0) {
+        setWarning(warningParts.join(" "));
       }
     });
   }
@@ -314,7 +373,7 @@ export function QuoteRequestBuilder({
     setDraft((d) => ({
       ...d,
       sections: d.sections.map((s) => (s.id === section.id ? section : s)),
-      status: "draft",
+      status: d.status === "sent" ? "sent" : "draft",
     }));
   }
 
@@ -328,9 +387,9 @@ export function QuoteRequestBuilder({
               Review and customize your quote before sending it to your customer.
             </p>
           </div>
-          {draft.status === "ready" ? (
+          {isSent ? (
             <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">
-              Ready to send
+              Sent
             </span>
           ) : hasSections ? (
             <span className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700">
@@ -338,6 +397,20 @@ export function QuoteRequestBuilder({
             </span>
           ) : null}
         </div>
+
+        {isSent && estimateId ? (
+          <p className="mt-3 text-sm text-zinc-600">
+            <Link href={`/estimates/${estimateId}`} className="font-medium text-[#2436BB] hover:underline">
+              View estimate →
+            </Link>
+          </p>
+        ) : null}
+
+        {!customerId && hasSections && !isSent ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Add the customer in Actions before sending this quote.
+          </p>
+        ) : null}
 
         {draft.siteVisitBanner ? (
           <p className="mt-4 rounded-lg border border-[#2436BB]/20 bg-[#2436BB]/5 px-3 py-2.5 text-sm text-[#2436BB]">
@@ -348,6 +421,12 @@ export function QuoteRequestBuilder({
         {error ? (
           <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
             {error}
+          </p>
+        ) : null}
+
+        {warning ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {warning}
           </p>
         ) : null}
 
@@ -368,7 +447,7 @@ export function QuoteRequestBuilder({
               disabled={pending}
               className="mt-4 rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e2d9a] disabled:opacity-50"
             >
-              {pending ? "Generating…" : "Generate Draft"}
+              {pending ? "Working…" : createButtonLabel}
             </button>
           </div>
         ) : (
@@ -379,13 +458,14 @@ export function QuoteRequestBuilder({
                 section={section}
                 requestId={requestId}
                 onUpdated={handleSectionUpdated}
+                readOnly={isSent}
               />
             ))}
           </div>
         )}
       </div>
 
-      {hasSections ? (
+      {hasSections && !isSent ? (
         <div className="sticky bottom-0 z-10 -mx-1 mt-3 rounded-xl border border-zinc-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/90">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-zinc-500">
@@ -408,15 +488,15 @@ export function QuoteRequestBuilder({
                 disabled={pending}
                 className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
               >
-                {pending ? "Working…" : "Regenerate Draft"}
+                {pending ? "Working…" : "Regenerate Suggestions"}
               </button>
               <button
                 type="button"
-                onClick={handleMarkReady}
+                onClick={handleSendQuote}
                 disabled={pending}
                 className="rounded-lg bg-[#2436BB] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#1e2d9a] disabled:opacity-50"
               >
-                Mark Ready to Send
+                {pending ? "Sending…" : "Send Quote"}
               </button>
             </div>
           </div>

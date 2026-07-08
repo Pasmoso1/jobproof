@@ -14,7 +14,7 @@ export const QUOTE_BUILDER_SECTION_KEYS = [
 
 export type QuoteBuilderSectionKey = (typeof QUOTE_BUILDER_SECTION_KEYS)[number];
 
-export type QuoteBuilderStatus = "empty" | "draft" | "ready";
+export type QuoteBuilderStatus = "empty" | "draft" | "ready" | "sent";
 
 export const QUOTE_BUILDER_SECTION_LABELS: Record<QuoteBuilderSectionKey, string> = {
   project_summary: "Project Summary",
@@ -23,10 +23,10 @@ export const QUOTE_BUILDER_SECTION_LABELS: Record<QuoteBuilderSectionKey, string
   items_requiring_confirmation: "Items Requiring Confirmation",
   optional_upgrades: "Optional Upgrades",
   exclusions: "Exclusions",
-  suggested_timeline: "Suggested Timeline",
-  suggested_warranty: "Suggested Warranty Language",
+  suggested_timeline: "Timeline",
+  suggested_warranty: "Warranty",
   assumptions: "Assumptions",
-  recommended_next_steps: "Recommended Next Steps",
+  recommended_next_steps: "Notes",
   pricing: "Pricing",
 };
 

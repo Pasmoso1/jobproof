@@ -161,6 +161,7 @@ export interface Estimate {
   profile_id: string;
   customer_id: string | null;
   job_id: string | null;
+  quote_request_id?: string | null;
   estimate_number: string;
   title: string;
   scope_of_work: string | null;
@@ -467,7 +468,9 @@ export interface QuoteRequest {
   project_brief_input_hash: string | null;
   quote_checklist_generated_at: string | null;
   quote_checklist_input_hash: string | null;
-  quote_builder_status?: "empty" | "draft" | "ready";
+  customer_id?: string | null;
+  estimate_id?: string | null;
+  quote_builder_status?: "empty" | "draft" | "ready" | "sent";
   quote_builder_generated_at?: string | null;
   quote_builder_input_hash?: string | null;
   quote_builder_version?: number;
