@@ -55,6 +55,11 @@ export const PRODUCT_ANALYTICS_EVENTS = {
   quote_sent_email_failed: "quote_sent_email_failed",
   quote_sent_sms_sent: "quote_sent_sms_sent",
   quote_sent_sms_failed: "quote_sent_sms_failed",
+  quote_viewed: "quote_viewed",
+  quote_accepted: "quote_accepted",
+  quote_declined: "quote_declined",
+  quote_question_submitted: "quote_question_submitted",
+  quote_change_request_submitted: "quote_change_request_submitted",
 } as const;
 
 export type ProductAnalyticsEventName =

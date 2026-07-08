@@ -162,6 +162,7 @@ export interface Estimate {
   customer_id: string | null;
   job_id: string | null;
   quote_request_id?: string | null;
+  customer_proposal?: Record<string, unknown> | null;
   estimate_number: string;
   title: string;
   scope_of_work: string | null;
@@ -187,6 +188,19 @@ export interface Estimate {
   estimate_pdf_path: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface EstimateCustomerMessage {
+  id: string;
+  estimate_id: string;
+  quote_request_id: string | null;
+  contractor_id: string;
+  message_type: "question" | "change_request" | "decline";
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  message_text: string;
+  created_at: string;
 }
 
 export interface Job {

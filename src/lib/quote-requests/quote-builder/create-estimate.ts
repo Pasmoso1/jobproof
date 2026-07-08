@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateEstimateNumber } from "@/lib/estimate-number";
+import { invoiceTaxShortLabel } from "@/lib/invoice-tax";
+import { buildCustomerProposalSnapshot } from "@/lib/public-estimate-proposal";
 import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 import { buildEstimateFieldsFromQuoteBuilder } from "@/lib/quote-requests/quote-builder/to-estimate";
 import type { QuoteBuilderSection } from "@/lib/quote-requests/quote-builder/types";
@@ -14,6 +16,7 @@ export async function upsertEstimateFromQuoteBuilder(
     projectType: string;
     propertyAddress: string;
     profileProvince: string | null;
+    businessName: string;
     sections: QuoteBuilderSection[];
   }
 ): Promise<{ estimateId: string } | { error: string }> {
@@ -33,6 +36,17 @@ export async function upsertEstimateFromQuoteBuilder(
   if ("error" in fields) {
     return { error: fields.error };
   }
+
+  const proposal = buildCustomerProposalSnapshot({
+    sections: input.sections,
+    projectTitle: fields.title,
+    businessName: input.businessName,
+    subtotal: fields.subtotal,
+    taxAmount: fields.taxAmount,
+    taxRateLabel: invoiceTaxShortLabel(fields.propertyProvince),
+    total: fields.total,
+    depositAmount: null,
+  });
 
   if (input.existingEstimateId) {
     const { data: existing } = await supabase
@@ -66,6 +80,7 @@ export async function upsertEstimateFromQuoteBuilder(
         tax_amount: fields.taxAmount,
         total: fields.total,
         notes: fields.notes,
+        customer_proposal: proposal,
         quote_request_id: input.requestId,
       })
       .eq("id", input.existingEstimateId)
@@ -98,6 +113,7 @@ export async function upsertEstimateFromQuoteBuilder(
       tax_amount: fields.taxAmount,
       total: fields.total,
       notes: fields.notes,
+      customer_proposal: proposal,
       status: "draft",
     })
     .select("id")

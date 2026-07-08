@@ -725,9 +725,9 @@ function estimateEmailHtml(opts: SendEstimateEmailOptions): string {
     <div style="font-family: Arial, Helvetica, sans-serif; line-height: 1.55; max-width: 600px; color: #111827;">
       <p style="font-size:16px;">Hi ${escapeHtml(opts.toName || "there")},</p>
       <p style="font-size:15px;">
-        You have received an <strong>estimate (quote)</strong> from <strong>${escapeHtml(c.businessName)}</strong>
-        for <strong>${escapeHtml(opts.estimateTitle)}</strong>. This is not a contract — please review the amounts
-        and details, then accept or decline on the secure link below when you are ready.
+        <strong>${escapeHtml(c.businessName)}</strong> has prepared a quote for
+        <strong>${escapeHtml(opts.estimateTitle)}</strong>. Open the secure link below to review the full proposal,
+        ask questions, request changes, or accept when you are ready.
       </p>
       ${pdfNote}
       <div style="margin-top:20px;padding:16px 18px;background:#eef2ff;border-radius:10px;border:1px solid #c7d2fe;">
@@ -781,7 +781,7 @@ export async function sendEstimateEmail(
     options.businessDisplayName ?? options.contractor.businessName ?? null
   );
   const title = options.estimateTitle.trim() || "Project";
-  const subject = `Estimate: ${options.estimateNumber} — ${title}`;
+  const subject = `Quote from ${options.contractor.businessName} — ${title}`;
   const isProd = process.env.NODE_ENV === "production";
   const html = estimateEmailHtml(options);
 

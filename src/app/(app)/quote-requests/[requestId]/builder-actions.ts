@@ -287,7 +287,7 @@ export async function sendQuoteFromBuilder(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("province")
+    .select("province, business_name")
     .eq("id", profileId)
     .single();
 
@@ -299,6 +299,7 @@ export async function sendQuoteFromBuilder(
     projectType: String(fullRequest.project_type ?? ""),
     propertyAddress: String(fullRequest.property_address ?? ""),
     profileProvince: (profile?.province as string | null) ?? null,
+    businessName: String(profile?.business_name ?? "Contractor"),
     sections,
   });
 
