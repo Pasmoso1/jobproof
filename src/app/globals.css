@@ -8,11 +8,11 @@
   --brand-orange: #F26C36;
 }
 
-a:not([class*="rounded-lg"]) {
+a:not([class*="rounded"]) {
   color: var(--brand-blue);
   transition: color 0.2s;
 }
-a:not([class*="rounded-lg"]):hover {
+a:not([class*="rounded"]):hover {
   color: var(--brand-teal);
 }
 

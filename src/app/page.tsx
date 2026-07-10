@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
+import { getPlanDisplayLines } from "@/lib/billing-plan-display";
+import {
+  DEFAULT_STORAGE_LIMIT_MB,
+  formatActiveJobLimit,
+  formatStorageGb,
+} from "@/lib/plan-limits";
 
 export const metadata: Metadata = {
   title: "JobProof — From first inquiry to signed quote",
@@ -8,19 +14,88 @@ export const metadata: Metadata = {
     "JobProof helps contractors manage quoting from the first customer inquiry through a signed proposal—organized, professional, and in one place.",
 };
 
-function TrialCta({ centered = false }: { centered?: boolean }) {
+const SOLO_PRICING = getPlanDisplayLines("essential", "standard");
+const PRO_PRICING = getPlanDisplayLines("professional", "standard");
+
+const SOLO_FEATURES = [
+  "Customer quote requests",
+  "Smart follow-up questions",
+  "Project Brief",
+  "Quote Preparation Checklist",
+  "Site Visit Notes",
+  "Quote Builder",
+  "Professional customer proposals",
+  "Customer management",
+  "Secure document storage",
+] as const;
+
+const PRO_FEATURES = [
+  "Higher usage limits",
+  "More active quote requests",
+  "Additional storage",
+  "Access to future Pro features as they are released",
+] as const;
+
+const COMPARISON_ROWS: Array<{
+  feature: string;
+  solo: string;
+  pro: string;
+}> = [
+  { feature: "Customer Quote Requests", solo: "Included", pro: "Included" },
+  { feature: "Smart Follow-up Questions", solo: "Included", pro: "Included" },
+  { feature: "Project Brief", solo: "Included", pro: "Included" },
+  { feature: "Quote Preparation Checklist", solo: "Included", pro: "Included" },
+  { feature: "Site Visit Notes", solo: "Included", pro: "Included" },
+  { feature: "Quote Builder", solo: "Included", pro: "Included" },
+  { feature: "Customer Records", solo: "Included", pro: "Included" },
+  { feature: "Professional Proposals", solo: "Included", pro: "Included" },
+  {
+    feature: "Active Jobs",
+    solo: formatActiveJobLimit("essential"),
+    pro: formatActiveJobLimit("professional"),
+  },
+  {
+    feature: "Storage",
+    solo: formatStorageGb(DEFAULT_STORAGE_LIMIT_MB),
+    pro: "Higher limits",
+  },
+  { feature: "Future Pro Features", solo: "—", pro: "Included" },
+];
+
+function TrialCta({
+  centered = false,
+  label = "Start Your 14-Day Free Trial",
+}: {
+  centered?: boolean;
+  label?: string;
+}) {
   return (
     <div className={centered ? "flex flex-col items-center" : undefined}>
       <Link
         href="/signup"
         className="inline-flex w-full items-center justify-center rounded-xl bg-[#2436BB] px-8 py-4 text-base font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
       >
-        Start Your 14-Day Free Trial
+        {label}
       </Link>
-      <p className={`mt-3 text-sm text-zinc-500 ${centered ? "text-center" : ""}`}>
-        No credit card required.
+      <p className={`mt-3 max-w-sm text-sm leading-relaxed text-zinc-500 ${centered ? "text-center" : ""}`}>
+        No credit card required. Cancel anytime during your trial.
       </p>
     </div>
+  );
+}
+
+function PlanFeatureList({ items }: { items: readonly string[] }) {
+  return (
+    <ul className="mt-6 space-y-2.5 text-sm text-zinc-600">
+      {items.map((item) => (
+        <li key={item} className="flex gap-2.5 leading-snug">
+          <span className="mt-0.5 shrink-0 font-bold text-[#2436BB]" aria-hidden>
+            •
+          </span>
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -171,14 +246,15 @@ export default function Home() {
               From first inquiry to signed quote.
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-zinc-600 sm:text-xl">
-              JobProof helps you manage the entire quoting process in one place—so you save time,
-              stay organized, look more professional in front of customers, and win more of the work
-              you quote.
+              You know the drill: a customer texts about a job, you reply from the truck, and by
+              the time you sit down to write the quote you&apos;re digging through message threads
+              trying to remember what they said. Photos are somewhere in your camera roll. Details
+              slip.
             </p>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-zinc-500">
-              Whether you run jobs solo or with a small crew, everything from the first message to
-              the accepted proposal lives in one workflow—not scattered across notebooks, texts, and
-              random folders.
+              JobProof keeps every inquiry in one place—from that first message through a signed
+              proposal—so you look more professional, stay organized, and win more of the work you
+              quote.
             </p>
             <div className="mt-10">
               <TrialCta centered />
@@ -209,12 +285,12 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Section 2 — Workflow */}
+        {/* Section 2 — How JobProof Works */}
         <section className="border-b border-zinc-200 bg-zinc-50/60 px-6 py-16 sm:px-8 sm:py-20">
           <div className="mx-auto max-w-3xl">
             <SectionHeading
               eyebrow="How it works"
-              title="One clear path from inquiry to signed quote"
+              title="How JobProof Works"
               lead="No complicated setup. Just a straightforward flow that matches how jobs actually start."
             />
             <ol className="mt-12 space-y-0">
@@ -240,6 +316,85 @@ export default function Home() {
                 </li>
               ))}
             </ol>
+          </div>
+        </section>
+
+        {/* Pricing */}
+        <section className="border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20">
+          <div className="mx-auto max-w-6xl">
+            <SectionHeading
+              title="Simple, Transparent Pricing"
+              lead="Choose the plan that&apos;s right for your business. Every plan includes a 14-day free trial with no credit card required."
+            />
+
+            <div className="mt-12 grid gap-6 lg:grid-cols-2">
+              <div className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
+                <div>
+                  <h3 className="text-2xl font-bold text-zinc-950">Solo</h3>
+                  <p className="mt-2 text-3xl font-bold tracking-tight text-zinc-950">
+                    {SOLO_PRICING.afterTrialLine.replace("/mo", "")}
+                    <span className="text-lg font-semibold text-zinc-500">/month</span>
+                  </p>
+                  <p className="mt-2 text-base text-zinc-600">Perfect for independent contractors.</p>
+                </div>
+                <PlanFeatureList items={SOLO_FEATURES} />
+                <Link
+                  href="/signup"
+                  className="mt-8 inline-flex w-full items-center justify-center rounded-xl bg-[#2436BB] px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2"
+                >
+                  Start Free Trial
+                </Link>
+              </div>
+
+              <div className="flex flex-col rounded-2xl border-2 border-[#2436BB] bg-white p-6 shadow-sm sm:p-8">
+                <div>
+                  <h3 className="text-2xl font-bold text-zinc-950">Pro</h3>
+                  <p className="mt-2 text-3xl font-bold tracking-tight text-zinc-950">
+                    {PRO_PRICING.afterTrialLine.replace("/mo", "")}
+                    <span className="text-lg font-semibold text-zinc-500">/month</span>
+                  </p>
+                  <p className="mt-2 text-base text-zinc-600">Built for growing contractors.</p>
+                </div>
+                <p className="mt-6 text-sm font-semibold text-zinc-800">Everything in Solo, plus:</p>
+                <PlanFeatureList items={PRO_FEATURES} />
+                <Link
+                  href="/signup"
+                  className="mt-8 inline-flex w-full items-center justify-center rounded-xl bg-[#2436BB] px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2"
+                >
+                  Start Free Trial
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-12">
+              <h3 className="text-center text-lg font-semibold text-zinc-950">Compare plans</h3>
+              <div className="mt-6 -mx-2 overflow-x-auto px-2 sm:mx-0 sm:px-0">
+                <table className="min-w-[560px] w-full border-collapse text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-200">
+                      <th scope="col" className="py-3 pr-4 font-semibold text-zinc-950">
+                        Feature
+                      </th>
+                      <th scope="col" className="px-4 py-3 text-center font-semibold text-zinc-950">
+                        Solo
+                      </th>
+                      <th scope="col" className="py-3 pl-4 text-center font-semibold text-zinc-950">
+                        Pro
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100">
+                    {COMPARISON_ROWS.map((row) => (
+                      <tr key={row.feature}>
+                        <td className="py-3.5 pr-4 font-medium text-zinc-800">{row.feature}</td>
+                        <td className="px-4 py-3.5 text-center text-zinc-600">{row.solo}</td>
+                        <td className="py-3.5 pl-4 text-center text-zinc-600">{row.pro}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -377,24 +532,23 @@ export default function Home() {
         {/* Final CTA */}
         <section className="bg-zinc-950 px-6 py-16 sm:px-8 sm:py-24">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#4DBACC]">
-              Get started
-            </p>
-            <h2 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
-              From first inquiry to signed quote.
+            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
+              Ready to spend less time chasing information and more time winning work?
             </h2>
-            <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-zinc-300">
-              Try JobProof free for 14 days and see how much smoother quoting can be when everything
-              lives in one place.
+            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-zinc-300">
+              Start your free 14-day trial today.
+            </p>
+            <p className="mx-auto mt-2 text-base text-zinc-400">No credit card required.</p>
+            <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-zinc-400">
+              Be professional from the very first customer inquiry.
             </p>
             <div className="mt-10 flex flex-col items-center">
               <Link
                 href="/signup"
                 className="inline-flex w-full items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-zinc-950 transition-colors hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-zinc-950 sm:w-auto"
               >
-                Start Your 14-Day Free Trial
+                Start Your Free Trial
               </Link>
-              <p className="mt-3 text-sm text-zinc-400">No credit card required.</p>
             </div>
           </div>
         </section>
