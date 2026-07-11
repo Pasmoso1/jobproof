@@ -15,7 +15,7 @@ import {
 export const metadata: Metadata = {
   title: "JobProof — From first inquiry to signed quote",
   description:
-    "JobProof helps contractors manage quoting from the first customer inquiry through a signed proposal—organized, professional, and in one place.",
+    "JobProof helps contractors go from the first customer message to a signed quote—organized, professional, and all in one place.",
 };
 
 const SOLO_PRICING = getPlanDisplayLines("essential", "standard");
@@ -29,7 +29,7 @@ const SOLO_FEATURES = [
   "Site Visit Notes",
   "Quote Builder",
   "Professional customer proposals",
-  "Customer management",
+  "Customer records",
   "Secure document storage",
 ] as const;
 
@@ -141,135 +141,135 @@ function SectionHeading({
 const WHY_OUTCOMES = [
   {
     title: "Win more jobs",
-    body: "When every inquiry is captured and followed up properly, fewer good leads slip through the cracks.",
+    body: "When every lead is written down and followed up, fewer good jobs fall through the cracks.",
   },
   {
     title: "Save hours every week",
-    body: "Stop digging through texts, emails, and camera rolls. The details you need are already where the quote lives.",
+    body: "Stop digging through texts, emails, and camera rolls. What you need is already with the quote.",
   },
   {
     title: "Look more professional",
-    body: "Send clear, polished proposals that make customers confident they hired the right contractor.",
+    body: "Send clear proposals that make customers feel confident they hired the right contractor.",
   },
   {
     title: "Keep every quote organized",
-    body: "One thread for each customer—from first message through acceptance—instead of scattered notes and apps.",
+    body: "One place for each customer—from the first message to the yes—instead of notes and apps everywhere.",
   },
   {
     title: "Never lose important information",
-    body: "Photos, site visit notes, and customer answers stay attached to the job, not lost on your phone.",
+    body: "Photos, site visit notes, and customer answers stay with the job, not lost on your phone.",
   },
   {
-    title: "Keep projects moving",
-    body: "Know what stage each quote is in so nothing stalls between the site visit and the signed yes.",
+    title: "Keep jobs moving",
+    body: "See where each quote stands so nothing sits between the site visit and the signed yes.",
   },
 ] as const;
 
 const WORKFLOW_STEPS = [
   {
     title: "Customer requests a quote",
-    body: "A new inquiry comes in with the basics—who they are, what they need, and where the work is.",
+    body: "A new request comes in with the basics—who they are, what they need, and where the work is.",
   },
   {
     title: "Collect the right information",
-    body: "Follow-up questions and customer photos help you understand the job before you even show up.",
+    body: "Follow-up questions and customer photos help you understand the job before you show up.",
   },
   {
     title: "Prepare for the site visit",
-    body: "Walk in knowing what to look for, what to measure, and what still needs confirming.",
+    body: "Walk in knowing what to look for, what to measure, and what still needs checking.",
   },
   {
     title: "Build a professional quote",
-    body: "Turn site notes and project details into a clear proposal you can review and adjust before sending.",
+    body: "Turn your site notes and job details into a clear proposal you can review before you send it.",
   },
   {
     title: "Send a proposal customers can review online",
-    body: "Customers get a clean, easy-to-read quote they can open on any device—no PDFs lost in email.",
+    body: "Customers get a clean quote they can open on any phone or computer—no PDF lost in email.",
   },
   {
     title: "Customer signs",
-    body: "They can accept online when they're ready, so you're not waiting on a callback to know where things stand.",
+    body: "They can accept online when they're ready, so you're not waiting on a callback to know where you stand.",
   },
   {
     title: "Ready to start the job",
-    body: "With the quote accepted, you move forward with confidence—and a clear record of what was agreed.",
+    body: "Once they accept, you can move ahead with a clear record of what was agreed.",
   },
 ] as const;
 
 const ORGANIZED_ITEMS = [
   {
     title: "Customer information",
-    body: "Names, contact details, and property info in one place—not copied between apps.",
+    body: "Names, phone numbers, and addresses in one place—not copied between apps.",
   },
   {
     title: "Photos",
-    body: "Customer uploads and your own site photos stay with the quote request.",
+    body: "Customer photos and your site photos stay with the quote request.",
   },
   {
     title: "Site visit notes",
-    body: "Capture what you saw on site while it's still fresh.",
+    body: "Write down what you saw on site while it's still fresh.",
   },
   {
     title: "Voice notes",
-    body: "Dictate observations during the walk-through instead of trying to remember later.",
+    body: "Talk through what you notice during the walk-through instead of trying to remember later.",
   },
   {
     title: "Quote preparation",
-    body: "Build and refine the proposal before it goes out the door.",
+    body: "Put the proposal together and tidy it up before it goes out.",
   },
   {
     title: "Professional proposals",
-    body: "Present scope, pricing, and terms in a format customers actually understand.",
+    body: "Show what's included, the price, and the terms in a way customers can actually follow.",
   },
   {
     title: "Customer communication",
-    body: "Questions, change requests, and acceptance—all tied to the same quote.",
+    body: "Questions, change requests, and the final yes—all tied to the same quote.",
   },
   {
     title: "Project history",
-    body: "A running record of what happened and when, from first inquiry onward.",
+    body: "A clear record of what happened and when, from the first message onward.",
   },
 ] as const;
 
 const PROTECTION_CARDS = [
   {
     title: "Customer-approved change orders",
-    body: "When the scope shifts, send a clear change order the customer can review and approve before any extra work starts—so everyone agrees on the update.",
+    body: "When the work changes, send a clear change order the customer can review and approve before any extra work starts—so you're both on the same page.",
   },
   {
     title: "Digital contracts",
-    body: "Contracts can be reviewed and signed electronically, then stay attached to the project so you always know what was agreed.",
+    body: "Contracts can be read and signed on a phone or computer, then stay with the job so you always know what was agreed.",
   },
   {
-    title: "Complete project documentation",
-    body: "Photos, notes, approvals, and key project details live together in one history—easy to find when you need them later.",
+    title: "All your job details in one place",
+    body: "Keep photos, notes, approvals, and key job details together in one place—easy to find when you need them later.",
   },
   {
     title: "Site visit records",
-    body: "Capture notes, photos, and voice recordings while you're on site so important details don't get lost on the drive home.",
+    body: "Take notes, photos, and voice recordings during the visit so important details don't get lost on the drive home.",
   },
   {
     title: "Customer communication history",
-    body: "Questions, proposal revisions, and important conversations stay with the project—not buried in text threads and email folders.",
+    body: "Keep customer questions, quote changes, and important conversations with the job—not buried in texts and email.",
   },
   {
     title: "Organized project timeline",
-    body: "Every milestone—from the first inquiry through the signed quote—is documented in one place so you can see how the job progressed.",
+    body: "Every key step—from the first message through the signed quote—stays in one place so you can see how the job moved forward.",
   },
 ] as const;
 
 const SWITCH_COMPARISON = [
   {
     before: "Customer details buried in text threads and half-finished notes.",
-    after: "One organized customer record for every inquiry and quote.",
+    after: "One customer record for every inquiry and quote.",
   },
   {
     before: "Scratch paper and memory after a site visit.",
-    after: "Structured site visit notes, photos, and voice recordings.",
+    after: "Clear site visit notes, photos, and voice recordings.",
   },
   {
     before: "Verbal \"yeah, go ahead\" with nothing to show for it.",
-    after: "Clear change orders customers review and approve online.",
+    after: "Change orders customers review and approve online.",
   },
   {
     before: "A basic quote emailed as a PDF—or typed into a message.",
@@ -277,11 +277,11 @@ const SWITCH_COMPARISON = [
   },
   {
     before: "Scrolling through camera rolls looking for the right photo.",
-    after: "Photos and files kept with the project history.",
+    after: "Photos and files kept with the job history.",
   },
   {
     before: "Juggling notebooks, texts, email, and a few other apps.",
-    after: "One workflow from first inquiry to signed quote.",
+    after: "One place from first inquiry to signed quote.",
   },
 ] as const;
 
@@ -313,14 +313,14 @@ export default function Home() {
               From first inquiry to signed quote.
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-zinc-600 sm:text-xl">
-              You know the drill: a customer texts about a job, you reply from the truck, and by
-              the time you sit down to write the quote you&apos;re digging through message threads
-              trying to remember what they said. Photos are somewhere in your camera roll. Details
-              slip.
+              You know how it goes. A customer texts about a job. You reply from the truck. By the
+              time you sit down to write the quote, you&apos;re digging through messages trying to
+              remember what they said. The photos are somewhere in your camera roll. Details get
+              lost.
             </p>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-zinc-500">
-              JobProof keeps every inquiry in one place—from that first message through a signed
-              proposal—so you look more professional, stay organized, and win more of the work you
+              JobProof keeps every request in one place—from that first message to a signed
+              quote—so you look more professional, stay organized, and win more of the work you
               quote.
             </p>
             <div className="mt-10">
@@ -334,7 +334,7 @@ export default function Home() {
           <div className="mx-auto max-w-6xl">
             <SectionHeading
               title="Why contractors choose JobProof"
-              lead="You didn't start contracting to chase paperwork. JobProof helps you run quotes the way you already work—just without the mess."
+              lead="You didn't start this business to chase paperwork. JobProof helps you run quotes the way you already work—just without the mess."
             />
             <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {WHY_OUTCOMES.map((item) => (
@@ -358,7 +358,7 @@ export default function Home() {
             <SectionHeading
               eyebrow="How it works"
               title="How JobProof Works"
-              lead="No complicated setup. Just a straightforward flow that matches how jobs actually start."
+              lead="No complicated setup. Just a clear path that matches how jobs actually start."
             />
             <ol className="mt-12 space-y-0">
               {WORKFLOW_STEPS.map((step, index) => (
@@ -391,7 +391,7 @@ export default function Home() {
           <div className="mx-auto max-w-6xl">
             <SectionHeading
               title="Simple, Transparent Pricing"
-              lead="Choose the plan that fits where your business is today—and where you want it to go. Every plan includes a 14-day free trial with no credit card required."
+              lead="Pick the plan that fits your business today—and where you want it to go. Every plan includes a 14-day free trial with no credit card required."
             />
 
             <div className="mt-12 grid gap-6 lg:grid-cols-2">
@@ -406,8 +406,8 @@ export default function Home() {
                     Perfect for independent contractors.
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-                    Everything you need to organize quote requests, prepare professional proposals,
-                    and win more work.
+                    Everything you need to keep quote requests organized, send professional
+                    proposals, and win more work.
                   </p>
                 </div>
                 <PlanFeatureList items={SOLO_FEATURES} />
@@ -433,12 +433,11 @@ export default function Home() {
                     Built for growing contractors.
                   </p>
                   <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-                    Everything in Solo, plus tools and benefits designed to help you grow your
-                    business.
+                    Everything in Solo, plus extras that help you grow your business.
                   </p>
                 </div>
                 <p className="mt-6 text-sm font-semibold text-zinc-800">
-                  Invest in your company with:
+                  Built to help your company grow:
                 </p>
                 <PlanFeatureList items={PRO_FEATURES} />
                 <Link
@@ -454,7 +453,7 @@ export default function Home() {
               <h3 className="text-center text-lg font-semibold text-zinc-950">Compare plans</h3>
               <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-zinc-600">
                 Solo keeps you organized. Pro helps you stay organized as you take on more work—and
-                get early access to new business tools.
+                get early access to new tools for your business.
               </p>
               <div className="mt-6 -mx-2 overflow-x-auto px-2 sm:mx-0 sm:px-0">
                 <table className="min-w-[560px] w-full border-collapse text-left text-sm">
@@ -493,7 +492,7 @@ export default function Home() {
           <div className="mx-auto max-w-6xl">
             <SectionHeading
               title="Everything organized before work begins"
-              lead="Most quoting problems start before the job does—missing details, forgotten photos, unclear scope. JobProof keeps it together so you're not juggling five different tools."
+              lead="Most quoting problems start before the job does—missing details, forgotten photos, unclear work. JobProof keeps it together so you're not juggling five different tools."
             />
             <div className="mt-12 grid gap-5 sm:grid-cols-2">
               {ORGANIZED_ITEMS.map((item) => (
@@ -516,7 +515,7 @@ export default function Home() {
             <p className="mx-auto mt-12 max-w-2xl text-center text-base leading-relaxed text-zinc-600">
               You shouldn&apos;t need a notebook, a photo album, a spreadsheet, and three apps just to
               send one quote. JobProof puts it in one place so you can focus on the work—not the
-              admin.
+              paperwork.
             </p>
           </div>
         </section>
@@ -524,12 +523,12 @@ export default function Home() {
         {/* Section 4 — Designed for contractors */}
         <section className="border-b border-zinc-200 bg-zinc-50/60 px-6 py-16 sm:px-8 sm:py-20">
           <div className="mx-auto max-w-3xl">
-            <SectionHeading title="Designed for the way contractors actually work" />
+            <SectionHeading title="Built for the way contractors actually work" />
             <div className="mt-10 space-y-5 text-base leading-relaxed text-zinc-600 sm:text-lg sm:leading-8">
               <p>
-                JobProof wasn&apos;t built as generic office software with a contractor label slapped on
-                it. It was shaped around real quoting workflows—the site visit, the follow-up
-                questions, the back-and-forth with the customer, and the moment they say yes.
+                JobProof wasn&apos;t built as generic office software with a contractor sticker on it.
+                It was built around how jobs really start—the site visit, the follow-up questions,
+                the back-and-forth with the customer, and the moment they say yes.
               </p>
               <p>
                 You work on your phone at the job site. You need answers fast. You don&apos;t have time
@@ -537,9 +536,8 @@ export default function Home() {
                 actually run your business.
               </p>
               <p>
-                Independent operators, small teams, and growing shops all use the same core flow:
-                capture the inquiry, prepare properly, send a professional quote, and move on to the
-                job.
+                Whether you work alone, with a small crew, or you&apos;re growing, the path is the same:
+                catch the request, get ready, send a professional quote, and get to the job.
               </p>
             </div>
           </div>
@@ -550,14 +548,14 @@ export default function Home() {
           <div className="mx-auto max-w-6xl">
             <SectionHeading
               title="A better experience for your customers"
-              lead="The way you present a quote says a lot about how you'll run the job. JobProof helps you look established and easy to work with."
+              lead="How you send a quote says a lot about how you'll run the job. JobProof helps you look established and easy to work with."
             />
             <div className="mx-auto mt-12 max-w-3xl">
               <p className="text-center text-base leading-relaxed text-zinc-600 sm:text-lg">
-                Customers receive a clean, professional proposal they can open on their phone or
-                computer. They can review the scope and pricing, ask a question, request a change,
-                or accept when they&apos;re ready—all without a confusing email thread or a PDF lost in
-                their downloads folder.
+                Customers get a clean, professional proposal they can open on their phone or
+                computer. They can review what&apos;s included and the price, ask a question, request a
+                change, or accept when they&apos;re ready—without a messy email thread or a PDF lost in
+                their downloads.
               </p>
               <ul className="mt-10 grid gap-4 sm:grid-cols-2">
                 {[
@@ -576,7 +574,7 @@ export default function Home() {
               </ul>
               <p className="mt-10 text-center text-base leading-relaxed text-zinc-600">
                 When customers trust what they&apos;re reading, they say yes faster—and you spend less
-                time going back and forth clarifying basics you already covered.
+                time going back and forth on basics you already covered.
               </p>
             </div>
           </div>
@@ -587,7 +585,7 @@ export default function Home() {
           <div className="mx-auto max-w-6xl">
             <SectionHeading
               title="Stay Protected Every Step of the Way"
-              lead="Using JobProof naturally builds organized records—so you and your customers stay on the same page from the first conversation through the work itself."
+              lead="As you use JobProof, you naturally build a clear record—so you and your customers stay on the same page from the first conversation through the work."
             />
             <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {PROTECTION_CARDS.map((item) => (
@@ -603,9 +601,9 @@ export default function Home() {
               ))}
             </div>
             <p className="mx-auto mt-12 max-w-2xl text-center text-base leading-relaxed text-zinc-600">
-              When questions come up later, you have organized records of what was discussed,
-              approved, and completed—without digging through old messages or trying to remember
-              every detail.
+              When questions come up later, you already have a clear record of what was talked
+              about, approved, and finished—without digging through old messages or trying to
+              remember every detail.
             </p>
           </div>
         </section>
@@ -615,26 +613,26 @@ export default function Home() {
           <div className="mx-auto max-w-3xl">
             <SectionHeading
               title="Stay organized when it matters"
-              lead="Quoting is the front end of the job. JobProof also helps you keep a clear record as work progresses."
+              lead="Getting the quote out is just the start. JobProof also helps you keep a clear record as the work moves ahead."
             />
             <div className="mt-10 space-y-5 text-base leading-relaxed text-zinc-600 sm:text-lg sm:leading-8">
               <p>
-                When customer approvals, photos, documentation, change orders, and project history
-                live in one system, you have what you need if questions come up later—not a scramble
-                to piece together what was agreed.
+                When customer approvals, photos, paperwork, change orders, and job history live in
+                one place, you have what you need if questions come up later—not a scramble to
+                piece together what was agreed.
               </p>
               <p>
-                That&apos;s simply how a professional business runs: nothing important gets lost, and
-                you can move forward with confidence.
+                That&apos;s just how a solid business runs: nothing important gets lost, and you can
+                move ahead with confidence.
               </p>
             </div>
             <ul className="mt-8 flex flex-wrap justify-center gap-3">
               {[
                 "Customer approvals",
                 "Photos",
-                "Documentation",
+                "Paperwork",
                 "Change orders",
-                "Project history",
+                "Job history",
               ].map((tag) => (
                 <li
                   key={tag}
@@ -652,7 +650,7 @@ export default function Home() {
           <div className="mx-auto max-w-5xl">
             <SectionHeading
               title="Why contractors switch to JobProof"
-              lead="Most contractors recognize the left column immediately. The right column is how quoting feels when everything lives in one place."
+              lead="Most contractors know the left column by heart. The right column is how quoting feels when everything lives in one place."
             />
             <div className="mt-12 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
               <div className="grid grid-cols-2 border-b border-zinc-200 bg-zinc-50">
@@ -687,14 +685,14 @@ export default function Home() {
         <section className="bg-zinc-950 px-6 py-16 sm:px-8 sm:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
-              Ready to spend less time chasing information and more time winning work?
+              Ready to spend less time chasing details and more time winning work?
             </h2>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-zinc-300">
               Start your free 14-day trial today.
             </p>
             <p className="mx-auto mt-2 text-base text-zinc-400">No credit card required.</p>
             <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-zinc-400">
-              Be professional from the very first customer inquiry.
+              Look professional from the very first customer message.
             </p>
             <div className="mt-10 flex flex-col items-center">
               <Link
