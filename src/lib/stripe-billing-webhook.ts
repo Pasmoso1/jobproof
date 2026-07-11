@@ -12,6 +12,10 @@ import { getPlanFromStripePriceId } from "@/lib/stripe";
 import { subscriptionCancellationDbFields } from "@/lib/stripe-subscription-cancellation";
 import { tierFromMetadata } from "@/lib/stripe-subscription-profile-sync";
 import { profileLimitColumnsForTier } from "@/lib/plan-entitlements";
+import {
+  resolveTrialEndsAtForStripeSync,
+  trackTrialConversionAnalytics,
+} from "@/lib/trial-conversion";
 
 function limitColumnsForPlanTier(tier: string | null | undefined) {
   const parsed = parseBillingPlanTier(String(tier ?? ""));
@@ -158,11 +162,28 @@ export async function processStripeBillingWebhook(
               subscription_current_period_end: toIso(
                 sub ? subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub) : null
               ),
-              trial_ends_at: toIso(sub?.trial_end),
+              trial_ends_at: resolveTrialEndsAtForStripeSync(
+                sub?.trial_end,
+                profile.trial_ends_at as string | null | undefined
+              ),
               ...limitColumnsForPlanTier(resolvedTier),
               ...(cancelPatch ?? {}),
             })
             .eq("id", profile.id);
+          trackTrialConversionAnalytics({
+            profile: {
+              id: String(profile.id),
+              subscription_status: oldStatus,
+              trial_started_at: profile.trial_started_at as string | null | undefined,
+              trial_ends_at: profile.trial_ends_at as string | null | undefined,
+              trial_plan_tier: profile.trial_plan_tier as string | null | undefined,
+              plan_tier: profile.plan_tier as string | null | undefined,
+            },
+            previousStatus: oldStatus,
+            newStatus,
+            subscribedPlan: resolvedTier,
+            source: "stripe_checkout_webhook",
+          });
           await insertBillingEventLog({
             profileId: String(profile.id),
             stripeCustomerId: customerId || null,
@@ -277,11 +298,34 @@ export async function processStripeBillingWebhook(
               plan?.pricingVersion ?? sub.metadata?.pricing_version ?? profile.pricing_version,
             subscription_status: sub.status,
             subscription_current_period_end: toIso(subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub)),
-            trial_ends_at: toIso(sub.trial_end),
+            trial_ends_at: resolveTrialEndsAtForStripeSync(
+              sub.trial_end,
+              profile.trial_ends_at as string | null | undefined
+            ),
             ...limitColumnsForPlanTier(resolvedTier),
             ...cancelPatch,
           })
           .eq("id", profile.id);
+
+        if (
+          event.type === "customer.subscription.created" &&
+          ["pending_trial", "trial", "expired"].includes(oldStatus.toLowerCase())
+        ) {
+          trackTrialConversionAnalytics({
+            profile: {
+              id: String(profile.id),
+              subscription_status: oldStatus,
+              trial_started_at: profile.trial_started_at as string | null | undefined,
+              trial_ends_at: profile.trial_ends_at as string | null | undefined,
+              trial_plan_tier: profile.trial_plan_tier as string | null | undefined,
+              plan_tier: profile.plan_tier as string | null | undefined,
+            },
+            previousStatus: oldStatus,
+            newStatus: sub.status,
+            subscribedPlan: resolvedTier,
+            source: "stripe_subscription_created",
+          });
+        }
 
         await insertBillingEventLog({
           profileId: String(profile.id),

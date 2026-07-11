@@ -23,6 +23,12 @@ export const PRODUCT_ANALYTICS_EVENTS = {
   read_only_mode_triggered: "read_only_mode_triggered",
   plan_selected: "plan_selected",
   subscription_checkout_started: "subscription_checkout_started",
+  trial_started: "trial_started",
+  trial_day_3: "trial_day_3",
+  trial_day_7: "trial_day_7",
+  trial_day_12: "trial_day_12",
+  trial_expired: "trial_expired",
+  trial_converted: "trial_converted",
   /** @deprecated Legacy beta onboarding — no longer fired for new signups. */
   beta_tester_created: "beta_tester_created",
   /** @deprecated Legacy beta onboarding — no longer fired for new signups. */

@@ -31,6 +31,8 @@ export function BillingActionButtons({
   showDowngradeToEssential,
   hasPendingEssentialDowngrade,
   subscriptionIsTrialing,
+  defaultCheckoutPlan = "essential",
+  showManagedTrialSubscribe = false,
 }: {
   isBetaTester?: boolean;
   billingUiTier: BillingUiTier;
@@ -42,6 +44,9 @@ export function BillingActionButtons({
   showDowngradeToEssential: boolean;
   hasPendingEssentialDowngrade: boolean;
   subscriptionIsTrialing: boolean;
+  defaultCheckoutPlan?: BillingPlanTier;
+  /** True when JobProof-managed trial (or expired) should subscribe via Stripe with no Stripe trial. */
+  showManagedTrialSubscribe?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -177,6 +182,8 @@ export function BillingActionButtons({
   const disableAll = busy !== null;
 
   if (!hasActiveSubscription) {
+    const preferred = defaultCheckoutPlan === "professional" ? "professional" : "essential";
+    const soloPrimary = preferred === "essential";
     return (
       <div className="space-y-3">
         {error && (
@@ -189,22 +196,47 @@ export function BillingActionButtons({
             {successMessage}
           </p>
         )}
+        <p className="text-sm text-zinc-600">
+          {showManagedTrialSubscribe
+            ? "Subscribe to keep creating new work. Your existing information stays saved either way. You can choose Solo or Pro before checkout."
+            : "Choose a plan to subscribe. No free trial on Stripe — your JobProof trial (if any) is separate."}
+        </p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => void goCheckout("essential", "essential")}
             disabled={disableAll}
-            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
+            className={
+              soloPrimary
+                ? "rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
+                : "rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
+            }
           >
-            {busy === "essential" ? "Opening..." : "Choose Essential — $29/mo"}
+            {busy === "essential"
+              ? "Opening..."
+              : showManagedTrialSubscribe
+                ? soloPrimary
+                  ? "Subscribe to Solo — $39/mo"
+                  : "Switch to Solo — $39/mo"
+                : "Choose Solo — $39/mo"}
           </button>
           <button
             type="button"
             onClick={() => void goCheckout("professional", "professional")}
             disabled={disableAll}
-            className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
+            className={
+              !soloPrimary
+                ? "rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
+                : "rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
+            }
           >
-            {busy === "professional" ? "Opening..." : "Choose Professional — $49/mo"}
+            {busy === "professional"
+              ? "Opening..."
+              : showManagedTrialSubscribe
+                ? !soloPrimary
+                  ? "Subscribe to Pro — $59/mo"
+                  : "Switch to Pro — $59/mo"
+                : "Choose Pro — $59/mo"}
           </button>
         </div>
         <div>
@@ -217,12 +249,7 @@ export function BillingActionButtons({
             {busy === "resync" ? "Refreshing…" : "Refresh billing status"}
           </button>
         </div>
-        <p className="text-xs text-zinc-600">
-          Founder pricing is locked in for early subscribers.
-        </p>
-        <p className="text-xs text-zinc-500">
-          Essential — $39/month regular · Professional — $59/month regular
-        </p>
+        <p className="text-xs text-zinc-500">Solo — $39/month · Pro — $59/month</p>
       </div>
     );
   }
@@ -251,9 +278,7 @@ export function BillingActionButtons({
       ) : null}
       {billingUiTier === "professional" && !hasScheduledCancellation && !hasPendingEssentialDowngrade ? (
         <p className="text-xs text-zinc-500">
-          {subscriptionIsTrialing
-            ? "You can switch plans during your trial without losing trial days."
-            : "Downgrades after trial happen at your next renewal."}
+          Downgrades take effect at your next renewal.
         </p>
       ) : null}
       {hasPendingEssentialDowngrade ? (

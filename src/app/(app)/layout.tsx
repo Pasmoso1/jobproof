@@ -1,5 +1,6 @@
 import { JobProofLogo } from "@/components/jobproof-logo";
 import { QuoteRequestsNavLink } from "@/components/quote-requests-nav-link";
+import { TrialStatusBanner } from "@/components/trial-status-banner";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getNewQuoteRequestCount } from "@/lib/quote-requests/response-alerts";
@@ -23,7 +24,25 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select(
+      `
+      id,
+      beta_tester,
+      subscription_status,
+      stripe_subscription_id,
+      trial_started_at,
+      trial_ends_at,
+      trial_plan_tier,
+      plan_tier,
+      business_name,
+      phone,
+      address_line_1,
+      city,
+      province,
+      postal_code,
+      quote_primary_trade
+    `
+    )
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -87,6 +106,11 @@ export default async function AppLayout({
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        {profile ? (
+          <div className="mb-4">
+            <TrialStatusBanner profile={profile} accountEmail={user.email ?? ""} />
+          </div>
+        ) : null}
         {children}
       </main>
     </div>

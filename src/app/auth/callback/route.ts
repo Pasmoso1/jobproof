@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
           .from("profiles")
           .select(
             `
+              id,
               signup_utm_source,
               signup_utm_medium,
               signup_utm_campaign,
@@ -84,7 +85,10 @@ export async function GET(request: NextRequest) {
               signup_referrer,
               signup_landing_page,
               signup_first_seen_at,
-              heard_about_source
+              heard_about_source,
+              trial_email_welcome_sent_at,
+              trial_plan_tier,
+              plan_tier
             `
           )
           .eq("user_id", user.id)
@@ -121,6 +125,43 @@ export async function GET(request: NextRequest) {
 
         if (Object.keys(patch).length > 0) {
           await supabase.from("profiles").update(patch).eq("user_id", user.id);
+        }
+
+        if (profile && !profile.trial_email_welcome_sent_at && user.email) {
+          const { sendTrialWelcomeEmail } = await import("@/lib/trial-emails");
+          const { parseBillingPlanTier } = await import("@/lib/billing-plan-display");
+          await sendTrialWelcomeEmail({
+            profileId: String(profile.id),
+            userEmail: user.email,
+            planTier:
+              parseBillingPlanTier(String(profile.trial_plan_tier ?? "")) ??
+              parseBillingPlanTier(String(profile.plan_tier ?? "")),
+          });
+          await supabase
+            .from("profiles")
+            .update({ trial_email_welcome_sent_at: new Date().toISOString() })
+            .eq("id", profile.id);
+        }
+      } else if (user?.email) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id, trial_email_welcome_sent_at, trial_plan_tier, plan_tier")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (profile && !profile.trial_email_welcome_sent_at) {
+          const { sendTrialWelcomeEmail } = await import("@/lib/trial-emails");
+          const { parseBillingPlanTier } = await import("@/lib/billing-plan-display");
+          await sendTrialWelcomeEmail({
+            profileId: String(profile.id),
+            userEmail: user.email,
+            planTier:
+              parseBillingPlanTier(String(profile.trial_plan_tier ?? "")) ??
+              parseBillingPlanTier(String(profile.plan_tier ?? "")),
+          });
+          await supabase
+            .from("profiles")
+            .update({ trial_email_welcome_sent_at: new Date().toISOString() })
+            .eq("id", profile.id);
         }
       }
       return NextResponse.redirect(new URL("/dashboard?confirmed=true", request.url));

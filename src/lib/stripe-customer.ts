@@ -18,16 +18,36 @@ export async function clearStaleJobProofStripeBilling(
   supabase: SupabaseClient,
   profileId: string
 ): Promise<void> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("trial_started_at, trial_ends_at, trial_plan_tier, plan_tier")
+    .eq("id", profileId)
+    .maybeSingle();
+
+  const trialStarted = Boolean(String(profile?.trial_started_at ?? "").trim());
+  const trialEnd = String(profile?.trial_ends_at ?? "").trim();
+  const trialStillOpen =
+    trialStarted && trialEnd && new Date(trialEnd).getTime() > Date.now();
+
   await supabase
     .from("profiles")
     .update({
       stripe_customer_id: null,
       stripe_subscription_id: null,
       stripe_price_id: null,
-      subscription_status: "trial",
+      subscription_status: trialStillOpen
+        ? "trial"
+        : trialStarted
+          ? "expired"
+          : "pending_trial",
       subscription_current_period_end: null,
-      trial_ends_at: null,
       grace_period_ends_at: null,
+      // Keep trial_started_at / trial_ends_at / plan_tier when a managed trial exists.
+      ...(trialStarted
+        ? {}
+        : {
+            trial_ends_at: null,
+          }),
     })
     .eq("id", profileId);
 }

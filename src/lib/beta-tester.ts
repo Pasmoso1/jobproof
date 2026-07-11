@@ -1,5 +1,6 @@
 import type { BillingPlanTier } from "@/lib/stripe";
 import { parseBillingPlanTier } from "@/lib/billing-plan-display";
+import { hasSelectedTrialPlan, type TrialLifecycleProfile } from "@/lib/trial-lifecycle";
 
 export type BetaTesterProfileFields = {
   beta_tester?: boolean | null;
@@ -7,6 +8,7 @@ export type BetaTesterProfileFields = {
   stripe_subscription_id?: string | null;
   subscription_status?: string | null;
   plan_tier?: string | null;
+  trial_plan_tier?: string | null;
 };
 
 export function isBetaTesterProfile(profile: BetaTesterProfileFields | null | undefined): boolean {
@@ -51,19 +53,32 @@ export function hasActiveJobProofSubscription(
 }
 
 /**
- * True when user must complete Stripe subscription checkout before using the app.
- * Legacy beta testers (beta_tester=true) skip; new signups require Stripe.
+ * True when the contractor still needs to pick Solo/Pro before continuing.
+ * Does not require Stripe — plan is stored on the profile for the managed trial.
  */
-export function needsBetaPlanSelection(profile: BetaTesterProfileFields | null | undefined): boolean {
+export function needsPlanSelection(
+  profile: (BetaTesterProfileFields & TrialLifecycleProfile) | null | undefined
+): boolean {
   if (!profile) return false;
   if (isBetaTesterProfile(profile)) return false;
   if (hasActiveJobProofSubscription(profile)) return false;
+  if (hasSelectedTrialPlan(profile)) return false;
   return true;
 }
 
+/**
+ * @deprecated Prefer needsPlanSelection — name kept for middleware call sites.
+ * Previously meant "must complete Stripe checkout"; now means "must select a plan".
+ */
+export function needsBetaPlanSelection(
+  profile: (BetaTesterProfileFields & TrialLifecycleProfile) | null | undefined
+): boolean {
+  return needsPlanSelection(profile);
+}
+
 export function betaPlanTierLabel(tier: BillingPlanTier | null): string {
-  if (tier === "essential") return "Essential";
-  if (tier === "professional") return "Professional";
+  if (tier === "essential") return "Solo";
+  if (tier === "professional") return "Pro";
   return "—";
 }
 
@@ -72,6 +87,7 @@ export function resolveBetaDisplayPlanTier(
 ): BillingPlanTier | null {
   return (
     parseBillingPlanTier(String(profile.beta_plan_tier ?? "")) ??
+    parseBillingPlanTier(String(profile.trial_plan_tier ?? "")) ??
     parseBillingPlanTier(String(profile.plan_tier ?? ""))
   );
 }

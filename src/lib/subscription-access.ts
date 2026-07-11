@@ -3,6 +3,8 @@ export type ProfileSubscriptionGate = {
   subscription_status?: string | null;
   grace_period_ends_at?: string | null;
   trial_ends_at?: string | null;
+  trial_started_at?: string | null;
+  stripe_subscription_id?: string | null;
   subscription_current_period_end?: string | null;
   subscription_cancel_at_period_end?: boolean | null;
   subscription_cancel_at?: string | null;
@@ -32,6 +34,12 @@ export type SubscriptionAccessResult = {
 export const READ_ONLY_MODE_ACTION_ERROR =
   "Your account is in read-only mode. Update billing to continue creating and sending documents.";
 
+export const TRIAL_ENDED_ACTION_ERROR =
+  "Your free trial has ended. Subscribe to continue creating new work while keeping all of your existing information.";
+
+export const PENDING_TRIAL_SETUP_MESSAGE =
+  "Complete your setup to begin your 14-day free trial.";
+
 export const FREE_BETA_HELPER_COPY =
   "Free beta access is enabled. Billing restrictions are temporarily disabled.";
 
@@ -59,6 +67,14 @@ function isPastOrNowIso(iso: string | null | undefined): boolean {
 
 function isTrialLikeStatus(status: string): boolean {
   return status === "trial" || status === "trialing";
+}
+
+function isPendingTrialStatus(status: string): boolean {
+  return status === "pending_trial";
+}
+
+function isExpiredStatus(status: string): boolean {
+  return status === "expired";
 }
 
 /**
@@ -134,6 +150,31 @@ export function getSubscriptionAccess(input: ProfileSubscriptionGate): Subscript
   const trialEndedWhileTrialing =
     isTrialLikeStatus(status) && isPastOrNowIso(input.trial_ends_at);
   const cancelAtPeriodEnd = input.subscription_cancel_at_period_end === true;
+  const hasStripeSub = Boolean(String(input.stripe_subscription_id ?? "").trim());
+
+  if (isExpiredStatus(status)) {
+    return allWrites(false, {
+      isReadOnlyMode: true,
+      reason: "Trial ended.",
+      billingReasonLabel: "Trial ended",
+      statusLabel: "Trial ended",
+      readOnlyActionError: TRIAL_ENDED_ACTION_ERROR,
+      freeBetaHelperCopy: null,
+    });
+  }
+
+  if (isPendingTrialStatus(status)) {
+    // Setup / onboarding: allow writes so contractors can finish profile & trades.
+    // Trial clock has not started yet.
+    return allWrites(true, {
+      isReadOnlyMode: false,
+      reason: "Complete setup to begin your free trial.",
+      billingReasonLabel: null,
+      statusLabel: "Setup required",
+      readOnlyActionError: null,
+      freeBetaHelperCopy: null,
+    });
+  }
 
   if (!status) {
     if (ALLOW_FREE_BETA_WITHOUT_SUBSCRIPTION) {
@@ -189,13 +230,23 @@ export function getSubscriptionAccess(input: ProfileSubscriptionGate): Subscript
   }
 
   if (isTrialLikeStatus(status)) {
+    if (trialEndedWhileTrialing && !hasStripeSub) {
+      return allWrites(false, {
+        isReadOnlyMode: true,
+        reason: "Trial ended.",
+        billingReasonLabel: "Trial ended",
+        statusLabel: "Trial ended",
+        readOnlyActionError: TRIAL_ENDED_ACTION_ERROR,
+        freeBetaHelperCopy: null,
+      });
+    }
     if (trialEndedWhileTrialing) {
       return allWrites(false, {
         isReadOnlyMode: true,
         reason: "Trial ended.",
         billingReasonLabel: "Trial ended",
         statusLabel: "Trial ended",
-        readOnlyActionError: READ_ONLY_MODE_ACTION_ERROR,
+        readOnlyActionError: TRIAL_ENDED_ACTION_ERROR,
         freeBetaHelperCopy: null,
       });
     }
@@ -207,7 +258,7 @@ export function getSubscriptionAccess(input: ProfileSubscriptionGate): Subscript
           reason: "Trial ended.",
           billingReasonLabel: "Trial ended",
           statusLabel: "Trial ended",
-          readOnlyActionError: READ_ONLY_MODE_ACTION_ERROR,
+          readOnlyActionError: TRIAL_ENDED_ACTION_ERROR,
           freeBetaHelperCopy: null,
         });
       }
@@ -217,6 +268,23 @@ export function getSubscriptionAccess(input: ProfileSubscriptionGate): Subscript
         billingReasonLabel: null,
         statusLabel: "Trial active · Scheduled to cancel",
         readOnlyActionError: null,
+        freeBetaHelperCopy: null,
+      });
+    }
+    // JobProof-managed trial without an end date yet should not grant open-ended access
+    // once we expect trial_ends_at to be set. If started but missing end, treat as setup.
+    if (
+      status === "trial" &&
+      !hasStripeSub &&
+      input.trial_started_at &&
+      !String(input.trial_ends_at ?? "").trim()
+    ) {
+      return allWrites(false, {
+        isReadOnlyMode: true,
+        reason: "Trial ended.",
+        billingReasonLabel: "Trial ended",
+        statusLabel: "Trial ended",
+        readOnlyActionError: TRIAL_ENDED_ACTION_ERROR,
         freeBetaHelperCopy: null,
       });
     }

@@ -9,6 +9,7 @@ import {
 } from "@/lib/stripe";
 import { subscriptionCancellationDbFields } from "@/lib/stripe-subscription-cancellation";
 import { profileLimitColumnsForTier } from "@/lib/plan-entitlements";
+import { resolveTrialEndsAtForStripeSync } from "@/lib/trial-conversion";
 
 export function subscriptionPeriodEndUnix(sub: Stripe.Subscription): number | null {
   const end = (sub as Stripe.Subscription & { current_period_end?: number }).current_period_end;
@@ -53,7 +54,13 @@ export type SyncStripeSubscriptionToProfileResult =
 
 type ProfileSyncInput = Pick<
   Profile,
-  "id" | "user_id" | "stripe_customer_id" | "stripe_subscription_id" | "plan_tier" | "pricing_version"
+  | "id"
+  | "user_id"
+  | "stripe_customer_id"
+  | "stripe_subscription_id"
+  | "plan_tier"
+  | "pricing_version"
+  | "trial_ends_at"
 >;
 
 /**
@@ -129,7 +136,7 @@ export async function syncStripeSubscriptionToProfile(
       pricing_version: plan?.pricingVersion ?? metaPricing ?? profile.pricing_version ?? null,
       subscription_status: sub.status,
       subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
-      trial_ends_at: unixToIso(sub.trial_end ?? null),
+      trial_ends_at: resolveTrialEndsAtForStripeSync(sub.trial_end ?? null, profile.trial_ends_at),
       ...profileLimitColumnsForTier(
         (resolvedTier as "essential" | "professional" | null) ?? "essential"
       ),

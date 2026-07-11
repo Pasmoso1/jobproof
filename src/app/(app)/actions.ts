@@ -204,7 +204,7 @@ export async function updateProfileBusinessInfo(formData: FormData) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, quote_primary_trade, quote_additional_trades, plan_tier, beta_tester, beta_plan_tier"
+      "id, quote_primary_trade, quote_additional_trades, plan_tier, trial_plan_tier, beta_tester, beta_plan_tier, stripe_subscription_id, subscription_status, trial_started_at, trial_ends_at, trial_email_welcome_sent_at, trial_email_started_sent_at, business_name, phone, address_line_1, city, province, postal_code"
     )
     .eq("user_id", user.id)
     .single();
@@ -293,11 +293,14 @@ export async function updateProfileBusinessInfo(formData: FormData) {
         ? profile.quote_additional_trades.map(String)
         : []
     );
+    const requirePrimary =
+      formData.get("primaryTradeRequired") === "1" ||
+      formData.get("primaryTradeRequired") === "true";
     const tradesResult = validateContractorTradesFields({
       primaryTrade: String(formData.get("primaryTrade") ?? ""),
       primaryTradeOther: String(formData.get("primaryTradeOther") ?? ""),
       additionalTrades: formData.getAll("additionalTrades").map(String),
-      primaryTradeRequired: false,
+      primaryTradeRequired: requirePrimary,
       maxTotalTrades: entitlements.maxTotalTrades,
       previousTotalTrades,
     });
@@ -374,6 +377,31 @@ export async function updateProfileBusinessInfo(formData: FormData) {
     .eq("id", profile.id);
 
   if (error) return { error: error.message };
+
+  // Start JobProof-managed trial once plan is selected and onboarding is complete.
+  try {
+    const { maybeStartManagedTrial } = await import("@/lib/start-managed-trial");
+    const nextPrimary =
+      tradeUpdates.quote_primary_trade !== undefined
+        ? tradeUpdates.quote_primary_trade
+        : profile.quote_primary_trade;
+    await maybeStartManagedTrial(
+      supabase,
+      {
+        ...profile,
+        business_name: businessName,
+        phone,
+        address_line_1: addressLine1,
+        city,
+        province,
+        postal_code: postalCode,
+        quote_primary_trade: nextPrimary,
+      },
+      accountEmail
+    );
+  } catch (err) {
+    console.error("[updateProfileBusinessInfo] trial start", err);
+  }
 
   revalidatePath("/settings/business");
   revalidatePath("/dashboard");

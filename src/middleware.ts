@@ -4,7 +4,8 @@ import {
   type ProfileOnboardingFields,
 } from "@/lib/supabase/middleware";
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
-import { BETA_PLAN_ONBOARDING_PATH, needsBetaPlanSelection } from "@/lib/beta-tester";
+import { BETA_PLAN_ONBOARDING_PATH, needsPlanSelection } from "@/lib/beta-tester";
+import { isOnboardingCompleteForTrial } from "@/lib/trial-lifecycle";
 
 const PROTECTED_PATHS = ["/dashboard", "/jobs", "/estimates", "/quote-requests", "/settings", "/onboarding"];
 const AUTH_PATHS = ["/login", "/signup"];
@@ -37,6 +38,14 @@ function isProfileIncomplete(
   accountEmail: string
 ): boolean {
   if (!profile) return true;
+  return !isOnboardingCompleteForTrial(profile, accountEmail);
+}
+
+function isBusinessIncomplete(
+  profile: ProfileOnboardingFields,
+  accountEmail: string
+): boolean {
+  if (!profile) return true;
   return !isBusinessProfileCompleteForApp({
     business_name: profile.business_name,
     account_email: accountEmail,
@@ -49,11 +58,11 @@ function isProfileIncomplete(
 }
 
 function postLoginPath(profile: ProfileOnboardingFields, accountEmail: string): string {
+  if (needsPlanSelection(profile)) {
+    return BETA_PLAN_ONBOARDING_PATH;
+  }
   if (isProfileIncomplete(profile, accountEmail)) {
     return BUSINESS_ONBOARDING_PATH;
-  }
-  if (needsBetaPlanSelection(profile)) {
-    return BETA_PLAN_ONBOARDING_PATH;
   }
   return "/dashboard";
 }
@@ -84,6 +93,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && requiresOnboarding(pathname)) {
+    // Plan first, then business profile + primary trade.
+    if (needsPlanSelection(profile)) {
+      const url = request.nextUrl.clone();
+      url.pathname = BETA_PLAN_ONBOARDING_PATH;
+      return Response.redirect(url);
+    }
     if (isProfileIncomplete(profile, user.email ?? "")) {
       const url = request.nextUrl.clone();
       url.pathname = BUSINESS_ONBOARDING_PATH;
@@ -93,15 +108,21 @@ export async function middleware(request: NextRequest) {
       }
       return Response.redirect(url);
     }
-    if (
-      needsBetaPlanSelection(profile) &&
-      pathname !== BETA_PLAN_ONBOARDING_PATH &&
-      !pathname.startsWith(`${BETA_PLAN_ONBOARDING_PATH}/`)
-    ) {
-      const url = request.nextUrl.clone();
-      url.pathname = BETA_PLAN_ONBOARDING_PATH;
-      return Response.redirect(url);
-    }
+  }
+
+  // Plan page: if plan already selected, send to business onboarding or dashboard.
+  if (
+    user &&
+    (pathname === BETA_PLAN_ONBOARDING_PATH || pathname.startsWith(`${BETA_PLAN_ONBOARDING_PATH}/`)) &&
+    !needsPlanSelection(profile)
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = isBusinessIncomplete(profile, user.email ?? "")
+      ? BUSINESS_ONBOARDING_PATH
+      : isProfileIncomplete(profile, user.email ?? "")
+        ? BUSINESS_ONBOARDING_PATH
+        : "/dashboard";
+    return Response.redirect(url);
   }
 
   return response;

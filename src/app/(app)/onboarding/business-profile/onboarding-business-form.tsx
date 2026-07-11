@@ -102,6 +102,7 @@ export function OnboardingBusinessForm({
     formData.set("postal_code", postalCode.trim());
     formData.set("primaryTrade", primaryTrade.trim());
     formData.set("primaryTradeOther", primaryTradeOther.trim());
+    formData.set("primaryTradeRequired", "1");
     for (const trade of additionalTrades) {
       formData.append("additionalTrades", trade);
     }
@@ -120,7 +121,7 @@ export function OnboardingBusinessForm({
       return;
     }
 
-    router.push("/onboarding/plan");
+    router.push("/dashboard");
     router.refresh();
   }
 
@@ -351,7 +352,7 @@ export function OnboardingBusinessForm({
           onAdditionalTradesChange={setAdditionalTrades}
           onContractorExtraCapabilitiesChange={setContractorExtraCapabilities}
           fieldErrors={fieldErrors}
-          primaryTradeRequired={false}
+          primaryTradeRequired={true}
           maxTotalTrades={maxTotalTrades}
           inputClassName="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
           selectClassName="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
@@ -364,7 +365,7 @@ export function OnboardingBusinessForm({
           disabled={loading}
           className="w-full rounded-lg bg-[#2436BB] px-4 py-3 font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {loading ? "Saving..." : "Save and continue"}
+          {loading ? "Saving..." : "Save and start free trial"}
         </button>
       </div>
     </form>

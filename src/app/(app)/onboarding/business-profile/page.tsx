@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/app/(app)/actions";
-import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
-import { BETA_PLAN_ONBOARDING_PATH, needsBetaPlanSelection } from "@/lib/beta-tester";
+import { BETA_PLAN_ONBOARDING_PATH, needsPlanSelection } from "@/lib/beta-tester";
 import { JobProofLogo } from "@/components/jobproof-logo";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
+import { isOnboardingCompleteForTrial } from "@/lib/trial-lifecycle";
 import { OnboardingBusinessForm } from "./onboarding-business-form";
 
 export const dynamic = "force-dynamic";
@@ -23,21 +23,11 @@ export default async function OnboardingBusinessProfilePage({
   const profile = await getProfile();
   const params = await searchParams;
 
-  if (
-    profile &&
-    isBusinessProfileCompleteForApp({
-      business_name: profile.business_name,
-      account_email: user.email ?? "",
-      phone: profile.phone,
-      address_line_1: profile.address_line_1,
-      city: profile.city,
-      province: profile.province,
-      postal_code: profile.postal_code,
-    })
-  ) {
-    if (needsBetaPlanSelection(profile)) {
-      redirect(params.redirect ?? BETA_PLAN_ONBOARDING_PATH);
-    }
+  if (needsPlanSelection(profile)) {
+    redirect(BETA_PLAN_ONBOARDING_PATH);
+  }
+
+  if (profile && isOnboardingCompleteForTrial(profile, user.email ?? "")) {
     redirect(params.redirect ?? "/dashboard");
   }
 
@@ -47,7 +37,7 @@ export default async function OnboardingBusinessProfilePage({
         <JobProofLogo className="mx-auto mb-6 h-10 w-auto" />
         <h1 className="text-2xl font-bold text-zinc-900">Set up your business profile</h1>
         <p className="mt-2 text-sm text-zinc-600">
-          This information will appear on your contracts and invoices and is required.
+          Finish setup to start your 14-day free trial. No credit card required.
         </p>
       </div>
 

@@ -51,6 +51,16 @@ Contractors enable timing in **Settings → Business**. For sends to run on a sc
 
 Implementation: `src/app/api/cron/invoice-reminders/route.ts` and `src/lib/invoice-reminder-cron.ts`.
 
+## Automated trial reminder emails (operators)
+
+JobProof-managed 14-day trials send day 3 / 7 / 12 / ended emails and mark expired status via cron:
+
+- **Route:** `POST /api/cron/trial-reminders`
+- **Auth:** same `Authorization: Bearer <CRON_SECRET>` as invoice reminders
+- **Also required:** `SUPABASE_SERVICE_ROLE_KEY`, Resend (`RESEND_API_KEY`), migration `056_jobproof_managed_trial.sql`
+
+Implementation: `src/app/api/cron/trial-reminders/route.ts` and `src/lib/trial-reminder-cron.ts`.
+
 ## Admin dashboard access
 
 `/admin` now uses normal JobProof login + an email allowlist.

@@ -43,6 +43,9 @@ import {
   tierFromMetadata,
   unixToIso,
 } from "@/lib/stripe-subscription-profile-sync";
+import {
+  resolveTrialEndsAtForStripeSync,
+} from "@/lib/trial-conversion";
 
 const SUBSCRIPTION_STATUSES_BLOCKING_NEW_CHECKOUT = new Set([
   "trialing",
@@ -192,7 +195,7 @@ export async function createSubscriptionCheckoutSession(params: {
       payment_method_collection: "always",
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
-        trial_period_days: 7,
+        // JobProof-managed trial already happened — start paid subscription immediately.
         metadata: {
           profile_id: String(profile.id),
           plan_tier: params.planTier,
@@ -203,7 +206,7 @@ export async function createSubscriptionCheckoutSession(params: {
         profile_id: String(profile.id),
         plan_tier: params.planTier,
         pricing_version: pricingVersion,
-        checkout_source: returnTo,
+        checkout_source: returnTo === "onboarding" ? "subscribe" : returnTo,
       },
     });
 
@@ -214,14 +217,12 @@ export async function createSubscriptionCheckoutSession(params: {
       };
     }
 
-    if (returnTo === "onboarding") {
-      trackProductEventSafe({
-        profileId: String(profile.id),
-        eventName: PRODUCT_ANALYTICS_EVENTS.subscription_checkout_started,
-        source: "onboarding_plan",
-        metadata: { selected_plan: params.planTier, pricing_version: pricingVersion },
-      });
-    }
+    trackProductEventSafe({
+      profileId: String(profile.id),
+      eventName: PRODUCT_ANALYTICS_EVENTS.subscription_checkout_started,
+      source: returnTo === "onboarding" ? "onboarding_plan" : "billing",
+      metadata: { selected_plan: params.planTier, pricing_version: pricingVersion },
+    });
 
     return { success: true, url: session.url };
   } catch (err) {
@@ -1037,6 +1038,8 @@ export async function syncSubscriptionAfterStripeReturn(input: {
   const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
   const metaTier = tierFromMetadata(sub.metadata?.plan_tier);
   const metaPricing = pricingFromMetadata(sub.metadata?.pricing_version);
+  const resolvedTier =
+    plan?.planTier ?? metaTier ?? parseBillingPlanTier(String(profile.plan_tier ?? "")) ?? null;
 
   await supabase
     .from("profiles")
@@ -1044,14 +1047,15 @@ export async function syncSubscriptionAfterStripeReturn(input: {
       stripe_customer_id: customerId,
       stripe_subscription_id: sub.id,
       stripe_price_id: priceId,
-      plan_tier: plan?.planTier ?? metaTier ?? profile.plan_tier ?? null,
+      plan_tier: resolvedTier,
       pricing_version: plan?.pricingVersion ?? metaPricing ?? profile.pricing_version ?? null,
       subscription_status: sub.status,
       subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
-      trial_ends_at: unixToIso(sub.trial_end ?? null),
-      ...profileLimitColumnsForTier(
-        plan?.planTier ?? metaTier ?? parseBillingPlanTier(String(profile.plan_tier ?? "")) ?? "essential"
+      trial_ends_at: resolveTrialEndsAtForStripeSync(
+        sub.trial_end ?? null,
+        profile.trial_ends_at as string | null | undefined
       ),
+      ...profileLimitColumnsForTier(resolvedTier ?? "essential"),
       ...subscriptionCancellationDbFields(sub),
     })
     .eq("id", profile.id)

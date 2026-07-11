@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { BillingPlanTier, BillingPricingVersion } from "@/lib/stripe";
 import { getPlanDisplayLines } from "@/lib/billing-plan-display";
-import { startOnboardingPlanCheckout } from "./actions";
+import {
+  formatActiveJobLimit,
+  formatPlanStorage,
+} from "@/lib/plan-limits";
+import { selectOnboardingPlan } from "./actions";
 
 function FeatureList({ items }: { items: string[] }) {
   return (
@@ -21,24 +26,26 @@ function FeatureList({ items }: { items: string[] }) {
 }
 
 export function PlanSelectionForm({ pricingVersion }: { pricingVersion: BillingPricingVersion }) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<BillingPlanTier | null>(null);
 
-  const essentialPricing = getPlanDisplayLines("essential", pricingVersion);
-  const professionalPricing = getPlanDisplayLines("professional", pricingVersion);
+  const soloPricing = getPlanDisplayLines("essential", pricingVersion);
+  const proPricing = getPlanDisplayLines("professional", pricingVersion);
 
   async function choose(planTier: BillingPlanTier) {
     setError(null);
     setLoading(planTier);
     try {
-      const result = await startOnboardingPlanCheckout(planTier);
+      const result = await selectOnboardingPlan(planTier);
       if (!result.success) {
         setError(result.error);
         return;
       }
-      window.location.href = result.url;
+      router.push(result.redirectTo);
+      router.refresh();
     } catch {
-      setError("Could not start checkout. Please try again.");
+      setError("Could not save your plan. Please try again.");
     } finally {
       setLoading(null);
     }
@@ -48,11 +55,11 @@ export function PlanSelectionForm({ pricingVersion }: { pricingVersion: BillingP
     <div className="space-y-8">
       <div className="rounded-xl border border-[#2436BB]/20 bg-[#2436BB]/5 px-4 py-3 text-sm text-zinc-700">
         <p className="font-medium text-zinc-900">
-          Choose the plan that fits your business.
+          Choose Solo or Pro for your free trial.
         </p>
         <p className="mt-1">
-          You&apos;ll start with a free trial, and billing begins after the trial ends. A payment method
-          is required to continue.
+          No credit card required. Your 14-day trial starts after you finish setup. You&apos;ll
+          evaluate the plan you pick here.
         </p>
       </div>
 
@@ -69,28 +76,27 @@ export function PlanSelectionForm({ pricingVersion }: { pricingVersion: BillingP
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <span className="text-lg font-semibold text-zinc-900">Essential</span>
-              <p className="mt-1 text-sm font-medium text-zinc-700">Best for solo contractors</p>
+              <span className="text-lg font-semibold text-zinc-900">Solo</span>
+              <p className="mt-1 text-sm font-medium text-zinc-700">Best for independent contractors</p>
             </div>
             <span className="shrink-0 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-semibold text-zinc-800">
-              {essentialPricing.afterTrialLine}
+              {soloPricing.afterTrialLine}
             </span>
           </div>
 
           <FeatureList
             items={[
-              "Up to 10 active jobs",
-              "Contracts & signatures",
-              "Change orders",
-              "Proof photos & timeline",
-              "Invoices",
-              "Payment tracking",
-              "Basic dispute documentation",
+              `${formatActiveJobLimit("essential")} active jobs`,
+              `${formatPlanStorage("essential")} secure storage`,
+              "Quote requests & proposals",
+              "Site visit notes",
+              "Customer records",
+              "Contracts & change orders",
             ]}
           />
 
           <span className="mt-auto pt-4 text-sm font-semibold text-[#2436BB]">
-            {loading === "essential" ? "Redirecting to checkout…" : "Choose Essential"}
+            {loading === "essential" ? "Saving…" : "Start with Solo"}
           </span>
         </button>
 
@@ -102,80 +108,35 @@ export function PlanSelectionForm({ pricingVersion }: { pricingVersion: BillingP
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <span className="text-lg font-semibold text-zinc-900">Professional</span>
-              <p className="mt-1 text-sm font-medium text-zinc-700">Best for growing businesses</p>
+              <span className="text-lg font-semibold text-zinc-900">Pro</span>
+              <p className="mt-1 text-sm font-medium text-zinc-700">Best for growing contractors</p>
             </div>
             <span className="shrink-0 rounded-full border border-[#2436BB]/25 bg-[#2436BB]/5 px-2.5 py-1 text-xs font-semibold text-zinc-800">
-              {professionalPricing.afterTrialLine}
+              {proPricing.afterTrialLine}
             </span>
           </div>
 
           <FeatureList
             items={[
-              "Everything in Essential",
-              "Unlimited active jobs",
-              "Higher storage limits",
-              "Advanced documentation workflows",
-              "Priority access to new features",
-              "Future team features",
+              "Everything in Solo",
+              `${formatActiveJobLimit("professional")} active jobs`,
+              `${formatPlanStorage("professional")} secure storage`,
+              "Multiple trades",
+              "Priority support",
+              "First access to new tools",
             ]}
           />
 
           <span className="mt-auto pt-4 text-sm font-semibold text-[#2436BB]">
-            {loading === "professional" ? "Redirecting to checkout…" : "Choose Professional"}
+            {loading === "professional" ? "Saving…" : "Start with Pro"}
           </span>
         </button>
       </div>
 
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold text-zinc-900">Compare plans</h2>
-          <p className="mt-1 text-sm text-zinc-600">
-            Quick overview of the key differences between Essential and Professional.
-          </p>
-        </div>
-
-        <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-          <table className="min-w-[640px] w-full text-left text-sm">
-            <thead className="bg-zinc-50">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-medium text-zinc-700">
-                  Feature
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium text-zinc-700">
-                  Essential
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium text-zinc-700">
-                  Professional
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
-              {[
-                ["Active jobs", "10", "Unlimited"],
-                ["Contracts", "✓", "✓"],
-                ["Change orders", "✓", "✓"],
-                ["Proof photos", "✓", "✓"],
-                ["Invoices", "✓", "✓"],
-                ["Payment tracking", "✓", "✓"],
-                ["Storage", "Standard", "Higher"],
-                ["Future team features", "—", "✓"],
-                ["Early feature access", "—", "✓"],
-              ].map(([feature, essential, professional]) => (
-                <tr key={feature}>
-                  <td className="px-4 py-3 font-medium text-zinc-900">{feature}</td>
-                  <td className="px-4 py-3 text-zinc-700">{essential}</td>
-                  <td className="px-4 py-3 text-zinc-700">{professional}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <p className="text-sm text-zinc-600">
-          7-day free trial on all plans. You won&apos;t be charged until the trial ends.
-        </p>
-      </section>
+      <p className="text-sm text-zinc-600">
+        14-day free trial. No credit card required. Billing only starts if you subscribe after the
+        trial.
+      </p>
     </div>
   );
 }

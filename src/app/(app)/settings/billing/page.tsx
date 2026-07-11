@@ -25,6 +25,15 @@ import {
 } from "@/lib/stripe-subscription-profile-sync";
 import { BillingActionButtons, StripeConnectActionButtons } from "./billing-actions-client";
 import { refreshStripeConnectStatus, syncSubscriptionAfterStripeReturn } from "./actions";
+import {
+  formatTrialDaysRemainingLabel,
+  getTrialDaysRemaining,
+  hasJobProofTrialStarted,
+  isJobProofManagedTrialActive,
+  isJobProofTrialExpired,
+  resolveTrialPlanTier,
+} from "@/lib/trial-lifecycle";
+import { betaPlanTierLabel } from "@/lib/beta-tester";
 
 function str(v: unknown): string {
   if (v == null) return "";
@@ -225,6 +234,17 @@ export default async function BillingSettingsPage({
 
   const showCheckoutConfirmationDetail = checkoutSuccess && billingComplete && planLines;
 
+  const managedTrialActive = isJobProofManagedTrialActive(profile);
+  const managedTrialExpired = isJobProofTrialExpired(profile);
+  const showManagedTrialSubscribe =
+    !isBetaTester &&
+    !hasActiveSubscription &&
+    (managedTrialActive || managedTrialExpired || hasJobProofTrialStarted(profile));
+  const defaultCheckoutPlan = resolveTrialPlanTier(profile) ?? planTier ?? "essential";
+  const trialDaysRemaining = getTrialDaysRemaining(profile);
+  const trialDaysLabel = formatTrialDaysRemainingLabel(trialDaysRemaining);
+  const trialPlanLabel = betaPlanTierLabel(resolveTrialPlanTier(profile));
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -335,6 +355,7 @@ export default async function BillingSettingsPage({
         </div>
       ) : null}
       {isTrialing &&
+        hasActiveSubscription &&
         hasPlanTier &&
         !(checkoutSuccess && billingComplete) &&
         !hasScheduledCancellation && (
@@ -351,6 +372,18 @@ export default async function BillingSettingsPage({
             )}
           </div>
         )}
+      {managedTrialActive && !hasActiveSubscription ? (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <p className="font-medium">
+            {trialDaysLabel ?? "Your free trial is active"}
+            {trialPlanLabel !== "—" ? ` · ${trialPlanLabel}` : ""}
+          </p>
+          <p className="mt-1">
+            Ends {formatBillingDateOrDash(profile.trial_ends_at)}. Your trial plan is locked until you
+            subscribe — then you can choose Solo or Pro at checkout.
+          </p>
+        </div>
+      ) : null}
       {isTrialing && !hasPlanTier && !access.freeBetaHelperCopy && !hasScheduledCancellation && (
         <div
           className={
@@ -373,19 +406,49 @@ export default async function BillingSettingsPage({
             </dd>
           </div>
           <div>
-            <dt className="text-zinc-500">Status</dt>
+            <dt className="text-zinc-500">
+              {hasActiveSubscription ? "Status" : "Trial status"}
+            </dt>
             <dd className="font-medium text-zinc-900">
               {isBetaTester ? "Beta tester (free access)" : statusCell}
             </dd>
           </div>
-          <div>
-            <dt className="text-zinc-500">Current period end</dt>
-            <dd className="font-medium text-zinc-900">{formatBillingDateOrDash(profile.subscription_current_period_end)}</dd>
-          </div>
-          <div>
-            <dt className="text-zinc-500">Trial ends</dt>
-            <dd className="font-medium text-zinc-900">{formatBillingDateOrDash(profile.trial_ends_at)}</dd>
-          </div>
+          {hasActiveSubscription ? (
+            <div>
+              <dt className="text-zinc-500">Renewal date</dt>
+              <dd className="font-medium text-zinc-900">
+                {formatBillingDateOrDash(profile.subscription_current_period_end)}
+              </dd>
+            </div>
+          ) : (
+            <>
+              <div>
+                <dt className="text-zinc-500">Trial plan</dt>
+                <dd className="font-medium text-zinc-900">{trialPlanLabel}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Trial start</dt>
+                <dd className="font-medium text-zinc-900">
+                  {formatBillingDateOrDash(profile.trial_started_at)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Trial end</dt>
+                <dd className="font-medium text-zinc-900">
+                  {formatBillingDateOrDash(profile.trial_ends_at)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Days remaining</dt>
+                <dd className="font-medium text-zinc-900">
+                  {managedTrialExpired
+                    ? "0 — trial ended"
+                    : trialDaysLabel ??
+                      (hasJobProofTrialStarted(profile) ? "—" : "Starts after setup")}
+                </dd>
+              </div>
+            </>
+          )}
           <div className="sm:col-span-2">
             <dt className="text-zinc-500">Stripe customer</dt>
             <dd className="font-mono text-xs text-zinc-700">
@@ -395,7 +458,9 @@ export default async function BillingSettingsPage({
         </dl>
         {!isBetaTester ? (
           <p className="mt-3 text-xs text-zinc-600">
-            Stripe will send receipts and billing emails to your account email.
+            {hasActiveSubscription
+              ? "Stripe will send receipts and billing emails to your account email."
+              : "No credit card is required during your free trial. Subscribe anytime from this page."}
           </p>
         ) : (
           <p className="mt-3 text-xs text-zinc-600">
@@ -414,7 +479,9 @@ export default async function BillingSettingsPage({
             showResumeSubscription={showResumeSubscription}
             showDowngradeToEssential={showDowngradeToEssential}
             hasPendingEssentialDowngrade={hasPendingEssentialDowngrade}
-            subscriptionIsTrialing={isTrialing}
+            subscriptionIsTrialing={isTrialing && hasActiveSubscription}
+            defaultCheckoutPlan={defaultCheckoutPlan}
+            showManagedTrialSubscribe={showManagedTrialSubscribe}
           />
         </div>
       </section>

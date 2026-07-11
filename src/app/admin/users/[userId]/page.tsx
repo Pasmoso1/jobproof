@@ -151,6 +151,8 @@ export default async function AdminUserDetailPage({
       subscription_status,
       subscription_current_period_end,
       trial_ends_at,
+      trial_started_at,
+      trial_plan_tier,
       grace_period_ends_at,
       subscription_cancel_at_period_end,
       subscription_cancel_at,
@@ -550,6 +552,25 @@ export default async function AdminUserDetailPage({
                     : "—",
               },
               { label: "subscription_status", value: toMaybeString(profile.subscription_status) ?? "" },
+              {
+                label: "Trial status",
+                value:
+                  profile.beta_tester === true
+                    ? "Beta (no trial)"
+                    : toMaybeString(profile.subscription_status) ?? "—",
+              },
+              {
+                label: "Trial plan",
+                value: toMaybeString(profile.trial_plan_tier) ?? toMaybeString(profile.plan_tier) ?? "—",
+              },
+              {
+                label: "trial_started_at",
+                value: formatBillingTimestamp(toMaybeString(profile.trial_started_at)),
+              },
+              {
+                label: "trial_ends_at",
+                value: formatBillingTimestamp(toMaybeString(profile.trial_ends_at)),
+              },
               { label: "pricing_version", value: toMaybeString(profile.pricing_version) ?? "" },
               { label: "stripe_customer_id", value: toMaybeString(profile.stripe_customer_id) ?? "" },
               { label: "stripe_subscription_id", value: toMaybeString(profile.stripe_subscription_id) ?? "" },
@@ -559,10 +580,6 @@ export default async function AdminUserDetailPage({
                 value: formatBillingTimestamp(
                   toMaybeString(profile.subscription_current_period_end)
                 ),
-              },
-              {
-                label: "trial_ends_at",
-                value: formatBillingTimestamp(toMaybeString(profile.trial_ends_at)),
               },
               {
                 label: "subscription_cancel_at_period_end",

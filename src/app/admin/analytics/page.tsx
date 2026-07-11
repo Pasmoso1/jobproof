@@ -52,6 +52,9 @@ export default async function AdminAnalyticsPage() {
     onboardingCompleted,
     subscriptionStarted,
     stripeConnectCompleted,
+    trialStarted,
+    trialConverted,
+    trialExpired,
     recentEvents,
     profilesWithFirstJob,
     profilesOnboardingCompleted,
@@ -63,6 +66,9 @@ export default async function AdminAnalyticsPage() {
     countEvents(supabase, PRODUCT_ANALYTICS_EVENTS.onboarding_completed),
     countEvents(supabase, PRODUCT_ANALYTICS_EVENTS.subscription_started),
     countEvents(supabase, PRODUCT_ANALYTICS_EVENTS.stripe_connect_completed),
+    countEvents(supabase, PRODUCT_ANALYTICS_EVENTS.trial_started),
+    countEvents(supabase, PRODUCT_ANALYTICS_EVENTS.trial_converted),
+    countEvents(supabase, PRODUCT_ANALYTICS_EVENTS.trial_expired),
     supabase
       .from("product_analytics_events")
       .select("created_at, event_name, profile_id, metadata, source")
@@ -87,6 +93,9 @@ export default async function AdminAnalyticsPage() {
   const cards = [
     ["Total signups", totalSignups],
     ["Onboarding started", onboardingStarted],
+    ["Trials started", trialStarted],
+    ["Trials converted", trialConverted],
+    ["Trials expired", trialExpired],
     ["First jobs created", firstJobsCreated],
     ["Onboarding completed (events)", onboardingCompleted],
     ["Onboarding completed (profiles)", completedProfiles],
@@ -94,6 +103,7 @@ export default async function AdminAnalyticsPage() {
     ["Stripe Connect completed", stripeConnectCompleted],
     ["Activation rate", pct(activatedProfiles, totalSignups)],
     ["Onboarding completion rate", pct(completedProfiles, totalSignups)],
+    ["Trial conversion rate", pct(trialConverted, trialStarted)],
   ] as const;
 
   const quoteCards = [

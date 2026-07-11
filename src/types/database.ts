@@ -10,6 +10,7 @@ export type Json =
 
 export type PlanType = "solo" | "team" | "enterprise";
 export type SubscriptionStatus =
+  | "pending_trial"
   | "trial"
   | "trialing"
   | "active"
@@ -18,7 +19,8 @@ export type SubscriptionStatus =
   | "past_due"
   | "unpaid"
   | "incomplete"
-  | "incomplete_expired";
+  | "incomplete_expired"
+  | "expired";
 export type JobStatus = "active" | "completed" | "cancelled";
 export type UpdateCategory = "before" | "progress" | "materials" | "issue" | "completion" | "other";
 export type JobContractStatus = "none" | "draft" | "pending" | "signed" | "void";
@@ -79,7 +81,15 @@ export interface Profile {
   plan_tier?: "essential" | "professional" | null;
   pricing_version?: "founder" | "standard" | null;
   subscription_current_period_end?: string | null;
+  trial_started_at?: string | null;
   trial_ends_at?: string | null;
+  trial_plan_tier?: "essential" | "professional" | null;
+  trial_email_welcome_sent_at?: string | null;
+  trial_email_started_sent_at?: string | null;
+  trial_email_day3_sent_at?: string | null;
+  trial_email_day7_sent_at?: string | null;
+  trial_email_day12_sent_at?: string | null;
+  trial_email_ended_sent_at?: string | null;
   grace_period_ends_at?: string | null;
   subscription_cancel_at_period_end?: boolean | null;
   subscription_cancel_at?: string | null;
