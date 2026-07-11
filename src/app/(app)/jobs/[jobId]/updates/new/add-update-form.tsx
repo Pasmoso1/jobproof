@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
+  checkStorageQuotaForUpload,
   createJobUpdate,
   type CreateJobUpdateResult,
 } from "../../../../actions";
@@ -380,6 +381,14 @@ export function AddUpdateForm({ jobId }: { jobId: string }) {
 
       if (!profile) {
         setError("Profile not found");
+        return;
+      }
+
+      const totalUploadBytes = staged.reduce((sum, s) => sum + s.file.size, 0);
+      const quota = await checkStorageQuotaForUpload(totalUploadBytes);
+      if (!quota.ok) {
+        setError(quota.error);
+        setUploadProgress(null);
         return;
       }
 

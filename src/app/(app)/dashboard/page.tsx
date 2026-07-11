@@ -21,6 +21,13 @@ import {
   outstandingIndicatorLinkClassName,
 } from "@/lib/job-dashboard-status";
 import { getSubscriptionAccess } from "@/lib/subscription-access";
+import {
+  formatActiveJobLimit,
+  formatStorageAllowance,
+  formatStorageBytes,
+  getPlanEntitlements,
+  storagePercentUsed,
+} from "@/lib/plan-entitlements";
 import { formatBillingDateOrDash } from "@/lib/billing-date-display";
 import {
   getContractorOnboardingProgress,
@@ -34,9 +41,7 @@ import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
 import { syncSubscriptionAfterStripeReturn } from "@/app/(app)/settings/billing/actions";
 
 function formatStorage(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return formatStorageBytes(bytes);
 }
 
 function firstSearchParam(v: string | string[] | undefined): string {
@@ -87,13 +92,14 @@ export default async function DashboardPage({
       postal_code: profile.postal_code,
     });
 
-  const storageLimitBytes = (profile?.storage_limit_mb ?? 10240) * 1024 * 1024;
-  const storagePercent = storageLimitBytes > 0
-    ? Math.round(((storageBytes ?? 0) / storageLimitBytes) * 100)
-    : 0;
+  const entitlements = getPlanEntitlements(profile);
+  const storageLimitBytes = entitlements.storageBytes;
+  const storagePercent = storagePercentUsed(storageBytes ?? 0, storageLimitBytes);
   const isStorageNearLimit = storagePercent >= 80;
+  const isStorageAtLimit = (storageBytes ?? 0) >= storageLimitBytes;
   const isJobLimitReached =
-    (activeCount ?? 0) >= (profile?.active_job_limit ?? 10);
+    entitlements.maxActiveJobs !== null &&
+    (activeCount ?? 0) >= entitlements.maxActiveJobs;
   const access = getSubscriptionAccess(profile ?? {});
 
   const jobIds = jobs.map((j: { id: string }) => j.id);
@@ -189,14 +195,18 @@ export default async function DashboardPage({
         <div className="space-y-3">
           {isStorageNearLimit && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Storage is {storagePercent}% full ({formatStorage(storageBytes ?? 0)} / {formatStorage(storageLimitBytes)}).
-              Consider removing old attachments or upgrading your plan.
+              Storage is {storagePercent}% full ({formatStorage(storageBytes ?? 0)} /{" "}
+              {formatStorageAllowance(entitlements)}
+              ).
+              {isStorageAtLimit
+                ? " New uploads are blocked until you free space or upgrade."
+                : " Consider removing old attachments or upgrading your plan."}
             </div>
           )}
           {isJobLimitReached && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              You&apos;ve reached your active job limit ({profile?.active_job_limit ?? 10}).
-              Complete or cancel jobs to create new ones, or upgrade your plan.
+              You&apos;ve reached your active job limit ({formatActiveJobLimit(entitlements)}).
+              Complete or cancel jobs to create new ones, or upgrade to Pro.
             </div>
           )}
         </div>
@@ -218,10 +228,10 @@ export default async function DashboardPage({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
           <p className="text-sm font-medium text-zinc-500">Plan</p>
-          <p className="mt-1 text-lg font-semibold capitalize text-zinc-900">
-            {profile?.plan_type ?? "Solo"}
+          <p className="mt-1 text-lg font-semibold text-zinc-900">
+            {entitlements.label}
           </p>
-          <p className="mt-0.5 text-xs text-zinc-500 capitalize">
+          <p className="mt-0.5 text-xs capitalize text-zinc-500">
             {profile?.subscription_status ?? "Trial"}
           </p>
         </div>
@@ -231,7 +241,7 @@ export default async function DashboardPage({
             {activeCount ?? 0}
           </p>
           <p className="mt-0.5 text-xs text-zinc-500">
-            Signed contracts only • of {profile?.active_job_limit ?? 10} limit
+            of {formatActiveJobLimit(entitlements)} limit
           </p>
         </div>
         <div className="rounded-xl border border-zinc-200 bg-white p-4 sm:p-5">
@@ -240,7 +250,7 @@ export default async function DashboardPage({
             {formatStorage(storageBytes ?? 0)}
           </p>
           <p className="mt-0.5 text-xs text-zinc-500">
-            of {(profile?.storage_limit_mb ?? 10240)} MB
+            of {formatStorageAllowance(entitlements)} ({storagePercent}% used)
           </p>
         </div>
       </div>

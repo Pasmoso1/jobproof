@@ -1,15 +1,27 @@
 import type { BillingPlanTier } from "@/lib/stripe";
+import {
+  formatActiveJobLimit as formatActiveJobEntitlement,
+  formatStorageAllowance,
+  formatTradeLimit,
+  getPlanEntitlements,
+  PLAN_ENTITLEMENTS,
+  type PlanEntitlements,
+} from "@/lib/plan-entitlements";
 
-/** Active job limits enforced via `profiles.active_job_limit`. */
-export const ESSENTIAL_ACTIVE_JOB_LIMIT = 10;
+/** @deprecated Prefer getPlanEntitlements / PLAN_ENTITLEMENTS */
+export const ESSENTIAL_ACTIVE_JOB_LIMIT = PLAN_ENTITLEMENTS.essential.maxActiveJobs!;
 
-/** Solo / Essential storage limit in MB (`profiles.storage_limit_mb` default). */
-export const SOLO_STORAGE_LIMIT_MB = 10240;
+/** @deprecated Prefer PLAN_ENTITLEMENTS.essential.storageBytes */
+export const SOLO_STORAGE_LIMIT_MB = Math.round(
+  PLAN_ENTITLEMENTS.essential.storageBytes / (1024 * 1024)
+);
 
-/** Pro storage allotment shown in marketing (100 GB). */
-export const PRO_STORAGE_LIMIT_MB = 102400;
+/** @deprecated Prefer PLAN_ENTITLEMENTS.professional.storageBytes */
+export const PRO_STORAGE_LIMIT_MB = Math.round(
+  PLAN_ENTITLEMENTS.professional.storageBytes / (1024 * 1024)
+);
 
-/** @deprecated Prefer SOLO_STORAGE_LIMIT_MB */
+/** @deprecated Prefer SOLO_STORAGE_LIMIT_MB / PLAN_ENTITLEMENTS */
 export const DEFAULT_STORAGE_LIMIT_MB = SOLO_STORAGE_LIMIT_MB;
 
 export function formatStorageGb(storageMb: number): string {
@@ -18,11 +30,17 @@ export function formatStorageGb(storageMb: number): string {
 }
 
 export function formatActiveJobLimit(tier: BillingPlanTier): string {
-  return tier === "professional" ? "Unlimited" : String(ESSENTIAL_ACTIVE_JOB_LIMIT);
+  return formatActiveJobEntitlement(getPlanEntitlements(tier));
 }
 
 export function formatPlanStorage(tier: BillingPlanTier): string {
-  return formatStorageGb(
-    tier === "professional" ? PRO_STORAGE_LIMIT_MB : SOLO_STORAGE_LIMIT_MB
-  );
+  return formatStorageAllowance(getPlanEntitlements(tier));
+}
+
+export function formatPlanTrades(tier: BillingPlanTier): string {
+  return formatTradeLimit(getPlanEntitlements(tier));
+}
+
+export function getMarketingEntitlements(tier: BillingPlanTier): PlanEntitlements {
+  return getPlanEntitlements(tier);
 }

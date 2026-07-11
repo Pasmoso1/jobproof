@@ -3,8 +3,13 @@ import {
   QUOTE_PRIMARY_TRADES,
   type QuotePrimaryTrade,
 } from "@/lib/quote-requests/constants";
+import {
+  countTotalTrades,
+  SOLO_TRADE_LIMIT_UPGRADE_MESSAGE,
+} from "@/lib/plan-entitlements";
 
-const MAX_ADDITIONAL_TRADES = 10;
+/** Absolute catalog ceiling (Pro / unlimited plans). */
+const MAX_ADDITIONAL_TRADES_CATALOG = 10;
 
 export function parseQuotePrimaryTrade(raw: string): QuotePrimaryTrade | null {
   const v = raw.trim();
@@ -41,14 +46,47 @@ export function parseAdditionalTrades(
     result.push(trade as QuotePrimaryTrade);
   }
 
-  if (result.length > MAX_ADDITIONAL_TRADES) {
+  if (result.length > MAX_ADDITIONAL_TRADES_CATALOG) {
     return {
       value: [],
-      error: `Select at most ${MAX_ADDITIONAL_TRADES} additional trades.`,
+      error: `Select at most ${MAX_ADDITIONAL_TRADES_CATALOG} additional trades.`,
     };
   }
 
   return { value: result };
+}
+
+/**
+ * Enforce plan trade caps (primary + additional).
+ * Grandfathering: over-limit accounts may keep or reduce existing selections,
+ * but cannot increase total trade count.
+ */
+export function enforcePlanTradeLimit(input: {
+  primaryTrade: string | null;
+  additionalTrades: readonly string[];
+  maxTotalTrades: number | null;
+  previousTotalTrades?: number | null;
+}): { ok: true } | { ok: false; error: string } {
+  if (input.maxTotalTrades === null) {
+    return { ok: true };
+  }
+
+  const total = countTotalTrades(input.primaryTrade, input.additionalTrades);
+  if (total <= input.maxTotalTrades) {
+    return { ok: true };
+  }
+
+  const previous =
+    input.previousTotalTrades != null && Number.isFinite(input.previousTotalTrades)
+      ? input.previousTotalTrades
+      : null;
+
+  // Allow saving an existing over-limit set when the contractor is not adding trades.
+  if (previous !== null && total <= previous) {
+    return { ok: true };
+  }
+
+  return { ok: false, error: SOLO_TRADE_LIMIT_UPGRADE_MESSAGE };
 }
 
 export function validateContractorTradesFields(input: {
@@ -56,6 +94,8 @@ export function validateContractorTradesFields(input: {
   primaryTradeOther: string;
   additionalTrades: string[];
   primaryTradeRequired: boolean;
+  maxTotalTrades?: number | null;
+  previousTotalTrades?: number | null;
 }): {
   ok: true;
   data: {
@@ -96,6 +136,18 @@ export function validateContractorTradesFields(input: {
   const additionalResult = parseAdditionalTrades(input.additionalTrades, primaryTrade);
   if (additionalResult.error) {
     fieldErrors.additionalTrades = additionalResult.error;
+  }
+
+  if (!additionalResult.error && input.maxTotalTrades !== undefined) {
+    const planCheck = enforcePlanTradeLimit({
+      primaryTrade,
+      additionalTrades: additionalResult.value,
+      maxTotalTrades: input.maxTotalTrades,
+      previousTotalTrades: input.previousTotalTrades,
+    });
+    if (!planCheck.ok) {
+      fieldErrors.additionalTrades = planCheck.error;
+    }
   }
 
   if (Object.keys(fieldErrors).length > 0) {

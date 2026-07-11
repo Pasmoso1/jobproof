@@ -28,10 +28,12 @@ export function OnboardingBusinessForm({
   profile,
   userEmail,
   confirmed,
+  maxTotalTrades = 2,
 }: {
   profile: Profile;
   userEmail: string;
   confirmed: boolean;
+  maxTotalTrades?: number | null;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -350,6 +352,7 @@ export function OnboardingBusinessForm({
           onContractorExtraCapabilitiesChange={setContractorExtraCapabilities}
           fieldErrors={fieldErrors}
           primaryTradeRequired={false}
+          maxTotalTrades={maxTotalTrades}
           inputClassName="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
           selectClassName="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
         />

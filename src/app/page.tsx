@@ -5,7 +5,12 @@ import { getPlanDisplayLines } from "@/lib/billing-plan-display";
 import {
   formatActiveJobLimit,
   formatPlanStorage,
+  formatPlanTrades,
 } from "@/lib/plan-limits";
+import {
+  formatStorageAllowance,
+  PLAN_ENTITLEMENTS,
+} from "@/lib/plan-entitlements";
 
 export const metadata: Metadata = {
   title: "JobProof — From first inquiry to signed quote",
@@ -30,7 +35,7 @@ const SOLO_FEATURES = [
 
 const PRO_FEATURES = [
   "Unlimited active jobs",
-  "100 GB secure document storage",
+  `${formatStorageAllowance(PLAN_ENTITLEMENTS.professional)} secure document storage`,
   "Support for multiple contractor trades",
   "Priority support",
   "First access to new business growth tools",
@@ -60,7 +65,7 @@ const COMPARISON_ROWS: Array<{
     solo: formatPlanStorage("essential"),
     pro: formatPlanStorage("professional"),
   },
-  { feature: "Multiple Contractor Trades", solo: "Up to 2", pro: "Unlimited" },
+  { feature: "Multiple Contractor Trades", solo: formatPlanTrades("essential"), pro: formatPlanTrades("professional") },
   { feature: "Priority Support", solo: "—", pro: "✓" },
   {
     feature: "First Access to New Business Growth Tools",

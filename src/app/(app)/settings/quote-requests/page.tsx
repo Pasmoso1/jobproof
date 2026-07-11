@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { resolveAppUrl } from "@/lib/stripe";
 import { QuoteRequestSettingsForm } from "./quote-request-settings-form";
 
@@ -16,12 +17,13 @@ export default async function QuoteRequestSettingsPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "quote_slug, business_name, phone, quote_logo_url, quote_pricing_profile, quote_primary_trade, quote_primary_trade_other, quote_additional_trades, contractor_extra_capabilities"
+      "quote_slug, business_name, phone, quote_logo_url, quote_pricing_profile, quote_primary_trade, quote_primary_trade_other, quote_additional_trades, contractor_extra_capabilities, plan_tier, beta_tester, beta_plan_tier"
     )
     .eq("user_id", user.id)
     .single();
 
   const appOrigin = resolveAppUrl();
+  const entitlements = getPlanEntitlements(profile);
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -36,7 +38,11 @@ export default async function QuoteRequestSettingsPage() {
         </p>
       </div>
 
-      <QuoteRequestSettingsForm profile={profile} appOrigin={appOrigin} />
+      <QuoteRequestSettingsForm
+        profile={profile}
+        appOrigin={appOrigin}
+        maxTotalTrades={entitlements.maxTotalTrades}
+      />
 
       {profile?.quote_slug ? (
         <p className="mt-4 text-sm text-zinc-600">

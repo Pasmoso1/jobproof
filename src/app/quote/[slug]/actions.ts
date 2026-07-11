@@ -21,6 +21,10 @@ import {
   trackProductEventSafe,
 } from "@/lib/product-analytics";
 import { validatePublicQuoteRequestFields } from "@/lib/validation/public-quote-request";
+import {
+  assertStorageQuotaAvailable,
+  incrementStorageUsage,
+} from "@/lib/storage-quota";
 
 export type SubmitQuoteRequestResult =
   | { success: true; requestId: string }
@@ -67,6 +71,23 @@ export async function createQuotePhotoUploadUrl(
   const admin = createServiceRoleClient();
   if (!admin) {
     return { success: false, error: "Unable to upload photos right now. Please try again." };
+  }
+
+  const quota = await assertStorageQuotaAvailable(
+    admin,
+    contractor.id,
+    {
+      plan_tier: contractor.plan_tier,
+      beta_tester: contractor.beta_tester,
+      beta_plan_tier: contractor.beta_plan_tier,
+    },
+    meta.byteSize
+  );
+  if (!quota.ok) {
+    return {
+      success: false,
+      error: "This contractor cannot accept more photo uploads right now. Please try again later.",
+    };
   }
 
   const fileId = generateUUID();
@@ -182,11 +203,39 @@ export async function submitPublicQuoteRequest(
   }
 
   let photoCount = 0;
+  let photoBytes = 0;
 
   for (const tmpPath of photoPaths) {
     const attachmentId = generateUUID();
     const ext = tmpPath.split(".").pop()?.toLowerCase() || "jpg";
     const finalPath = `${contractor.id}/${requestId}/${attachmentId}.${ext}`;
+
+    let fileBytes = 0;
+    try {
+      const { data: blob } = await admin.storage
+        .from(QUOTE_REQUEST_STORAGE_BUCKET)
+        .download(tmpPath);
+      if (blob) fileBytes = blob.size;
+    } catch {
+      /* continue — size tracked best-effort */
+    }
+
+    if (fileBytes > 0) {
+      const quota = await assertStorageQuotaAvailable(
+        admin,
+        contractor.id,
+        {
+          plan_tier: contractor.plan_tier,
+          beta_tester: contractor.beta_tester,
+          beta_plan_tier: contractor.beta_plan_tier,
+        },
+        fileBytes
+      );
+      if (!quota.ok) {
+        await admin.storage.from(QUOTE_REQUEST_STORAGE_BUCKET).remove([tmpPath]);
+        continue;
+      }
+    }
 
     const { error: moveError } = await admin.storage
       .from(QUOTE_REQUEST_STORAGE_BUCKET)
@@ -209,6 +258,11 @@ export async function submitPublicQuoteRequest(
     }
 
     photoCount += 1;
+    photoBytes += fileBytes;
+  }
+
+  if (photoBytes > 0) {
+    await incrementStorageUsage(admin, contractor.id, photoBytes);
   }
 
   void maybeGenerateProjectBrief(admin, requestId, "submission", false)

@@ -28,6 +28,11 @@ import {
   type OrganizedSiteVisitNotes,
   type SiteVisitNotesRecord,
 } from "@/lib/quote-requests/site-visit-notes/types";
+import {
+  assertStorageQuotaAvailable,
+  decrementStorageUsage,
+  incrementStorageUsage,
+} from "@/lib/storage-quota";
 
 type ActionError = { success: false; error: string };
 
@@ -40,12 +45,17 @@ async function requireProfileAndRequest(requestId: string) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, plan_tier, beta_tester, beta_plan_tier")
     .eq("user_id", user.id)
     .single();
 
   if (!profile?.id) {
-    return { supabase, profileId: null as string | null, request: null };
+    return {
+      supabase,
+      profileId: null as string | null,
+      profile: null,
+      request: null,
+    };
   }
 
   const { data: request } = await supabase
@@ -55,7 +65,7 @@ async function requireProfileAndRequest(requestId: string) {
     .eq("contractor_id", profile.id)
     .maybeSingle();
 
-  return { supabase, profileId: profile.id, request };
+  return { supabase, profileId: profile.id, profile, request };
 }
 
 async function ensureSiteVisitNotesRow(
@@ -278,8 +288,8 @@ export async function registerSiteVisitPhotoUpload(
   requestId: string,
   meta: { mimeType: string; byteSize: number }
 ): Promise<CreateSiteVisitPhotoUploadResult> {
-  const { supabase, profileId, request } = await requireProfileAndRequest(requestId);
-  if (!profileId || !request) {
+  const { supabase, profileId, profile, request } = await requireProfileAndRequest(requestId);
+  if (!profileId || !profile || !request) {
     return { success: false, error: "Quote request not found." };
   }
 
@@ -296,6 +306,16 @@ export async function registerSiteVisitPhotoUpload(
   const metaCheck = validateSiteVisitPhotoMeta(meta);
   if (!metaCheck.ok) {
     return { success: false, error: metaCheck.error };
+  }
+
+  const quota = await assertStorageQuotaAvailable(
+    supabase,
+    profileId,
+    profile,
+    meta.byteSize
+  );
+  if (!quota.ok) {
+    return { success: false, error: quota.error };
   }
 
   const photoId = generateUUID();
@@ -315,8 +335,8 @@ export async function confirmSiteVisitPhotoUpload(
   filePath: string,
   meta: { mimeType: string; byteSize: number }
 ): Promise<ConfirmSiteVisitPhotoResult> {
-  const { supabase, profileId, request } = await requireProfileAndRequest(requestId);
-  if (!profileId || !request) {
+  const { supabase, profileId, profile, request } = await requireProfileAndRequest(requestId);
+  if (!profileId || !profile || !request) {
     return { success: false, error: "Quote request not found." };
   }
 
@@ -327,6 +347,16 @@ export async function confirmSiteVisitPhotoUpload(
   const metaCheck = validateSiteVisitPhotoMeta(meta);
   if (!metaCheck.ok) {
     return { success: false, error: metaCheck.error };
+  }
+
+  const quota = await assertStorageQuotaAvailable(
+    supabase,
+    profileId,
+    profile,
+    meta.byteSize
+  );
+  if (!quota.ok) {
+    return { success: false, error: quota.error };
   }
 
   const { count } = await supabase
@@ -355,6 +385,8 @@ export async function confirmSiteVisitPhotoUpload(
     console.error("[confirmSiteVisitPhotoUpload]", error);
     return { success: false, error: "Could not save photo." };
   }
+
+  await incrementStorageUsage(supabase, profileId, meta.byteSize);
 
   const { data: signed } = await supabase.storage
     .from(QUOTE_REQUEST_STORAGE_BUCKET)
@@ -390,6 +422,19 @@ export async function deleteSiteVisitPhoto(
     return { success: false, error: "Photo not found." };
   }
 
+  let freedBytes = 0;
+  try {
+    const admin = createServiceRoleClient();
+    if (admin) {
+      const { data: blob } = await admin.storage
+        .from(QUOTE_REQUEST_STORAGE_BUCKET)
+        .download(photo.file_path);
+      if (blob) freedBytes = blob.size;
+    }
+  } catch {
+    /* ignore */
+  }
+
   const { error } = await supabase
     .from("quote_request_site_visit_photos")
     .delete()
@@ -402,6 +447,10 @@ export async function deleteSiteVisitPhoto(
   }
 
   await supabase.storage.from(QUOTE_REQUEST_STORAGE_BUCKET).remove([photo.file_path]);
+  if (freedBytes > 0) {
+    await decrementStorageUsage(supabase, profileId, freedBytes);
+  }
+
   revalidatePath(`/quote-requests/${requestId}`);
   return { success: true };
 }
@@ -456,14 +505,24 @@ export async function registerSiteVisitVoiceUpload(
   requestId: string,
   meta: { mimeType: string; byteSize: number }
 ): Promise<RegisterVoiceUploadResult> {
-  const { profileId, request } = await requireProfileAndRequest(requestId);
-  if (!profileId || !request) {
+  const { supabase, profileId, profile, request } = await requireProfileAndRequest(requestId);
+  if (!profileId || !profile || !request) {
     return { success: false, error: "Quote request not found." };
   }
 
   const metaCheck = validateSiteVisitAudioMeta(meta);
   if (!metaCheck.ok) {
     return { success: false, error: metaCheck.error };
+  }
+
+  const quota = await assertStorageQuotaAvailable(
+    supabase,
+    profileId,
+    profile,
+    meta.byteSize
+  );
+  if (!quota.ok) {
+    return { success: false, error: quota.error };
   }
 
   const voiceId = generateUUID();
@@ -483,8 +542,8 @@ export async function transcribeSiteVisitVoiceUpload(
   filePath: string,
   meta: { mimeType: string; byteSize: number; durationSeconds?: number }
 ): Promise<TranscribeVoiceUploadResult> {
-  const { supabase, profileId, request } = await requireProfileAndRequest(requestId);
-  if (!profileId || !request) {
+  const { supabase, profileId, profile, request } = await requireProfileAndRequest(requestId);
+  if (!profileId || !profile || !request) {
     return { success: false, error: "Quote request not found." };
   }
 
@@ -495,6 +554,16 @@ export async function transcribeSiteVisitVoiceUpload(
   const metaCheck = validateSiteVisitAudioMeta(meta);
   if (!metaCheck.ok) {
     return { success: false, error: metaCheck.error };
+  }
+
+  const quota = await assertStorageQuotaAvailable(
+    supabase,
+    profileId,
+    profile,
+    meta.byteSize
+  );
+  if (!quota.ok) {
+    return { success: false, error: quota.error };
   }
 
   const admin = createServiceRoleClient();
@@ -542,6 +611,8 @@ export async function transcribeSiteVisitVoiceUpload(
     console.error("[transcribeSiteVisitVoiceUpload] insert", error);
     return { success: false, error: "Could not save transcription." };
   }
+
+  await incrementStorageUsage(supabase, profileId, meta.byteSize);
 
   revalidatePath(`/quote-requests/${requestId}`);
   return { success: true, transcription, voiceNoteId: inserted.id };

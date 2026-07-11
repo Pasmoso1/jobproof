@@ -25,6 +25,7 @@ import { sendEstimateEmail } from "@/lib/delivery-service";
 import { generateEstimateNumber } from "@/lib/estimate-number";
 import { createCustomer } from "@/app/(app)/actions";
 import { getSubscriptionAccess, READ_ONLY_MODE_ACTION_ERROR, type ProfileSubscriptionGate } from "@/lib/subscription-access";
+import { assertActiveJobSlotAvailable } from "@/lib/active-job-limit";
 
 function subscriptionWriteBlockedMessage(profile: ProfileSubscriptionGate): string | null {
   const a = getSubscriptionAccess(profile);
@@ -917,7 +918,7 @@ export async function convertEstimateToJob(
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, active_job_limit, province, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+      "id, plan_tier, beta_tester, beta_plan_tier, province, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
     )
     .eq("user_id", user.id)
     .single();
@@ -927,16 +928,9 @@ export async function convertEstimateToJob(
   const subBlock = subscriptionWriteBlockedMessage(profile);
   if (subBlock) return { error: subBlock };
 
-  const { count } = await supabase
-    .from("jobs")
-    .select("*", { count: "exact", head: true })
-    .eq("profile_id", profile.id)
-    .eq("status", "active");
-
-  if ((count ?? 0) >= profile.active_job_limit) {
-    return {
-      error: `Active job limit (${profile.active_job_limit}) reached. Complete or cancel a job first.`,
-    };
+  const jobLimit = await assertActiveJobSlotAvailable(supabase, profile.id, profile);
+  if (!jobLimit.ok) {
+    return { error: jobLimit.error };
   }
 
   const { data: est, error: estErr } = await supabase

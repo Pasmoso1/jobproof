@@ -5,6 +5,10 @@ import {
   QUOTE_PRIMARY_TRADES,
 } from "@/lib/quote-requests/constants";
 import { ContractorExtraCapabilitiesField } from "@/components/contractor/contractor-extra-capabilities-field";
+import {
+  countTotalTrades,
+  SOLO_TRADE_LIMIT_UPGRADE_MESSAGE,
+} from "@/lib/plan-entitlements";
 
 const FIELD_INPUT_CLASS =
   "mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-base text-zinc-900 placeholder:text-zinc-400 sm:text-sm";
@@ -31,6 +35,8 @@ type ContractorTradesServicesFieldsProps = {
   primaryTradeRequired?: boolean;
   inputClassName?: string;
   selectClassName?: string;
+  /** Max primary + additional trades; null = unlimited (Pro). */
+  maxTotalTrades?: number | null;
 };
 
 export function ContractorTradesServicesFields({
@@ -46,17 +52,24 @@ export function ContractorTradesServicesFields({
   primaryTradeRequired = true,
   inputClassName = FIELD_INPUT_CLASS,
   selectClassName = FIELD_SELECT_CLASS,
+  maxTotalTrades = null,
 }: ContractorTradesServicesFieldsProps) {
   const additionalOptions = QUOTE_ADDITIONAL_TRADE_OPTIONS.filter(
     (trade) => trade !== primaryTrade
   );
 
+  const totalSelected = countTotalTrades(primaryTrade, additionalTrades);
+  const atPlanLimit =
+    maxTotalTrades !== null && totalSelected >= maxTotalTrades;
+  const isSoloLimited = maxTotalTrades !== null;
+
   function toggleAdditionalTrade(trade: string) {
     if (additionalTrades.includes(trade)) {
       onAdditionalTradesChange(additionalTrades.filter((t) => t !== trade));
-    } else {
-      onAdditionalTradesChange([...additionalTrades, trade]);
+      return;
     }
+    if (atPlanLimit) return;
+    onAdditionalTradesChange([...additionalTrades, trade]);
   }
 
   function onPrimaryChange(value: string) {
@@ -77,6 +90,12 @@ export function ContractorTradesServicesFields({
           Your trades and services help JobProof match quote requests to the work you actually
           perform.
         </p>
+        {isSoloLimited ? (
+          <p className="mt-2 text-xs font-medium text-zinc-700">
+            {maxTotalTrades} trades included
+            {totalSelected > 0 ? ` · ${totalSelected} selected` : ""}
+          </p>
+        ) : null}
       </div>
 
       <label className="block">
@@ -137,16 +156,22 @@ export function ContractorTradesServicesFields({
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {additionalOptions.map((trade) => {
             const checked = additionalTrades.includes(trade);
+            const disabled = !checked && atPlanLimit;
             return (
               <label
                 key={trade}
-                className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50"
+                className={`flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-800 ${
+                  disabled
+                    ? "cursor-not-allowed opacity-50"
+                    : "cursor-pointer hover:bg-zinc-50"
+                }`}
               >
                 <input
                   type="checkbox"
                   name="additionalTrades"
                   value={trade}
                   checked={checked}
+                  disabled={disabled}
                   onChange={() => toggleAdditionalTrade(trade)}
                   className="h-4 w-4 rounded border-zinc-300 text-[#2436BB] focus:ring-[#2436BB]"
                 />
@@ -155,6 +180,9 @@ export function ContractorTradesServicesFields({
             );
           })}
         </div>
+        {atPlanLimit ? (
+          <p className="mt-2 text-xs text-[#2436BB]">{SOLO_TRADE_LIMIT_UPGRADE_MESSAGE}</p>
+        ) : null}
         {fieldErrors.additionalTrades ? (
           <p className="mt-1 text-xs text-red-600">{fieldErrors.additionalTrades}</p>
         ) : null}

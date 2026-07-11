@@ -12,6 +12,15 @@ import {
 import { parseContractorExtraCapabilities } from "@/lib/validation/contractor-extra-capabilities";
 import { validateContractorTradesFields } from "@/lib/validation/contractor-trades";
 import {
+  countTotalTrades,
+  getPlanEntitlements,
+} from "@/lib/plan-entitlements";
+import { assertActiveJobSlotAvailable } from "@/lib/active-job-limit";
+import {
+  assertStorageQuotaAvailable,
+  incrementStorageUsage,
+} from "@/lib/storage-quota";
+import {
   contractSigningScheduleErrorMessage,
   parsePositiveContractPrice,
   validateCustomerEmail,
@@ -194,7 +203,9 @@ export async function updateProfileBusinessInfo(formData: FormData) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select(
+      "id, quote_primary_trade, quote_additional_trades, plan_tier, beta_tester, beta_plan_tier"
+    )
     .eq("user_id", user.id)
     .single();
 
@@ -275,11 +286,20 @@ export async function updateProfileBusinessInfo(formData: FormData) {
     quote_additional_trades?: string[];
   } = {};
   if (formData.has("primaryTrade")) {
+    const entitlements = getPlanEntitlements(profile);
+    const previousTotalTrades = countTotalTrades(
+      profile.quote_primary_trade,
+      Array.isArray(profile.quote_additional_trades)
+        ? profile.quote_additional_trades.map(String)
+        : []
+    );
     const tradesResult = validateContractorTradesFields({
       primaryTrade: String(formData.get("primaryTrade") ?? ""),
       primaryTradeOther: String(formData.get("primaryTradeOther") ?? ""),
       additionalTrades: formData.getAll("additionalTrades").map(String),
       primaryTradeRequired: false,
+      maxTotalTrades: entitlements.maxTotalTrades,
+      previousTotalTrades,
     });
     if (!tradesResult.ok) {
       return { fieldErrors: tradesResult.fieldErrors };
@@ -386,6 +406,34 @@ export async function getStorageUsage() {
   return data?.total_bytes ?? 0;
 }
 
+/** Pre-upload storage quota check for contractor-owned files. */
+export async function checkStorageQuotaForUpload(
+  additionalBytes: number
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, plan_tier, beta_tester, beta_plan_tier")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!profile) return { ok: false, error: "Profile not found" };
+
+  const quota = await assertStorageQuotaAvailable(
+    supabase,
+    profile.id,
+    profile,
+    additionalBytes
+  );
+  if (!quota.ok) return { ok: false, error: quota.error };
+  return { ok: true };
+}
+
 export async function getActiveJobsCount() {
   const supabase = await createClient();
   const {
@@ -405,8 +453,7 @@ export async function getActiveJobsCount() {
     .from("jobs")
     .select("*", { count: "exact", head: true })
     .eq("profile_id", profile.id)
-    .eq("status", "active")
-    .eq("contract_status", "signed");
+    .eq("status", "active");
 
   return count ?? 0;
 }
@@ -553,7 +600,7 @@ export async function createJob(formData: FormData) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, active_job_limit, province, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+      "id, plan_tier, beta_tester, beta_plan_tier, province, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
     )
     .eq("user_id", user.id)
     .single();
@@ -564,22 +611,18 @@ export async function createJob(formData: FormData) {
   const readOnlyErr = blockIfReadOnly(access, String(profile.id));
   if (readOnlyErr) return { error: readOnlyErr };
 
-  const [{ count: totalJobCount }, { count: activeJobCount }] = await Promise.all([
+  const [{ count: totalJobCount }, jobLimit] = await Promise.all([
     supabase
       .from("jobs")
       .select("id", { count: "exact", head: true })
       .eq("profile_id", profile.id),
-    supabase
-      .from("jobs")
-      .select("id", { count: "exact", head: true })
-      .eq("profile_id", profile.id)
-      .eq("status", "active"),
+    assertActiveJobSlotAvailable(supabase, profile.id, profile),
   ]);
 
   const isFirstJob = (totalJobCount ?? 0) === 0;
 
-  if ((activeJobCount ?? 0) >= profile.active_job_limit) {
-    return { error: `Active job limit (${profile.active_job_limit}) reached. Upgrade your plan for more.` };
+  if (!jobLimit.ok) {
+    return { error: jobLimit.error };
   }
 
   const customerId = String(formData.get("customer_id") ?? "").trim();
@@ -1099,7 +1142,7 @@ export async function createJobUpdate(
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
+      "id, plan_tier, beta_tester, beta_plan_tier, subscription_status, grace_period_ends_at, trial_ends_at, subscription_current_period_end, subscription_cancel_at_period_end, subscription_cancel_at, subscription_canceled_at"
     )
     .eq("user_id", user.id)
     .single();
@@ -1111,6 +1154,19 @@ export async function createJobUpdate(
   const access = getSubscriptionAccess(profile);
   if (access.isReadOnlyMode) {
     return { error: access.readOnlyActionError ?? READ_ONLY_MODE_ACTION_ERROR };
+  }
+
+  const incomingBytes = filePaths.reduce((s, f) => s + (Number(f.sizeBytes) || 0), 0);
+  if (incomingBytes > 0) {
+    const quota = await assertStorageQuotaAvailable(
+      supabase,
+      profile.id,
+      profile,
+      incomingBytes
+    );
+    if (!quota.ok) {
+      return { error: quota.error };
+    }
   }
 
   const category = (formData.get("category") as UpdateCategory) ?? "other";
@@ -1265,21 +1321,7 @@ export async function createJobUpdate(
     }
 
     const totalBytes = filePaths.reduce((s, f) => s + f.sizeBytes, 0);
-    const { data: usage } = await supabase
-      .from("storage_usage")
-      .select("total_bytes")
-      .eq("profile_id", profile.id)
-      .single();
-
-    if (usage) {
-      await supabase
-        .from("storage_usage")
-        .update({
-          total_bytes: (usage.total_bytes ?? 0) + totalBytes,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("profile_id", profile.id);
-    }
+    await incrementStorageUsage(supabase, profile.id, totalBytes);
   }
 
   trackContractorMilestoneSafe({

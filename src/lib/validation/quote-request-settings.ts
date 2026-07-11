@@ -28,6 +28,8 @@ export function validateQuoteRequestSettings(input: {
   primaryTradeOther: string;
   additionalTrades: string[];
   contractorExtraCapabilities: string;
+  maxTotalTrades?: number | null;
+  previousTotalTrades?: number | null;
 }): { ok: true; data: {
   quoteSlug: string;
   businessName: string;
@@ -81,6 +83,8 @@ export function validateQuoteRequestSettings(input: {
     primaryTradeOther: input.primaryTradeOther,
     additionalTrades: input.additionalTrades,
     primaryTradeRequired: true,
+    maxTotalTrades: input.maxTotalTrades,
+    previousTotalTrades: input.previousTotalTrades,
   });
   if (!tradesResult.ok) {
     Object.assign(fieldErrors, tradesResult.fieldErrors);

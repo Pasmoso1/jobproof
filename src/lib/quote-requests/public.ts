@@ -10,6 +10,9 @@ export type PublicQuoteContractor = {
   quote_logo_url: string | null;
   /** Effective trade label for public display (custom label when Other). */
   trade_label: string | null;
+  plan_tier: string | null;
+  beta_tester: boolean;
+  beta_plan_tier: string | null;
 };
 
 export async function getContractorByQuoteSlug(
@@ -24,7 +27,7 @@ export async function getContractorByQuoteSlug(
   const { data } = await admin
     .from("profiles")
     .select(
-      "id, quote_slug, business_name, phone, quote_logo_url, quote_primary_trade, quote_primary_trade_other"
+      "id, quote_slug, business_name, phone, quote_logo_url, quote_primary_trade, quote_primary_trade_other, plan_tier, beta_tester, beta_plan_tier"
     )
     .ilike("quote_slug", normalized)
     .maybeSingle();
@@ -41,5 +44,8 @@ export async function getContractorByQuoteSlug(
       quote_primary_trade: data.quote_primary_trade,
       quote_primary_trade_other: data.quote_primary_trade_other,
     }),
+    plan_tier: data.plan_tier != null ? String(data.plan_tier) : null,
+    beta_tester: data.beta_tester === true,
+    beta_plan_tier: data.beta_plan_tier != null ? String(data.beta_plan_tier) : null,
   };
 }

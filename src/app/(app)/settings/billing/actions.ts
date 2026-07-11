@@ -18,9 +18,11 @@ import {
   isSubscriptionTimestampInFuture,
 } from "@/lib/subscription-access";
 import {
+  parseBillingPlanTier,
   planUpdatedProfessionalTrialingMessage,
   professionalTrialingBillingBannerMessage,
 } from "@/lib/billing-plan-display";
+import { profileLimitColumnsForTier } from "@/lib/plan-entitlements";
 import {
   type BillingPlanTier,
   type BillingPricingVersion,
@@ -333,6 +335,7 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
         subscription_status: sub.status,
         subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
         trial_ends_at: unixToIso(sub.trial_end ?? null),
+        ...profileLimitColumnsForTier("professional"),
         ...subscriptionCancellationDbFields(sub),
       })
       .eq("id", profile.id)
@@ -393,6 +396,9 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
         subscription_status: updated.status,
         subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(updated)),
         trial_ends_at: unixToIso(updated.trial_end ?? null),
+        ...profileLimitColumnsForTier(
+          plan?.planTier ?? metaTier ?? "professional"
+        ),
         ...subscriptionCancellationDbFields(updated),
       })
       .eq("id", profile.id)
@@ -529,6 +535,7 @@ export async function downgradeSubscriptionToEssential(): Promise<DowngradeSubsc
         pending_plan_tier: null,
         pending_plan_effective_at: null,
         stripe_subscription_schedule_id: null,
+        ...profileLimitColumnsForTier("essential"),
         ...subscriptionCancellationDbFields(sub),
       })
       .eq("id", profile.id)
@@ -604,6 +611,7 @@ export async function downgradeSubscriptionToEssential(): Promise<DowngradeSubsc
           pending_plan_tier: null,
           pending_plan_effective_at: null,
           stripe_subscription_schedule_id: null,
+          ...profileLimitColumnsForTier(plan?.planTier ?? "essential"),
           ...subscriptionCancellationDbFields(updated),
         })
         .eq("id", profile.id)
@@ -1041,6 +1049,9 @@ export async function syncSubscriptionAfterStripeReturn(input: {
       subscription_status: sub.status,
       subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
       trial_ends_at: unixToIso(sub.trial_end ?? null),
+      ...profileLimitColumnsForTier(
+        plan?.planTier ?? metaTier ?? parseBillingPlanTier(String(profile.plan_tier ?? "")) ?? "essential"
+      ),
       ...subscriptionCancellationDbFields(sub),
     })
     .eq("id", profile.id)

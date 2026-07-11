@@ -4,6 +4,7 @@ import { getProfile } from "@/app/(app)/actions";
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
 import { BETA_PLAN_ONBOARDING_PATH, needsBetaPlanSelection } from "@/lib/beta-tester";
 import { JobProofLogo } from "@/components/jobproof-logo";
+import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { OnboardingBusinessForm } from "./onboarding-business-form";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +55,7 @@ export default async function OnboardingBusinessProfilePage({
         profile={profile}
         userEmail={user.email ?? ""}
         confirmed={params.confirmed === "true"}
+        maxTotalTrades={getPlanEntitlements(profile).maxTotalTrades}
       />
     </div>
   );

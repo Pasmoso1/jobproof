@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { validateQuoteRequestSettings } from "@/lib/validation/quote-request-settings";
+import {
+  countTotalTrades,
+  getPlanEntitlements,
+} from "@/lib/plan-entitlements";
 
 export type QuoteRequestSettingsResult =
   | { success: true }
@@ -20,13 +24,23 @@ export async function updateQuoteRequestSettings(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, quote_slug")
+    .select(
+      "id, quote_slug, quote_primary_trade, quote_additional_trades, plan_tier, beta_tester, beta_plan_tier"
+    )
     .eq("user_id", user.id)
     .single();
 
   if (!profile?.id) {
     return { success: false, error: "Profile not found." };
   }
+
+  const entitlements = getPlanEntitlements(profile);
+  const previousTotalTrades = countTotalTrades(
+    profile.quote_primary_trade,
+    Array.isArray(profile.quote_additional_trades)
+      ? profile.quote_additional_trades.map(String)
+      : []
+  );
 
   const validation = validateQuoteRequestSettings({
     quoteSlug: String(formData.get("quoteSlug") ?? ""),
@@ -38,6 +52,8 @@ export async function updateQuoteRequestSettings(
     primaryTradeOther: String(formData.get("primaryTradeOther") ?? ""),
     additionalTrades: formData.getAll("additionalTrades").map(String),
     contractorExtraCapabilities: String(formData.get("contractor_extra_capabilities") ?? ""),
+    maxTotalTrades: entitlements.maxTotalTrades,
+    previousTotalTrades,
   });
 
   if (!validation.ok) {

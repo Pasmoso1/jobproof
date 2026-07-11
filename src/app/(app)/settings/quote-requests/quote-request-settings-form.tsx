@@ -30,9 +30,11 @@ type ProfileFields = {
 export function QuoteRequestSettingsForm({
   profile,
   appOrigin,
+  maxTotalTrades = null,
 }: {
   profile: ProfileFields | null;
   appOrigin: string;
+  maxTotalTrades?: number | null;
 }) {
   const [quoteSlug, setQuoteSlug] = useState(profile?.quote_slug ?? "");
   const [businessName, setBusinessName] = useState(profile?.business_name ?? "");
@@ -214,6 +216,7 @@ export function QuoteRequestSettingsForm({
         onContractorExtraCapabilitiesChange={setContractorExtraCapabilities}
         fieldErrors={fieldErrors}
         primaryTradeRequired
+        maxTotalTrades={maxTotalTrades}
       />
 
       <button

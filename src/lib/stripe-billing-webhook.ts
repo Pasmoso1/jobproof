@@ -8,11 +8,15 @@ import {
   roundInvoiceMoney,
 } from "@/lib/invoice-payment-recalc";
 import { getTodayYmdEastern } from "@/lib/datetime-eastern";
-import {
-  getPlanFromStripePriceId,
-} from "@/lib/stripe";
+import { getPlanFromStripePriceId } from "@/lib/stripe";
 import { subscriptionCancellationDbFields } from "@/lib/stripe-subscription-cancellation";
 import { tierFromMetadata } from "@/lib/stripe-subscription-profile-sync";
+import { profileLimitColumnsForTier } from "@/lib/plan-entitlements";
+
+function limitColumnsForPlanTier(tier: string | null | undefined) {
+  const parsed = parseBillingPlanTier(String(tier ?? ""));
+  return profileLimitColumnsForTier(parsed ?? "essential");
+}
 
 function toIso(ts?: number | null): string | null {
   if (!ts) return null;
@@ -137,13 +141,15 @@ export async function processStripeBillingWebhook(
           const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
           const cancelPatch = sub ? subscriptionCancellationDbFields(sub) : null;
           const newStatus = sub?.status ?? String(profile.subscription_status ?? "");
+          const resolvedTier =
+            plan?.planTier ?? session.metadata?.plan_tier ?? profile.plan_tier;
           await admin
             .from("profiles")
             .update({
               stripe_customer_id: customerId || profile.stripe_customer_id,
               stripe_subscription_id: subId || profile.stripe_subscription_id,
               stripe_price_id: priceId,
-              plan_tier: plan?.planTier ?? session.metadata?.plan_tier ?? profile.plan_tier,
+              plan_tier: resolvedTier,
               pricing_version:
                 plan?.pricingVersion ??
                 session.metadata?.pricing_version ??
@@ -153,6 +159,7 @@ export async function processStripeBillingWebhook(
                 sub ? subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub) : null
               ),
               trial_ends_at: toIso(sub?.trial_end),
+              ...limitColumnsForPlanTier(resolvedTier),
               ...(cancelPatch ?? {}),
             })
             .eq("id", profile.id);
@@ -257,18 +264,21 @@ export async function processStripeBillingWebhook(
         const cancelPatch = subscriptionCancellationDbFields(sub);
         const oldStatus = String(profile.subscription_status ?? "");
         const classification = classifySubscriptionChange({ profile, sub });
+        const resolvedTier =
+          plan?.planTier ?? sub.metadata?.plan_tier ?? profile.plan_tier;
         await admin
           .from("profiles")
           .update({
             stripe_customer_id: customerId || profile.stripe_customer_id,
             stripe_subscription_id: sub.id,
             stripe_price_id: priceId,
-            plan_tier: plan?.planTier ?? sub.metadata?.plan_tier ?? profile.plan_tier,
+            plan_tier: resolvedTier,
             pricing_version:
               plan?.pricingVersion ?? sub.metadata?.pricing_version ?? profile.pricing_version,
             subscription_status: sub.status,
             subscription_current_period_end: toIso(subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub)),
             trial_ends_at: toIso(sub.trial_end),
+            ...limitColumnsForPlanTier(resolvedTier),
             ...cancelPatch,
           })
           .eq("id", profile.id);
