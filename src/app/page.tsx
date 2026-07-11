@@ -231,6 +231,60 @@ const ORGANIZED_ITEMS = [
   },
 ] as const;
 
+const PROTECTION_CARDS = [
+  {
+    title: "Customer-approved change orders",
+    body: "When the scope shifts, send a clear change order the customer can review and approve before any extra work starts—so everyone agrees on the update.",
+  },
+  {
+    title: "Digital contracts",
+    body: "Contracts can be reviewed and signed electronically, then stay attached to the project so you always know what was agreed.",
+  },
+  {
+    title: "Complete project documentation",
+    body: "Photos, notes, approvals, and key project details live together in one history—easy to find when you need them later.",
+  },
+  {
+    title: "Site visit records",
+    body: "Capture notes, photos, and voice recordings while you're on site so important details don't get lost on the drive home.",
+  },
+  {
+    title: "Customer communication history",
+    body: "Questions, proposal revisions, and important conversations stay with the project—not buried in text threads and email folders.",
+  },
+  {
+    title: "Organized project timeline",
+    body: "Every milestone—from the first inquiry through the signed quote—is documented in one place so you can see how the job progressed.",
+  },
+] as const;
+
+const SWITCH_COMPARISON = [
+  {
+    before: "Customer details buried in text threads and half-finished notes.",
+    after: "One organized customer record for every inquiry and quote.",
+  },
+  {
+    before: "Scratch paper and memory after a site visit.",
+    after: "Structured site visit notes, photos, and voice recordings.",
+  },
+  {
+    before: "Verbal \"yeah, go ahead\" with nothing to show for it.",
+    after: "Clear change orders customers review and approve online.",
+  },
+  {
+    before: "A basic quote emailed as a PDF—or typed into a message.",
+    after: "Professional proposals customers can open, review, and accept.",
+  },
+  {
+    before: "Scrolling through camera rolls looking for the right photo.",
+    after: "Photos and files kept with the project history.",
+  },
+  {
+    before: "Juggling notebooks, texts, email, and a few other apps.",
+    after: "One workflow from first inquiry to signed quote.",
+  },
+] as const;
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-white font-sans text-zinc-900">
@@ -528,8 +582,36 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Section 6 — Protection */}
-        <section className="border-b border-zinc-200 bg-zinc-50/40 px-6 py-16 sm:px-8 sm:py-20">
+        {/* Stay protected — natural documentation */}
+        <section className="border-b border-zinc-200 bg-zinc-50/60 px-6 py-16 sm:px-8 sm:py-20">
+          <div className="mx-auto max-w-6xl">
+            <SectionHeading
+              title="Stay Protected Every Step of the Way"
+              lead="Using JobProof naturally builds organized records—so you and your customers stay on the same page from the first conversation through the work itself."
+            />
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {PROTECTION_CARDS.map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
+                >
+                  <h3 className="text-lg font-semibold text-zinc-950">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600 sm:text-[15px]">
+                    {item.body}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="mx-auto mt-12 max-w-2xl text-center text-base leading-relaxed text-zinc-600">
+              When questions come up later, you have organized records of what was discussed,
+              approved, and completed—without digging through old messages or trying to remember
+              every detail.
+            </p>
+          </div>
+        </section>
+
+        {/* Section 6 — Stay organized when it matters */}
+        <section className="border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20">
           <div className="mx-auto max-w-3xl">
             <SectionHeading
               title="Stay organized when it matters"
@@ -542,8 +624,8 @@ export default function Home() {
                 to piece together what was agreed.
               </p>
               <p>
-                That&apos;s not about fear. It&apos;s about running a professional business where nothing
-                important gets lost and you can get paid with confidence.
+                That&apos;s simply how a professional business runs: nothing important gets lost, and
+                you can move forward with confidence.
               </p>
             </div>
             <ul className="mt-8 flex flex-wrap justify-center gap-3">
@@ -562,6 +644,42 @@ export default function Home() {
                 </li>
               ))}
             </ul>
+          </div>
+        </section>
+
+        {/* Why contractors switch */}
+        <section className="border-b border-zinc-200 bg-zinc-50/40 px-6 py-16 sm:px-8 sm:py-20">
+          <div className="mx-auto max-w-5xl">
+            <SectionHeading
+              title="Why contractors switch to JobProof"
+              lead="Most contractors recognize the left column immediately. The right column is how quoting feels when everything lives in one place."
+            />
+            <div className="mt-12 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+              <div className="grid grid-cols-2 border-b border-zinc-200 bg-zinc-50">
+                <div className="border-r border-zinc-200 px-4 py-4 sm:px-6">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 sm:text-base sm:normal-case sm:tracking-normal">
+                    Before JobProof
+                  </h3>
+                </div>
+                <div className="px-4 py-4 sm:px-6">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[#2436BB] sm:text-base sm:normal-case sm:tracking-normal">
+                    With JobProof
+                  </h3>
+                </div>
+              </div>
+              <ul className="divide-y divide-zinc-100">
+                {SWITCH_COMPARISON.map((row) => (
+                  <li key={row.before} className="grid grid-cols-2">
+                    <p className="border-r border-zinc-100 px-4 py-4 text-sm leading-6 text-zinc-600 sm:px-6 sm:text-[15px]">
+                      {row.before}
+                    </p>
+                    <p className="px-4 py-4 text-sm leading-6 font-medium text-zinc-900 sm:px-6 sm:text-[15px]">
+                      {row.after}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </section>
 
