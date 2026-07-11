@@ -3,9 +3,8 @@ import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
 import { getPlanDisplayLines } from "@/lib/billing-plan-display";
 import {
-  DEFAULT_STORAGE_LIMIT_MB,
   formatActiveJobLimit,
-  formatStorageGb,
+  formatPlanStorage,
 } from "@/lib/plan-limits";
 
 export const metadata: Metadata = {
@@ -30,10 +29,12 @@ const SOLO_FEATURES = [
 ] as const;
 
 const PRO_FEATURES = [
-  "Higher usage limits",
-  "More active quote requests",
-  "Additional storage",
-  "Access to future Pro features as they are released",
+  "Unlimited active jobs",
+  "100 GB secure document storage",
+  "Support for multiple contractor trades",
+  "Priority support",
+  "First access to new business growth tools",
+  "All future Pro business features included",
 ] as const;
 
 const COMPARISON_ROWS: Array<{
@@ -41,25 +42,32 @@ const COMPARISON_ROWS: Array<{
   solo: string;
   pro: string;
 }> = [
-  { feature: "Customer Quote Requests", solo: "Included", pro: "Included" },
-  { feature: "Smart Follow-up Questions", solo: "Included", pro: "Included" },
-  { feature: "Project Brief", solo: "Included", pro: "Included" },
-  { feature: "Quote Preparation Checklist", solo: "Included", pro: "Included" },
-  { feature: "Site Visit Notes", solo: "Included", pro: "Included" },
-  { feature: "Quote Builder", solo: "Included", pro: "Included" },
-  { feature: "Customer Records", solo: "Included", pro: "Included" },
-  { feature: "Professional Proposals", solo: "Included", pro: "Included" },
+  { feature: "Customer Quote Requests", solo: "✓", pro: "✓" },
+  { feature: "Smart Follow-up Questions", solo: "✓", pro: "✓" },
+  { feature: "Project Brief", solo: "✓", pro: "✓" },
+  { feature: "Quote Preparation Checklist", solo: "✓", pro: "✓" },
+  { feature: "Site Visit Notes", solo: "✓", pro: "✓" },
+  { feature: "Quote Builder", solo: "✓", pro: "✓" },
+  { feature: "Customer Records", solo: "✓", pro: "✓" },
+  { feature: "Professional Proposals", solo: "✓", pro: "✓" },
   {
     feature: "Active Jobs",
     solo: formatActiveJobLimit("essential"),
     pro: formatActiveJobLimit("professional"),
   },
   {
-    feature: "Storage",
-    solo: formatStorageGb(DEFAULT_STORAGE_LIMIT_MB),
-    pro: "Higher limits",
+    feature: "Secure Storage",
+    solo: formatPlanStorage("essential"),
+    pro: formatPlanStorage("professional"),
   },
-  { feature: "Future Pro Features", solo: "—", pro: "Included" },
+  { feature: "Multiple Contractor Trades", solo: "Up to 2", pro: "Unlimited" },
+  { feature: "Priority Support", solo: "—", pro: "✓" },
+  {
+    feature: "First Access to New Business Growth Tools",
+    solo: "—",
+    pro: "✓",
+  },
+  { feature: "Future Pro Business Features", solo: "—", pro: "✓" },
 ];
 
 function TrialCta({
@@ -324,7 +332,7 @@ export default function Home() {
           <div className="mx-auto max-w-6xl">
             <SectionHeading
               title="Simple, Transparent Pricing"
-              lead="Choose the plan that&apos;s right for your business. Every plan includes a 14-day free trial with no credit card required."
+              lead="Choose the plan that fits where your business is today—and where you want it to go. Every plan includes a 14-day free trial with no credit card required."
             />
 
             <div className="mt-12 grid gap-6 lg:grid-cols-2">
@@ -335,7 +343,13 @@ export default function Home() {
                     {SOLO_PRICING.afterTrialLine.replace("/mo", "")}
                     <span className="text-lg font-semibold text-zinc-500">/month</span>
                   </p>
-                  <p className="mt-2 text-base text-zinc-600">Perfect for independent contractors.</p>
+                  <p className="mt-2 text-base font-medium text-zinc-800">
+                    Perfect for independent contractors.
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+                    Everything you need to organize quote requests, prepare professional proposals,
+                    and win more work.
+                  </p>
                 </div>
                 <PlanFeatureList items={SOLO_FEATURES} />
                 <Link
@@ -346,16 +360,27 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="flex flex-col rounded-2xl border-2 border-[#2436BB] bg-white p-6 shadow-sm sm:p-8">
+              <div className="relative flex flex-col rounded-2xl border-2 border-[#2436BB] bg-[#2436BB]/5 p-6 shadow-md sm:p-8">
                 <div>
+                  <p className="mb-3 inline-flex items-center rounded-full bg-[#2436BB] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                    ⭐ Most Popular
+                  </p>
                   <h3 className="text-2xl font-bold text-zinc-950">Pro</h3>
                   <p className="mt-2 text-3xl font-bold tracking-tight text-zinc-950">
                     {PRO_PRICING.afterTrialLine.replace("/mo", "")}
                     <span className="text-lg font-semibold text-zinc-500">/month</span>
                   </p>
-                  <p className="mt-2 text-base text-zinc-600">Built for growing contractors.</p>
+                  <p className="mt-2 text-base font-medium text-zinc-800">
+                    Built for growing contractors.
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+                    Everything in Solo, plus tools and benefits designed to help you grow your
+                    business.
+                  </p>
                 </div>
-                <p className="mt-6 text-sm font-semibold text-zinc-800">Everything in Solo, plus:</p>
+                <p className="mt-6 text-sm font-semibold text-zinc-800">
+                  Invest in your company with:
+                </p>
                 <PlanFeatureList items={PRO_FEATURES} />
                 <Link
                   href="/signup"
@@ -368,6 +393,10 @@ export default function Home() {
 
             <div className="mt-12">
               <h3 className="text-center text-lg font-semibold text-zinc-950">Compare plans</h3>
+              <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-zinc-600">
+                Solo keeps you organized. Pro helps you stay organized as you take on more work—and
+                get early access to new business tools.
+              </p>
               <div className="mt-6 -mx-2 overflow-x-auto px-2 sm:mx-0 sm:px-0">
                 <table className="min-w-[560px] w-full border-collapse text-left text-sm">
                   <thead>
@@ -378,7 +407,7 @@ export default function Home() {
                       <th scope="col" className="px-4 py-3 text-center font-semibold text-zinc-950">
                         Solo
                       </th>
-                      <th scope="col" className="py-3 pl-4 text-center font-semibold text-zinc-950">
+                      <th scope="col" className="py-3 pl-4 text-center font-semibold text-[#2436BB]">
                         Pro
                       </th>
                     </tr>
@@ -388,7 +417,9 @@ export default function Home() {
                       <tr key={row.feature}>
                         <td className="py-3.5 pr-4 font-medium text-zinc-800">{row.feature}</td>
                         <td className="px-4 py-3.5 text-center text-zinc-600">{row.solo}</td>
-                        <td className="py-3.5 pl-4 text-center text-zinc-600">{row.pro}</td>
+                        <td className="py-3.5 pl-4 text-center font-medium text-zinc-800">
+                          {row.pro}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
