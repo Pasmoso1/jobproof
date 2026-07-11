@@ -18,6 +18,7 @@ export type ProfileOnboardingFields = {
   trial_plan_tier?: string | null;
   trial_started_at?: string | null;
   trial_ends_at?: string | null;
+  trial_expired_screen_seen_at?: string | null;
 } | null;
 
 export async function updateSession(request: NextRequest): Promise<{
@@ -55,7 +56,7 @@ export async function updateSession(request: NextRequest): Promise<{
     const { data } = await supabase
       .from("profiles")
       .select(
-        "business_name, phone, address_line_1, city, province, postal_code, quote_primary_trade, beta_tester, beta_plan_tier, stripe_subscription_id, subscription_status, plan_tier, trial_plan_tier, trial_started_at, trial_ends_at"
+        "business_name, phone, address_line_1, city, province, postal_code, quote_primary_trade, beta_tester, beta_plan_tier, stripe_subscription_id, subscription_status, plan_tier, trial_plan_tier, trial_started_at, trial_ends_at, trial_expired_screen_seen_at"
       )
       .eq("user_id", user.id)
       .single();

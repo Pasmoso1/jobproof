@@ -90,6 +90,8 @@ export interface Profile {
   trial_email_day7_sent_at?: string | null;
   trial_email_day12_sent_at?: string | null;
   trial_email_ended_sent_at?: string | null;
+  /** Set when the one-time post-expiry intro screen has been dismissed. */
+  trial_expired_screen_seen_at?: string | null;
   grace_period_ends_at?: string | null;
   subscription_cancel_at_period_end?: boolean | null;
   subscription_cancel_at?: string | null;

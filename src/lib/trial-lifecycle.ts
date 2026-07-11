@@ -18,6 +18,7 @@ export type TrialLifecycleProfile = PlanEntitlementProfile & {
   trial_started_at?: string | null;
   trial_ends_at?: string | null;
   trial_plan_tier?: string | null;
+  trial_expired_screen_seen_at?: string | null;
   quote_primary_trade?: string | null;
   business_name?: string | null;
   phone?: string | null;
@@ -130,6 +131,19 @@ export function isJobProofTrialExpired(
   if (!endRaw) return false;
   const end = new Date(endRaw).getTime();
   return Number.isFinite(end) && end <= now.getTime() && !subId;
+}
+
+/**
+ * First login after trial expiry: show the dedicated intro once.
+ * True when the trial is expired and the intro has never been dismissed.
+ */
+export function needsTrialExpiredIntro(
+  profile: TrialLifecycleProfile | null | undefined
+): boolean {
+  if (!profile) return false;
+  if (profile.beta_tester === true) return false;
+  if (!isJobProofTrialExpired(profile)) return false;
+  return !String(profile.trial_expired_screen_seen_at ?? "").trim();
 }
 
 /** Profile columns to write when starting the managed trial. */

@@ -5,12 +5,31 @@ import {
 } from "@/lib/supabase/middleware";
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
 import { BETA_PLAN_ONBOARDING_PATH, needsPlanSelection } from "@/lib/beta-tester";
-import { isOnboardingCompleteForTrial } from "@/lib/trial-lifecycle";
+import { isOnboardingCompleteForTrial, needsTrialExpiredIntro } from "@/lib/trial-lifecycle";
 
-const PROTECTED_PATHS = ["/dashboard", "/jobs", "/estimates", "/quote-requests", "/settings", "/onboarding"];
+const PROTECTED_PATHS = [
+  "/dashboard",
+  "/jobs",
+  "/estimates",
+  "/quote-requests",
+  "/settings",
+  "/onboarding",
+  "/collections",
+  "/customers",
+  "/trial-ended",
+];
 const AUTH_PATHS = ["/login", "/signup"];
 const BUSINESS_ONBOARDING_PATH = "/onboarding/business-profile";
-const PATHS_REQUIRING_ONBOARDING = ["/dashboard", "/jobs", "/estimates", "/quote-requests", "/settings"];
+const TRIAL_ENDED_PATH = "/trial-ended";
+const PATHS_REQUIRING_ONBOARDING = [
+  "/dashboard",
+  "/jobs",
+  "/estimates",
+  "/quote-requests",
+  "/settings",
+  "/collections",
+  "/customers",
+];
 
 function isProtected(pathname: string): boolean {
   return PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -21,10 +40,16 @@ function isAuthPath(pathname: string): boolean {
 }
 
 function isOnboardingPath(pathname: string): boolean {
-  return pathname === BUSINESS_ONBOARDING_PATH ||
+  return (
+    pathname === BUSINESS_ONBOARDING_PATH ||
     pathname.startsWith(`${BUSINESS_ONBOARDING_PATH}/`) ||
     pathname === BETA_PLAN_ONBOARDING_PATH ||
-    pathname.startsWith(`${BETA_PLAN_ONBOARDING_PATH}/`);
+    pathname.startsWith(`${BETA_PLAN_ONBOARDING_PATH}/`)
+  );
+}
+
+function isTrialEndedPath(pathname: string): boolean {
+  return pathname === TRIAL_ENDED_PATH || pathname.startsWith(`${TRIAL_ENDED_PATH}/`);
 }
 
 function requiresOnboarding(pathname: string): boolean {
@@ -63,6 +88,9 @@ function postLoginPath(profile: ProfileOnboardingFields, accountEmail: string): 
   }
   if (isProfileIncomplete(profile, accountEmail)) {
     return BUSINESS_ONBOARDING_PATH;
+  }
+  if (needsTrialExpiredIntro(profile)) {
+    return TRIAL_ENDED_PATH;
   }
   return "/dashboard";
 }
@@ -121,7 +149,29 @@ export async function middleware(request: NextRequest) {
       ? BUSINESS_ONBOARDING_PATH
       : isProfileIncomplete(profile, user.email ?? "")
         ? BUSINESS_ONBOARDING_PATH
-        : "/dashboard";
+        : needsTrialExpiredIntro(profile)
+          ? TRIAL_ENDED_PATH
+          : "/dashboard";
+    return Response.redirect(url);
+  }
+
+  // First visit after trial expiry: dedicated intro once, then never again.
+  if (
+    user &&
+    !isTrialEndedPath(pathname) &&
+    !isOnboardingPath(pathname) &&
+    requiresOnboarding(pathname) &&
+    needsTrialExpiredIntro(profile)
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = TRIAL_ENDED_PATH;
+    return Response.redirect(url);
+  }
+
+  // Already dismissed (or not applicable): don't stay on the intro page.
+  if (user && isTrialEndedPath(pathname) && !needsTrialExpiredIntro(profile)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
     return Response.redirect(url);
   }
 

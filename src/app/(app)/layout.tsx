@@ -34,6 +34,7 @@ export default async function AppLayout({
       trial_ends_at,
       trial_plan_tier,
       plan_tier,
+      trial_expired_screen_seen_at,
       business_name,
       phone,
       address_line_1,

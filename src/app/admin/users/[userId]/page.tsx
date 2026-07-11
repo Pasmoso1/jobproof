@@ -153,6 +153,7 @@ export default async function AdminUserDetailPage({
       trial_ends_at,
       trial_started_at,
       trial_plan_tier,
+      trial_expired_screen_seen_at,
       grace_period_ends_at,
       subscription_cancel_at_period_end,
       subscription_cancel_at,
@@ -570,6 +571,12 @@ export default async function AdminUserDetailPage({
               {
                 label: "trial_ends_at",
                 value: formatBillingTimestamp(toMaybeString(profile.trial_ends_at)),
+              },
+              {
+                label: "trial_expired_screen_seen_at",
+                value: formatBillingTimestamp(
+                  toMaybeString(profile.trial_expired_screen_seen_at)
+                ),
               },
               { label: "pricing_version", value: toMaybeString(profile.pricing_version) ?? "" },
               { label: "stripe_customer_id", value: toMaybeString(profile.stripe_customer_id) ?? "" },
