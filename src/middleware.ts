@@ -17,6 +17,7 @@ const PROTECTED_PATHS = [
   "/collections",
   "/customers",
   "/trial-ended",
+  "/support",
 ];
 const AUTH_PATHS = ["/login", "/signup"];
 const BUSINESS_ONBOARDING_PATH = "/onboarding/business-profile";
@@ -29,6 +30,7 @@ const PATHS_REQUIRING_ONBOARDING = [
   "/settings",
   "/collections",
   "/customers",
+  "/support",
 ];
 
 function isProtected(pathname: string): boolean {

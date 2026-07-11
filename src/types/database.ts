@@ -603,3 +603,55 @@ export interface QuoteRequestBuilderSectionRow {
   created_at: string;
   updated_at: string;
 }
+
+export type SupportTicketCategory =
+  | "general_question"
+  | "need_help"
+  | "bug_report"
+  | "feature_suggestion"
+  | "billing";
+
+export type SupportTicketStatus = "open" | "in_progress" | "resolved" | "closed";
+
+export interface SupportTicket {
+  id: string;
+  profile_id: string;
+  name: string;
+  email: string;
+  subject: string;
+  category: SupportTicketCategory;
+  message: string;
+  metadata: Json;
+  status: SupportTicketStatus;
+  email_notification_sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type FeatureRequestCategory =
+  | "quoting"
+  | "customers"
+  | "billing"
+  | "mobile"
+  | "integrations"
+  | "reporting"
+  | "other";
+
+export type FeatureRequestStatus =
+  | "submitted"
+  | "under_review"
+  | "planned"
+  | "shipped"
+  | "declined";
+
+export interface FeatureRequest {
+  id: string;
+  profile_id: string;
+  title: string;
+  description: string;
+  category: FeatureRequestCategory;
+  status: FeatureRequestStatus;
+  vote_count: number;
+  created_at: string;
+  updated_at: string;
+}

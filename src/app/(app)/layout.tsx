@@ -96,6 +96,12 @@ export default async function AppLayout({
             >
               Billing
             </Link>
+            <Link
+              href="/support"
+              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
+            >
+              Support
+            </Link>
             <a
               href={getFeedbackMailtoHref()}
               className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
