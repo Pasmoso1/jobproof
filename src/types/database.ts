@@ -652,6 +652,7 @@ export interface FeatureRequest {
   category: FeatureRequestCategory;
   status: FeatureRequestStatus;
   vote_count: number;
+  email_notification_sent_at?: string | null;
   created_at: string;
   updated_at: string;
 }

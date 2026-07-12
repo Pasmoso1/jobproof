@@ -1,7 +1,16 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
 import { SUPPORT_APP_VERSION } from "@/lib/support/types";
+import {
+  adminUserUrl,
+  featureRequestCategoryLabel,
+  formatOpsDateTime,
+  sendOpsNotification,
+  supportTicketCategoryLabel,
+} from "@/lib/support/ops-notifications";
 
 export type SupportTicketCategory =
   | "general_question"
@@ -29,6 +38,26 @@ function trimRequired(value: FormDataEntryValue | null, label: string): string |
   return s;
 }
 
+async function markEmailNotificationSent(
+  table: "support_tickets" | "feature_requests",
+  id: string
+): Promise<void> {
+  const admin = createServiceRoleClient();
+  if (!admin) {
+    console.error(
+      `[markEmailNotificationSent] SUPABASE_SERVICE_ROLE_KEY missing — cannot set email_notification_sent_at on ${table} ${id}`
+    );
+    return;
+  }
+  const { error } = await admin
+    .from(table)
+    .update({ email_notification_sent_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) {
+    console.error(`[markEmailNotificationSent] ${table}`, error.message);
+  }
+}
+
 export async function submitSupportTicket(formData: FormData): Promise<SupportFormResult> {
   const supabase = await createClient();
   const {
@@ -38,7 +67,7 @@ export async function submitSupportTicket(formData: FormData): Promise<SupportFo
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, business_name, contractor_name")
     .eq("user_id", user.id)
     .maybeSingle();
   if (!profile) return { success: false, error: "Profile not found." };
@@ -63,6 +92,7 @@ export async function submitSupportTicket(formData: FormData): Promise<SupportFo
     return { success: false, error: "Please choose a category." };
   }
 
+  const submittedAt = new Date().toISOString();
   const metadata = {
     current_page: String(formData.get("current_page") ?? "").trim() || null,
     browser: String(formData.get("browser") ?? "").trim() || null,
@@ -72,24 +102,85 @@ export async function submitSupportTicket(formData: FormData): Promise<SupportFo
     profile_id: String(profile.id),
     user_id: user.id,
     app_version: SUPPORT_APP_VERSION,
-    submitted_at: new Date().toISOString(),
+    submitted_at: submittedAt,
   };
 
-  const { error } = await supabase.from("support_tickets").insert({
-    profile_id: profile.id,
-    name,
-    email,
-    subject,
-    category,
-    message,
-    metadata,
-    status: "open",
-  });
+  const { data: ticket, error } = await supabase
+    .from("support_tickets")
+    .insert({
+      profile_id: profile.id,
+      name,
+      email,
+      subject,
+      category,
+      message,
+      metadata,
+      status: "open",
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    console.error("[submitSupportTicket]", error.message);
+  if (error || !ticket) {
+    console.error("[submitSupportTicket]", error?.message);
     return { success: false, error: "Could not send your message. Please try again." };
   }
+
+  trackProductEventSafe({
+    profileId: String(profile.id),
+    eventName: PRODUCT_ANALYTICS_EVENTS.support_ticket_created,
+    source: "support_contact",
+    metadata: {
+      ticket_id: ticket.id,
+      category,
+    },
+  });
+
+  const businessName = String(profile.business_name ?? "").trim() || "—";
+  const notify = await sendOpsNotification({
+    kind: "support_ticket",
+    subject: "New JobProof Support Request",
+    replyTo: email,
+    fields: [
+      { label: "Contractor name", value: name },
+      { label: "Business name", value: businessName },
+      { label: "Email", value: email },
+      { label: "Category", value: supportTicketCategoryLabel(category) },
+      { label: "Subject", value: subject },
+      { label: "Date/time", value: formatOpsDateTime(submittedAt) },
+      { label: "User ID", value: user.id },
+      { label: "Profile ID", value: String(profile.id) },
+      { label: "Current page", value: metadata.current_page ?? "—" },
+      { label: "Browser", value: metadata.browser ?? "—" },
+      { label: "Operating system", value: metadata.operating_system ?? "—" },
+      { label: "Screen size", value: metadata.screen_size ?? "—" },
+      { label: "App version", value: SUPPORT_APP_VERSION },
+      { label: "Admin", value: adminUserUrl(String(profile.id)) },
+    ],
+    messageLabel: "Message",
+    messageBody: message,
+  });
+
+  if (notify.ok) {
+    await markEmailNotificationSent("support_tickets", ticket.id);
+    trackProductEventSafe({
+      profileId: String(profile.id),
+      eventName: PRODUCT_ANALYTICS_EVENTS.support_ticket_email_sent,
+      source: "support_contact",
+      metadata: { ticket_id: ticket.id },
+    });
+  } else {
+    trackProductEventSafe({
+      profileId: String(profile.id),
+      eventName: PRODUCT_ANALYTICS_EVENTS.support_ticket_email_failed,
+      source: "support_contact",
+      metadata: {
+        ticket_id: ticket.id,
+        error: notify.error.slice(0, 200),
+        skipped: notify.skipped === true,
+      },
+    });
+  }
+
   return { success: true };
 }
 
@@ -102,7 +193,7 @@ export async function submitFeatureRequest(formData: FormData): Promise<SupportF
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, business_name, contractor_name, business_contact_email")
     .eq("user_id", user.id)
     .maybeSingle();
   if (!profile) return { success: false, error: "Profile not found." };
@@ -125,18 +216,99 @@ export async function submitFeatureRequest(formData: FormData): Promise<SupportF
     return { success: false, error: "Please choose a category." };
   }
 
-  const { error } = await supabase.from("feature_requests").insert({
-    profile_id: profile.id,
-    title,
-    description,
-    category,
-    status: "submitted",
-    vote_count: 0,
-  });
+  const { data: request, error } = await supabase
+    .from("feature_requests")
+    .insert({
+      profile_id: profile.id,
+      title,
+      description,
+      category,
+      status: "submitted",
+      vote_count: 0,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    console.error("[submitFeatureRequest]", error.message);
+  if (error || !request) {
+    console.error("[submitFeatureRequest]", error?.message);
     return { success: false, error: "Could not save your request. Please try again." };
   }
+
+  trackProductEventSafe({
+    profileId: String(profile.id),
+    eventName: PRODUCT_ANALYTICS_EVENTS.feature_request_created,
+    source: "support_feature_requests",
+    metadata: {
+      feature_request_id: request.id,
+      category,
+    },
+  });
+
+  const contractorName =
+    String(profile.contractor_name ?? "").trim() ||
+    String(profile.business_name ?? "").trim() ||
+    "—";
+  const businessName = String(profile.business_name ?? "").trim() || "—";
+  const replyEmail =
+    String(profile.business_contact_email ?? "").trim() || String(user.email ?? "").trim();
+  const submittedAt = new Date().toISOString();
+
+  if (!replyEmail) {
+    console.error(
+      "[submitFeatureRequest] No contractor email for Reply-To — notification skipped; request saved"
+    );
+    trackProductEventSafe({
+      profileId: String(profile.id),
+      eventName: PRODUCT_ANALYTICS_EVENTS.feature_request_email_failed,
+      source: "support_feature_requests",
+      metadata: {
+        feature_request_id: request.id,
+        error: "Missing contractor email for Reply-To",
+        skipped: true,
+      },
+    });
+    return { success: true };
+  }
+
+  const notify = await sendOpsNotification({
+    kind: "feature_request",
+    subject: "New JobProof Feature Request",
+    replyTo: replyEmail,
+    fields: [
+      { label: "Contractor name", value: contractorName },
+      { label: "Business name", value: businessName },
+      { label: "Email", value: replyEmail },
+      { label: "Feature title", value: title },
+      { label: "Category", value: featureRequestCategoryLabel(category) },
+      { label: "Date/time", value: formatOpsDateTime(submittedAt) },
+      { label: "User ID", value: user.id },
+      { label: "Profile ID", value: String(profile.id) },
+      { label: "Admin", value: adminUserUrl(String(profile.id)) },
+    ],
+    messageLabel: "Description",
+    messageBody: description,
+  });
+
+  if (notify.ok) {
+    await markEmailNotificationSent("feature_requests", request.id);
+    trackProductEventSafe({
+      profileId: String(profile.id),
+      eventName: PRODUCT_ANALYTICS_EVENTS.feature_request_email_sent,
+      source: "support_feature_requests",
+      metadata: { feature_request_id: request.id },
+    });
+  } else {
+    trackProductEventSafe({
+      profileId: String(profile.id),
+      eventName: PRODUCT_ANALYTICS_EVENTS.feature_request_email_failed,
+      source: "support_feature_requests",
+      metadata: {
+        feature_request_id: request.id,
+        error: notify.error.slice(0, 200),
+        skipped: notify.skipped === true,
+      },
+    });
+  }
+
   return { success: true };
 }

@@ -61,6 +61,21 @@ JobProof-managed 14-day trials send day 3 / 7 / 12 / ended emails and mark expir
 
 Implementation: `src/app/api/cron/trial-reminders/route.ts` and `src/lib/trial-reminder-cron.ts`.
 
+## Support Center ops emails
+
+Contact Support and Feature Request submissions are saved first, then an ops email is sent via Resend.
+
+Required env:
+
+```bash
+SUPPORT_EMAIL=jeffrey@jobproof.ca
+RESEND_API_KEY=...
+RESEND_FROM=Job Proof <hello@jobproof.ca>
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+If `SUPPORT_EMAIL` is missing, the submission still succeeds; the server logs an error and skips the email. Successful sends set `email_notification_sent_at` (supports future retries on null rows).
+
 ## Admin dashboard access
 
 `/admin` now uses normal JobProof login + an email allowlist.

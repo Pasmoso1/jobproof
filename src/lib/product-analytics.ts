@@ -29,6 +29,12 @@ export const PRODUCT_ANALYTICS_EVENTS = {
   trial_day_12: "trial_day_12",
   trial_expired: "trial_expired",
   trial_converted: "trial_converted",
+  support_ticket_created: "support_ticket_created",
+  support_ticket_email_sent: "support_ticket_email_sent",
+  support_ticket_email_failed: "support_ticket_email_failed",
+  feature_request_created: "feature_request_created",
+  feature_request_email_sent: "feature_request_email_sent",
+  feature_request_email_failed: "feature_request_email_failed",
   /** @deprecated Legacy beta onboarding — no longer fired for new signups. */
   beta_tester_created: "beta_tester_created",
   /** @deprecated Legacy beta onboarding — no longer fired for new signups. */
