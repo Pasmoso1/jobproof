@@ -364,8 +364,8 @@ function CreateInvoicePanel({
     contractorProvince ?? null,
     job.property_province ?? null
   );
-  const taxRate = taxDefaults.taxRate;
-  const taxShort = taxDefaults.shortLabel;
+  const taxRate = taxDefaults?.taxRate ?? 0;
+  const taxShort = taxDefaults?.shortLabel ?? "Tax";
 
   const preview = useMemo(() => {
     const sub = agreedSubtotal;
@@ -381,6 +381,16 @@ function CreateInvoicePanel({
       balanceDue,
     };
   }, [agreedSubtotal, taxRate, depositOnFile]);
+
+  if (!taxDefaults) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+        Select a province on this job&apos;s property address (or complete your business province in
+        Settings) before creating an invoice. JobProof needs a province to suggest the correct sales
+        tax.
+      </div>
+    );
+  }
 
   const showDepositOnFileNote =
     depositOnFile > 0 && Math.abs(depositOnFile - preview.depositCredited) > 0.005;

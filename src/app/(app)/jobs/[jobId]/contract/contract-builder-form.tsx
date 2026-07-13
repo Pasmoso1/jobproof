@@ -135,9 +135,13 @@ function buildContractFormState(
         existingContract.tax_rate != null &&
         Number.isFinite(Number(existingContract.tax_rate))
           ? String(existingContract.tax_rate)
-          : String(
-              defaultTaxRateForNewFinancials(profile?.province, job.property_province).taxRate
-            ),
+          : (() => {
+              const d = defaultTaxRateForNewFinancials(
+                profile?.province,
+                job.property_province
+              );
+              return d != null ? String(d.taxRate) : "";
+            })(),
       companyName: existingContract.company_name ?? profile?.business_name ?? "",
       contractorName: existingContract.contractor_name ?? profile?.contractor_name ?? "",
       contractorEmail: existingContract.contractor_email ?? userEmail ?? "",
@@ -174,9 +178,10 @@ function buildContractFormState(
         : "",
     startDate: normalizeDateInput(job.start_date),
     completionDate: normalizeDateInput(job.estimated_completion_date),
-    taxRate: String(
-      defaultTaxRateForNewFinancials(profile?.province, job.property_province).taxRate
-    ),
+    taxRate: (() => {
+      const d = defaultTaxRateForNewFinancials(profile?.province, job.property_province);
+      return d != null ? String(d.taxRate) : "";
+    })(),
     companyName: profile?.business_name ?? "",
     contractorName: profile?.contractor_name ?? "",
     contractorEmail: userEmail ?? "",

@@ -144,7 +144,7 @@ export async function POST(request: Request) {
       <p>Thanks for requesting early access to <strong>Job Proof</strong>.</p>
 
       <p>
-      We're building Job Proof with real contractors across Ontario to help
+      We're building Job Proof with real contractors across Canada to help
       create clear contracts, document jobs properly, and stay protected
       when problems happen.
       </p>

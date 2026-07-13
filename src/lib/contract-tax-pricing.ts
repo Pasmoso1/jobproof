@@ -38,6 +38,7 @@ export function computeContractPricingBreakdown(
     Number(taxRateOverride) >= 0
       ? Number(taxRateOverride)
       : taxRateFromPropertyProvince(propertyProvince);
+  if (rate == null || !Number.isFinite(rate) || rate < 0) return null;
   const taxAmount = roundMoney(sub * rate);
   const totalIncludingTax = roundMoney(sub + taxAmount);
   const depRaw =

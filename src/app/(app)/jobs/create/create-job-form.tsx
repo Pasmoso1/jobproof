@@ -11,6 +11,9 @@ import {
   validateScopeOfWork,
   validateTrade,
 } from "@/lib/validation/job-create";
+import { ProvinceSelect } from "@/components/canada/province-select";
+import { provinceSelectValue, PROVINCE_REQUIRED_FOR_TAX_MESSAGE } from "@/lib/canada/provinces";
+import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 
 type Customer = {
   id: string;
@@ -516,7 +519,7 @@ export function CreateJobForm({
               required
               value={propertyCity}
               onChange={(e) => setPropertyCity(e.target.value)}
-              placeholder="London"
+              placeholder="City"
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
             />
           </div>
@@ -524,15 +527,20 @@ export function CreateJobForm({
             <label htmlFor="propertyProvince" className="block text-sm font-medium text-zinc-700">
               Province <span className="text-red-500">*</span>
             </label>
-            <input
+            <ProvinceSelect
               id="propertyProvince"
-              type="text"
+              name="property_province"
               required
-              value={propertyProvince}
-              onChange={(e) => setPropertyProvince(e.target.value)}
-              placeholder="ON"
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+              value={provinceSelectValue(propertyProvince)}
+              onChange={(v) => {
+                setPropertyProvince(v);
+                const d = defaultTaxRateForNewFinancials(null, v || null);
+                if (d) setTaxRate(String(d.taxRate));
+              }}
             />
+            {!propertyProvince.trim() && !taxRate.trim() ? (
+              <p className="mt-1 text-xs text-amber-800">{PROVINCE_REQUIRED_FOR_TAX_MESSAGE}</p>
+            ) : null}
           </div>
           <div>
             <label htmlFor="propertyPostalCode" className="block text-sm font-medium text-zinc-700">
@@ -543,7 +551,7 @@ export function CreateJobForm({
               type="text"
               value={propertyPostalCode}
               onChange={(e) => setPropertyPostalCode(e.target.value)}
-              placeholder="N6A 1B2"
+              placeholder="Postal code"
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
             />
           </div>

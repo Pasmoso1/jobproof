@@ -12,9 +12,8 @@ export default async function CreateJobPage() {
     getJobs(),
   ]);
   const isFirstProtectedJob = jobs.length === 0;
-  const initialTaxRate = String(
-    defaultTaxRateForNewFinancials(profile?.province ?? null, null).taxRate
-  );
+  const initialTax = defaultTaxRateForNewFinancials(profile?.province ?? null, null);
+  const initialTaxRate = initialTax != null ? String(initialTax.taxRate) : "";
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -33,6 +32,12 @@ export default async function CreateJobPage() {
             ? "Start with the basics. You can add photos, contracts, estimates, and invoices after the job is created."
             : "Add a new job with customer details and scope."}
         </p>
+        {!initialTax ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            Select a province on the job address (or finish your business profile) so JobProof can
+            suggest the correct sales tax. You can still edit the tax rate after selecting.
+          </p>
+        ) : null}
       </div>
 
       <CreateJobForm

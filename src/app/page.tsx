@@ -387,7 +387,7 @@ export default function Home() {
         </section>
 
         {/* Pricing */}
-        <section className="border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20">
+        <section id="pricing" className="border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20">
           <div className="mx-auto max-w-6xl">
             <SectionHeading
               title="Simple, Transparent Pricing"
@@ -709,7 +709,19 @@ export default function Home() {
       <footer className="border-t border-zinc-200 bg-white px-6 py-8 sm:px-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
           <p className="text-sm text-zinc-500">© {new Date().getFullYear()} JobProof</p>
-          <div className="flex gap-6 text-sm">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm">
+            <a href="#pricing" className="font-medium text-zinc-600 hover:text-zinc-900">
+              Pricing
+            </a>
+            <Link href="/support" className="font-medium text-zinc-600 hover:text-zinc-900">
+              Support
+            </Link>
+            <Link href="/privacy" className="font-medium text-zinc-600 hover:text-zinc-900">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="font-medium text-zinc-600 hover:text-zinc-900">
+              Terms of Service
+            </Link>
             <Link href="/login" className="font-medium text-zinc-600 hover:text-zinc-900">
               Sign in
             </Link>

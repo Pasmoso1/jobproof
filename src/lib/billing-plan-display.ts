@@ -46,13 +46,13 @@ export type PlanDisplay = {
 };
 
 const FOUNDER: Record<BillingPlanTier, string> = {
-  essential: "$29/mo",
-  professional: "$49/mo",
+  essential: "$29 CAD/mo",
+  professional: "$49 CAD/mo",
 };
 
 const STANDARD: Record<BillingPlanTier, string> = {
-  essential: "$39/mo",
-  professional: "$59/mo",
+  essential: "$39 CAD/mo",
+  professional: "$59 CAD/mo",
 };
 
 const TIER_NAME: Record<BillingPlanTier, string> = {

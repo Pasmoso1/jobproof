@@ -1,3 +1,6 @@
+import { validateCanadianPhone } from "@/lib/canada/phone";
+import { normalizeCanadianProvince } from "@/lib/canada/provinces";
+
 /** Shared client + server validation for business profile (onboarding + settings). */
 
 const EMAIL_REGEX =
@@ -29,9 +32,11 @@ export function validateBusinessProfileFields(
     errors.account_email = "Enter a valid email address.";
   }
 
-  if (!input.phone?.trim()) {
-    errors.phone = "Phone is required.";
-  }
+  const phoneErr = validateCanadianPhone(input.phone, {
+    required: true,
+    label: "phone number",
+  });
+  if (phoneErr) errors.phone = phoneErr;
 
   if (!input.address_line_1?.trim()) {
     errors.address_line_1 = "Address line 1 is required.";
@@ -41,8 +46,8 @@ export function validateBusinessProfileFields(
     errors.city = "City is required.";
   }
 
-  if (!input.province?.trim()) {
-    errors.province = "Province is required.";
+  if (!normalizeCanadianProvince(input.province)) {
+    errors.province = "Select a Canadian province or territory.";
   }
 
   if (!input.postal_code?.trim()) {

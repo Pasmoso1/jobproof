@@ -44,9 +44,13 @@ export default async function EstimateDetailPage({
   ]);
   if (!estimate) notFound();
 
-  const initialTaxRate = String(
-    defaultTaxRateForNewFinancials(profile?.province ?? null, null).taxRate
-  );
+  const initialTax = defaultTaxRateForNewFinancials(profile?.province ?? null, null);
+  const initialTaxRate =
+    estimate.tax_rate != null && Number.isFinite(Number(estimate.tax_rate))
+      ? String(estimate.tax_rate)
+      : initialTax != null
+        ? String(initialTax.taxRate)
+        : "";
   const taxLabel = invoiceTaxShortLabel(estimate.property_province);
   const publicUrl =
     estimate.public_token && estimate.status !== "draft"

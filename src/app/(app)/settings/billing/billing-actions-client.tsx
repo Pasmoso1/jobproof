@@ -216,9 +216,9 @@ export function BillingActionButtons({
               ? "Opening..."
               : showManagedTrialSubscribe
                 ? soloPrimary
-                  ? "Subscribe to Solo — $39/mo"
-                  : "Switch to Solo — $39/mo"
-                : "Choose Solo — $39/mo"}
+                  ? "Subscribe to Solo — $39 CAD/mo"
+                  : "Switch to Solo — $39 CAD/mo"
+                : "Choose Solo — $39 CAD/mo"}
           </button>
           <button
             type="button"
@@ -234,9 +234,9 @@ export function BillingActionButtons({
               ? "Opening..."
               : showManagedTrialSubscribe
                 ? !soloPrimary
-                  ? "Subscribe to Pro — $59/mo"
-                  : "Switch to Pro — $59/mo"
-                : "Choose Pro — $59/mo"}
+                  ? "Subscribe to Pro — $59 CAD/mo"
+                  : "Switch to Pro — $59 CAD/mo"
+                : "Choose Pro — $59 CAD/mo"}
           </button>
         </div>
         <div>
@@ -249,7 +249,7 @@ export function BillingActionButtons({
             {busy === "resync" ? "Refreshing…" : "Refresh billing status"}
           </button>
         </div>
-        <p className="text-xs text-zinc-500">Solo — $39/month · Pro — $59/month</p>
+        <p className="text-xs text-zinc-500">Solo — $39 CAD/month · Pro — $59 CAD/month</p>
       </div>
     );
   }
@@ -356,7 +356,7 @@ export function BillingActionButtons({
               disabled={disableAll}
               className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
             >
-              {busy === "essential" ? "Opening..." : "Choose Essential — $29/mo"}
+              {busy === "essential" ? "Opening..." : "Choose Essential — $29 CAD/mo"}
             </button>
             <button
               type="button"
@@ -364,7 +364,7 @@ export function BillingActionButtons({
               disabled={disableAll}
               className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
             >
-              {busy === "professional" ? "Opening..." : "Choose Professional — $49/mo"}
+              {busy === "professional" ? "Opening..." : "Choose Professional — $49 CAD/mo"}
             </button>
           </>
         ) : null}
@@ -395,7 +395,7 @@ export function BillingActionButtons({
         Founder pricing is locked in for early subscribers.
       </p>
       <p className="text-xs text-zinc-500">
-        Essential — $39/month regular · Professional — $59/month regular
+        Essential — $39 CAD/month regular · Professional — $59 CAD/month regular
       </p>
     </div>
   );

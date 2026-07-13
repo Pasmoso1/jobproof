@@ -34,6 +34,8 @@ import { computeContractPricingBreakdown, formatContractMoney } from "@/lib/cont
 import { resolvePublicAppOrigin } from "@/lib/app-origin";
 import { invoiceTaxShortLabelFromAppliedAmounts } from "@/lib/invoice-tax";
 import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
+import { normalizeCanadianProvince } from "@/lib/canada/provinces";
+import { normalizeCanadianPhoneForStorage } from "@/lib/canada/phone";
 import {
   formatDateEastern,
   formatLocalDateStringEastern,
@@ -213,11 +215,13 @@ export async function updateProfileBusinessInfo(formData: FormData) {
 
   const businessName = String(formData.get("business_name") ?? "").trim();
   const contractorName = String(formData.get("contractor_name") ?? "").trim() || null;
-  const phone = String(formData.get("phone") ?? "").trim();
+  const phoneRaw = String(formData.get("phone") ?? "").trim();
+  const phone = normalizeCanadianPhoneForStorage(phoneRaw) ?? phoneRaw;
   const addressLine1 = String(formData.get("address_line_1") ?? "").trim();
   const addressLine2 = String(formData.get("address_line_2") ?? "").trim() || null;
   const city = String(formData.get("city") ?? "").trim();
-  const province = String(formData.get("province") ?? "").trim();
+  const provinceRaw = String(formData.get("province") ?? "").trim();
+  const province = normalizeCanadianProvince(provinceRaw) ?? provinceRaw;
   const postalCode = String(formData.get("postal_code") ?? "").trim();
   const defaultPaymentTerms =
     String(formData.get("default_contract_payment_terms") ?? "").trim() || null;
@@ -575,11 +579,12 @@ export async function createCustomer(formData: FormData) {
 
   const fullName = String(formData.get("full_name") ?? formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim() || null;
+  const phoneRaw = String(formData.get("phone") ?? "").trim() || null;
   const addressLine1 = String(formData.get("address_line_1") ?? "").trim() || null;
   const addressLine2 = String(formData.get("address_line_2") ?? "").trim() || null;
   const city = String(formData.get("city") ?? "").trim() || null;
-  const province = String(formData.get("province") ?? "").trim() || null;
+  const provinceRaw = String(formData.get("province") ?? "").trim() || null;
+  const province = normalizeCanadianProvince(provinceRaw) ?? provinceRaw;
   const postalCode = String(formData.get("postal_code") ?? "").trim() || null;
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
@@ -592,10 +597,11 @@ export async function createCustomer(formData: FormData) {
     return { error: emailErr };
   }
 
-  const phoneErr = validateCustomerPhone(phone ?? "");
+  const phoneErr = validateCustomerPhone(phoneRaw ?? "");
   if (phoneErr) {
     return { error: phoneErr };
   }
+  const phone = normalizeCanadianPhoneForStorage(phoneRaw) ?? phoneRaw;
 
   const { data, error } = await supabase
     .from("customers")
@@ -662,7 +668,9 @@ export async function createJob(formData: FormData) {
   const propertyAddressLine1 = String(formData.get("property_address_line_1") ?? "").trim() || null;
   const propertyAddressLine2 = String(formData.get("property_address_line_2") ?? "").trim() || null;
   const propertyCity = String(formData.get("property_city") ?? "").trim() || null;
-  const propertyProvince = String(formData.get("property_province") ?? "").trim() || null;
+  const propertyProvinceRaw = String(formData.get("property_province") ?? "").trim() || null;
+  const propertyProvince =
+    normalizeCanadianProvince(propertyProvinceRaw) ?? propertyProvinceRaw;
   const propertyPostalCode = String(formData.get("property_postal_code") ?? "").trim() || null;
   const depositAmountRaw = formData.get("deposit_amount");
   const depositAmount = depositAmountRaw ? parseFloat(String(depositAmountRaw)) : null;
@@ -674,9 +682,19 @@ export async function createJob(formData: FormData) {
   const fallbackJobTax = defaultTaxRateForNewFinancials(
     profile.province,
     propertyProvince
-  ).taxRate;
+  )?.taxRate;
   const taxRate =
-    Number.isFinite(taxRateParsed) && taxRateParsed >= 0 ? taxRateParsed : fallbackJobTax;
+    Number.isFinite(taxRateParsed) && taxRateParsed >= 0
+      ? taxRateParsed
+      : fallbackJobTax != null
+        ? fallbackJobTax
+        : NaN;
+  if (!Number.isFinite(taxRate) || taxRate < 0) {
+    return {
+      error:
+        "Select a province or territory so JobProof can suggest the correct sales tax, or enter a tax rate manually.",
+    };
+  }
   const startDate = String(formData.get("start_date") ?? "").trim();
   const estimatedCompletionDate = String(formData.get("estimated_completion_date") ?? "").trim();
   const originalContractPriceRaw = formData.get("original_contract_price");
@@ -690,11 +708,13 @@ export async function createJob(formData: FormData) {
     return { fieldErrors: { service_category: tradeErr } };
   }
 
-  const customerPhoneInput = String(formData.get("customer_phone") ?? "").trim();
-  if (customerPhoneInput) {
+  const customerPhoneInputRaw = String(formData.get("customer_phone") ?? "").trim();
+  if (customerPhoneInputRaw) {
+    const normalizedPhone =
+      normalizeCanadianPhoneForStorage(customerPhoneInputRaw) ?? customerPhoneInputRaw;
     await supabase
       .from("customers")
-      .update({ phone: customerPhoneInput })
+      .update({ phone: normalizedPhone })
       .eq("id", customerId)
       .eq("profile_id", profile.id);
   }
@@ -713,7 +733,7 @@ export async function createJob(formData: FormData) {
   if (custEmailErr) {
     return { fieldErrors: { customer_email: custEmailErr } };
   }
-  const custPhoneErr = validateCustomerPhone(customerRow.phone ?? customerPhoneInput);
+  const custPhoneErr = validateCustomerPhone(customerRow.phone ?? customerPhoneInputRaw);
   if (custPhoneErr) {
     return { fieldErrors: { customer_phone: custPhoneErr } };
   }
@@ -844,7 +864,9 @@ export async function updateJob(jobId: string, formData: FormData) {
   const propertyAddressLine1 = String(formData.get("property_address_line_1") ?? "").trim() || null;
   const propertyAddressLine2 = String(formData.get("property_address_line_2") ?? "").trim() || null;
   const propertyCity = String(formData.get("property_city") ?? "").trim() || null;
-  const propertyProvince = String(formData.get("property_province") ?? "").trim() || null;
+  const propertyProvinceRaw = String(formData.get("property_province") ?? "").trim() || null;
+  const propertyProvince =
+    normalizeCanadianProvince(propertyProvinceRaw) ?? propertyProvinceRaw;
   const propertyPostalCode = String(formData.get("property_postal_code") ?? "").trim() || null;
   const depositAmountRaw = formData.get("deposit_amount");
   const depositAmount = depositAmountRaw ? parseFloat(String(depositAmountRaw)) : null;
@@ -867,11 +889,13 @@ export async function updateJob(jobId: string, formData: FormData) {
     return { fieldErrors: { customer_email: customerEmailFieldErr } };
   }
 
-  const customerPhoneInput = String(formData.get("customer_phone") ?? "").trim();
-  const customerPhoneFieldErr = validateCustomerPhone(customerPhoneInput);
+  const customerPhoneInputRaw = String(formData.get("customer_phone") ?? "").trim();
+  const customerPhoneFieldErr = validateCustomerPhone(customerPhoneInputRaw);
   if (customerPhoneFieldErr) {
     return { fieldErrors: { customer_phone: customerPhoneFieldErr } };
   }
+  const customerPhoneInput =
+    normalizeCanadianPhoneForStorage(customerPhoneInputRaw) ?? customerPhoneInputRaw;
 
   const { data: linkedCustomer } = await supabase
     .from("customers")
@@ -1483,7 +1507,7 @@ export async function createOrUpdateContract(
   const defaultContractTax = defaultTaxRateForNewFinancials(
     profile.province,
     job.property_province
-  ).taxRate;
+  )?.taxRate ?? null;
 
   const { data: existingEditable } = await supabase
     .from("contracts")
@@ -1597,10 +1621,23 @@ export async function createOrUpdateContract(
     resolvedContractTaxRate = structuredTax;
   } else if (existing) {
     const er = existing.tax_rate;
-    resolvedContractTaxRate =
-      er != null && Number.isFinite(Number(er)) ? Number(er) : defaultContractTax;
-  } else {
+    if (er != null && Number.isFinite(Number(er))) {
+      resolvedContractTaxRate = Number(er);
+    } else if (defaultContractTax != null) {
+      resolvedContractTaxRate = defaultContractTax;
+    } else {
+      return {
+        error:
+          "Select a province on the job property address (or complete your business province) so JobProof can suggest sales tax, or enter a tax rate on the contract.",
+      };
+    }
+  } else if (defaultContractTax != null) {
     resolvedContractTaxRate = defaultContractTax;
+  } else {
+    return {
+      error:
+        "Select a province on the job property address (or complete your business province) so JobProof can suggest sales tax, or enter a tax rate on the contract.",
+    };
   }
 
   const payload = {
@@ -3493,6 +3530,12 @@ export async function createInvoice(
     profile.province,
     propertyProvince
   );
+  if (!invoiceTaxDefaults) {
+    return {
+      error:
+        "Add a job property province (or complete your business province) before creating an invoice with automatic tax.",
+    };
+  }
   const rate = invoiceTaxDefaults.taxRate;
   const depositRaw = Number(job.deposit_amount ?? 0);
   const depositOnFile = Number.isFinite(depositRaw) && depositRaw > 0 ? depositRaw : 0;

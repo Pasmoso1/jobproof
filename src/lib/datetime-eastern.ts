@@ -1,4 +1,4 @@
-/** User-facing dates/times for contractors and customers (Ontario / Eastern). */
+/** User-facing dates/times for contractors and customers (Canada / Eastern). */
 export const APP_USER_TIMEZONE = "America/Toronto";
 
 /** Today's calendar date as `YYYY-MM-DD` in Eastern time. */
@@ -80,7 +80,7 @@ export function formatLocalDateStringEastern(
 
 /**
  * First and last calendar day (`YYYY-MM-DD`) of the month that contains `now` in Eastern time.
- * Used for grouping payment rows by contractor-facing month (Ontario).
+ * Used for grouping payment rows by contractor-facing month (Eastern).
  */
 export function getEasternMonthYmdRange(now: Date = new Date()): {
   startYmd: string;

@@ -11,6 +11,11 @@ import { parsePositiveContractPrice, validateScopeOfWork } from "@/lib/validatio
 import { computeEstimateTotals } from "@/lib/estimate-pricing";
 import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 import { invoiceTaxRateDisplayLabel } from "@/lib/invoice-tax";
+import { ProvinceSelect } from "@/components/canada/province-select";
+import {
+  provinceSelectValue,
+  PROVINCE_REQUIRED_FOR_TAX_MESSAGE,
+} from "@/lib/canada/provinces";
 
 type Customer = {
   id: string;
@@ -363,6 +368,7 @@ export function EstimateForm({
             <input
               value={propertyCity}
               onChange={(e) => setPropertyCity(e.target.value)}
+              placeholder="City"
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
             />
             {fieldErrors.property_city && (
@@ -373,28 +379,34 @@ export function EstimateForm({
             <label className="block text-sm font-medium text-zinc-700">
               Province <span className="text-red-500">*</span>
             </label>
-            <input
-              value={propertyProvince}
-              onChange={(e) => {
-                setPropertyProvince(e.target.value);
+            <ProvinceSelect
+              id="property_province"
+              name="property_province"
+              required
+              value={provinceSelectValue(propertyProvince)}
+              onChange={(v) => {
+                setPropertyProvince(v);
                 const d = defaultTaxRateForNewFinancials(
                   profileProvince,
-                  e.target.value.trim() || null
+                  v.trim() || null
                 );
-                setTaxRate(String(d.taxRate));
+                if (d) setTaxRate(String(d.taxRate));
               }}
-              placeholder="ON"
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+              aria-invalid={!!fieldErrors.property_province}
             />
             {fieldErrors.property_province && (
               <p className="mt-1 text-sm text-red-600">{fieldErrors.property_province}</p>
             )}
+            {!propertyProvince.trim() ? (
+              <p className="mt-1 text-xs text-amber-800">{PROVINCE_REQUIRED_FOR_TAX_MESSAGE}</p>
+            ) : null}
           </div>
           <div>
             <label className="block text-sm font-medium text-zinc-700">Postal code</label>
             <input
               value={propertyPostalCode}
               onChange={(e) => setPropertyPostalCode(e.target.value)}
+              placeholder="Postal code"
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
             />
           </div>

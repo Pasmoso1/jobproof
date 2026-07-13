@@ -194,6 +194,10 @@ export async function createSubscriptionCheckoutSession(params: {
       cancel_url: cancelUrl,
       payment_method_collection: "always",
       line_items: [{ price: priceId, quantity: 1 }],
+      // TODO(Stripe Tax): When enabling SaaS tax collection for Canadian provinces,
+      // set automatic_tax: { enabled: true }, ensure customer addresses are collected
+      // (customer_update / billing_address_collection), and verify Stripe Tax is
+      // configured for the account. Do not enable until tax product work is scoped.
       subscription_data: {
         // JobProof-managed trial already happened — start paid subscription immediately.
         metadata: {

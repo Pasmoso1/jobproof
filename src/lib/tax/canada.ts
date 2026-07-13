@@ -1,18 +1,28 @@
 /**
  * Default Canadian sales tax by province/territory (combined GST/HST/PST-style rates).
  * Used for new jobs, contracts, and invoices — apply only at creation time.
+ *
+ * Does NOT silently assume Ontario when province is missing.
  */
 
-export const DEFAULT_CANADA_SALES_TAX_RATE = 0.13;
+import {
+  canadianProvinceCode,
+  normalizeCanadianProvince,
+  PROVINCE_REQUIRED_FOR_TAX_MESSAGE,
+} from "@/lib/canada/provinces";
+
+export { PROVINCE_REQUIRED_FOR_TAX_MESSAGE };
 
 export type CanadaProvinceTax = {
   taxRate: number;
   /** Human-readable description */
   label: string;
-  /** Compact, e.g. "13% (ON)" */
+  /** Compact, e.g. "13% (Ontario)" */
   shortLabel: string;
-  /** Two-letter or canonical code for display */
+  /** Two-letter code for display */
   provinceCode: string;
+  /** Canonical full province name */
+  provinceName: string;
 };
 
 const RATE_BY_CODE: Record<string, { rate: number; label: string }> = {
@@ -31,34 +41,6 @@ const RATE_BY_CODE: Record<string, { rate: number; label: string }> = {
   QC: { rate: 0.14975, label: "GST + QST (Quebec)" },
 };
 
-function provinceCodeFromRaw(raw: string | null | undefined): string {
-  if (!raw) return "";
-  const s = raw.trim().toUpperCase();
-  if (!s) return "";
-  if (s.includes("ONTARIO") || s.startsWith("ON")) return "ON";
-  if (s.includes("ALBERTA") || s.startsWith("AB")) return "AB";
-  if (s.includes("BRITISH COLUMBIA") || s.startsWith("BC")) return "BC";
-  if (
-    s.includes("QUEBEC") ||
-    s.includes("QUÉBEC") ||
-    s.startsWith("QC") ||
-    s.startsWith("PQ")
-  ) {
-    return "QC";
-  }
-  if (s.includes("MANITOBA") || s.startsWith("MB")) return "MB";
-  if (s.includes("SASKATCHEWAN") || s.startsWith("SK")) return "SK";
-  if (s.includes("NOVA SCOTIA") || s.startsWith("NS")) return "NS";
-  if (s.includes("NEW BRUNSWICK") || s.startsWith("NB")) return "NB";
-  if (s.includes("NEWFOUNDLAND") || s.startsWith("NL")) return "NL";
-  if (s.includes("PRINCE EDWARD") || s.startsWith("PE")) return "PE";
-  if (s.includes("NORTHWEST TERRITOR") || s.startsWith("NT")) return "NT";
-  if (s.includes("NUNAVUT") || s.startsWith("NU")) return "NU";
-  if (s.includes("YUKON") || s.startsWith("YT")) return "YT";
-  if (s.length >= 2) return s.slice(0, 2);
-  return s;
-}
-
 function formatPct(rate: number): string {
   const pct = rate * 100;
   if (Math.abs(pct - Math.round(pct)) < 1e-9) {
@@ -68,39 +50,41 @@ function formatPct(rate: number): string {
 }
 
 /**
- * Default tax row for a province/territory name or code (e.g. "ON", "Ontario", "British Columbia").
- * Unknown or empty input → Ontario-style default (13%).
+ * Default tax row for a recognized Canadian province/territory.
+ * Returns null when province is missing or not recognized — never assumes Ontario.
  */
 export function getDefaultTaxForProvince(
   province: string | null | undefined
-): CanadaProvinceTax {
-  const raw = province?.trim() ?? "";
-  const code = provinceCodeFromRaw(raw) || "ON";
+): CanadaProvinceTax | null {
+  const name = normalizeCanadianProvince(province);
+  const code = canadianProvinceCode(province);
+  if (!name || !code) return null;
   const row = RATE_BY_CODE[code];
-  const rate = row?.rate ?? DEFAULT_CANADA_SALES_TAX_RATE;
-  const labelBase = row?.label ?? "Sales tax (default)";
-  const pctStr = formatPct(rate);
-  const shortLabel = `${pctStr}% (${code})`;
-  const label = `${pctStr}% — ${labelBase}`;
-
+  if (!row) return null;
+  const pctStr = formatPct(row.rate);
   return {
-    taxRate: rate,
-    label,
-    shortLabel,
+    taxRate: row.rate,
+    label: `${pctStr}% — ${row.label}`,
+    shortLabel: `${pctStr}% (${name})`,
     provinceCode: code,
+    provinceName: name,
   };
 }
 
 /**
- * Prefer contractor business province; if missing, fall back to job work-site (property) province.
- * Matches prior app behavior when contractor province was unset.
+ * Prefer contractor business province; if missing, fall back to job property province.
+ * Returns null when neither yields a recognized province (caller must require selection).
  */
 export function defaultTaxRateForNewFinancials(
   contractorProvince: string | null | undefined,
   jobPropertyProvince: string | null | undefined
-): CanadaProvinceTax {
+): CanadaProvinceTax | null {
   if (contractorProvince?.trim()) {
-    return getDefaultTaxForProvince(contractorProvince);
+    const fromContractor = getDefaultTaxForProvince(contractorProvince);
+    if (fromContractor) return fromContractor;
   }
   return getDefaultTaxForProvince(jobPropertyProvince);
 }
+
+/** @deprecated Prefer getDefaultTaxForProvince which returns null when unset. */
+export const DEFAULT_CANADA_SALES_TAX_RATE = 0.13;

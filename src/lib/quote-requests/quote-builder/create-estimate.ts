@@ -20,10 +20,17 @@ export async function upsertEstimateFromQuoteBuilder(
     sections: QuoteBuilderSection[];
   }
 ): Promise<{ estimateId: string } | { error: string }> {
-  const taxRate = defaultTaxRateForNewFinancials(
+  const taxDefaults = defaultTaxRateForNewFinancials(
     input.profileProvince,
     null
-  ).taxRate;
+  );
+  if (!taxDefaults) {
+    return {
+      error:
+        "Complete your business province in Settings before creating an estimate with automatic tax.",
+    };
+  }
+  const taxRate = taxDefaults.taxRate;
 
   const fields = buildEstimateFieldsFromQuoteBuilder({
     sections: input.sections,

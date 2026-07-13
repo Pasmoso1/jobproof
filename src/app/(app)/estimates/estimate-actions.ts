@@ -14,6 +14,8 @@ import {
   validateTrade,
 } from "@/lib/validation/job-create";
 import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
+import { normalizeCanadianProvince } from "@/lib/canada/provinces";
+import { normalizeCanadianPhoneForStorage } from "@/lib/canada/phone";
 import { formatDateEastern, formatLocalDateStringEastern, getTodayYmdEastern } from "@/lib/datetime-eastern";
 import { invoiceTaxShortLabel } from "@/lib/invoice-tax";
 import { resolvePublicAppOrigin } from "@/lib/app-origin";
@@ -272,8 +274,10 @@ async function resolveCustomerIdForEstimate(
       .eq("profile_id", profileId)
       .maybeSingle();
     if (!c) return { error: "Customer not found." };
-    const phoneOverride = String(formData.get("existing_customer_phone") ?? "").trim();
-    if (phoneOverride) {
+    const phoneOverrideRaw = String(formData.get("existing_customer_phone") ?? "").trim();
+    if (phoneOverrideRaw) {
+      const phoneOverride =
+        normalizeCanadianPhoneForStorage(phoneOverrideRaw) ?? phoneOverrideRaw;
       await supabase
         .from("customers")
         .update({ phone: phoneOverride })
@@ -319,7 +323,9 @@ function parseEstimateForm(
   const propertyAddressLine1 = String(formData.get("property_address_line_1") ?? "").trim() || null;
   const propertyAddressLine2 = String(formData.get("property_address_line_2") ?? "").trim() || null;
   const propertyCity = String(formData.get("property_city") ?? "").trim() || null;
-  const propertyProvince = String(formData.get("property_province") ?? "").trim() || null;
+  const propertyProvinceRaw = String(formData.get("property_province") ?? "").trim() || null;
+  const propertyProvince =
+    normalizeCanadianProvince(propertyProvinceRaw) ?? propertyProvinceRaw;
   const propertyPostalCode = String(formData.get("property_postal_code") ?? "").trim() || null;
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const expiryDate = String(formData.get("expiry_date") ?? "").trim() || null;
@@ -337,9 +343,21 @@ function parseEstimateForm(
   const fallbackTax = defaultTaxRateForNewFinancials(
     profileProvince,
     propertyProvince
-  ).taxRate;
+  )?.taxRate;
   const taxRate =
-    Number.isFinite(taxRateParsed) && taxRateParsed >= 0 ? taxRateParsed : fallbackTax;
+    Number.isFinite(taxRateParsed) && taxRateParsed >= 0
+      ? taxRateParsed
+      : fallbackTax != null
+        ? fallbackTax
+        : NaN;
+  if (!Number.isFinite(taxRate) || taxRate < 0) {
+    return {
+      fieldErrors: {
+        property_province:
+          "Select a province or territory so JobProof can suggest the correct sales tax. You can still edit the tax rate after selecting.",
+      },
+    };
+  }
 
   const { taxAmount, total } = computeEstimateTotals(subtotalRes.value, taxRate);
 

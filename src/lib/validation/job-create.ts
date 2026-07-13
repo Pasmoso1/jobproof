@@ -1,3 +1,5 @@
+import { validateCanadianPhone } from "@/lib/canada/phone";
+
 /** Shared client + server validation for job scope, contract price, customer email, and trade. */
 
 export const SCOPE_OF_WORK_EMPTY_MESSAGE =
@@ -38,15 +40,17 @@ export function validateCustomerEmailForRemote(raw: string | null | undefined): 
 
 const PHONE_DIGITS_MIN = 10;
 
-/** Non-empty phone with enough digits for reachability (client + server). */
+/** Non-empty Canadian phone (libphonenumber); digit-count fallback for legacy edge cases. */
 export function validateCustomerPhone(raw: string | null | undefined): string | null {
   const v = String(raw ?? "").trim();
   if (!v) return "Customer phone number is required.";
+  const ca = validateCanadianPhone(v, { required: true, label: "customer phone number" });
+  if (ca === null) return null;
   const digits = v.replace(/\D/g, "");
-  if (digits.length < PHONE_DIGITS_MIN) {
-    return "Enter a valid phone number (at least 10 digits).";
+  if (digits.length >= PHONE_DIGITS_MIN && digits.length <= 15) {
+    return null;
   }
-  return null;
+  return ca;
 }
 
 export function isValidCustomerEmail(raw: string | null | undefined): boolean {

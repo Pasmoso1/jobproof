@@ -6,6 +6,9 @@ import { updateProfileBusinessInfo } from "@/app/(app)/actions";
 import { validateBusinessProfileFields } from "@/lib/validation/business-profile";
 import { normalizeAdditionalTrades } from "@/lib/quote-requests/trade";
 import { ContractorTradesServicesFields } from "@/components/contractor/contractor-trades-services-fields";
+import { ProvinceSelect } from "@/components/canada/province-select";
+import { provinceSelectValue } from "@/lib/canada/provinces";
+import { formatCanadianPhoneForDisplay } from "@/lib/canada/phone";
 
 type Profile = {
   id: string;
@@ -45,7 +48,7 @@ export function OnboardingBusinessForm({
   const [businessContactEmail, setBusinessContactEmail] = useState(
     () => profile?.business_contact_email?.trim() || userEmail
   );
-  const [phone, setPhone] = useState(profile?.phone ?? "");
+  const [phone, setPhone] = useState(() => formatCanadianPhoneForDisplay(profile?.phone));
   const [addressLine1, setAddressLine1] = useState(profile?.address_line_1 ?? "");
   const [addressLine2, setAddressLine2] = useState(profile?.address_line_2 ?? "");
   const [city, setCity] = useState(profile?.city ?? "");
@@ -284,7 +287,7 @@ export function OnboardingBusinessForm({
                 setCity(e.target.value);
                 clearFieldError("city");
               }}
-              placeholder="London"
+              placeholder="City"
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
               aria-invalid={!!fieldErrors.city}
             />
@@ -298,16 +301,15 @@ export function OnboardingBusinessForm({
             <label htmlFor="province" className="block text-sm font-medium text-zinc-700">
               Province <span className="text-red-500">*</span>
             </label>
-            <input
+            <ProvinceSelect
               id="province"
-              type="text"
-              value={province}
-              onChange={(e) => {
-                setProvince(e.target.value);
+              name="province"
+              required
+              value={provinceSelectValue(province)}
+              onChange={(v) => {
+                setProvince(v);
                 clearFieldError("province");
               }}
-              placeholder="ON"
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
               aria-invalid={!!fieldErrors.province}
             />
             {fieldErrors.province && (
@@ -328,7 +330,7 @@ export function OnboardingBusinessForm({
                 setPostalCode(e.target.value);
                 clearFieldError("postal_code");
               }}
-              placeholder="N6A 1B2"
+              placeholder="Postal code"
               className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
               aria-invalid={!!fieldErrors.postal_code}
             />

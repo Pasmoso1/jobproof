@@ -81,6 +81,9 @@ export async function POST(req: Request) {
         },
       ],
       customer_email: customer?.email ?? undefined,
+      // TODO(Stripe Tax): Customer invoice Checkout is Connect destination charges.
+      // If enabling Stripe Tax later for customer payments, evaluate Connect + Tax
+      // compatibility carefully; do not enable automatic_tax without product decisions.
       payment_intent_data: {
         transfer_data: {
           destination: connectAccountId,
