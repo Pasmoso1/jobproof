@@ -15,7 +15,7 @@ import {
 export const metadata: Metadata = {
   title: "JobProof — From first inquiry to signed quote",
   description:
-    "JobProof helps contractors go from the first customer message to a signed quote—organized, professional, and all in one place.",
+    "JobProof helps contractors go from the first quote request to a signed proposal—organized, professional, and all in one place.",
 };
 
 const SOLO_PRICING = getPlanDisplayLines("essential", "standard");
@@ -145,7 +145,7 @@ const WHY_OUTCOMES = [
   },
   {
     title: "Save hours every week",
-    body: "Stop digging through texts, emails, and camera rolls. What you need is already with the quote.",
+    body: "Stop hunting for details across texts, emails, and camera rolls. Photos, notes, and customer answers stay with the quote.",
   },
   {
     title: "Look more professional",
@@ -153,7 +153,7 @@ const WHY_OUTCOMES = [
   },
   {
     title: "Keep every quote organized",
-    body: "One place for each customer—from the first message to the yes—instead of notes and apps everywhere.",
+    body: "One place for each customer—from the first quote request to the yes—instead of notes and apps everywhere.",
   },
   {
     title: "Never lose important information",
@@ -222,12 +222,12 @@ const ORGANIZED_ITEMS = [
     body: "Show what's included, the price, and the terms in a way customers can actually follow.",
   },
   {
-    title: "Customer communication",
+    title: "Customer questions and approvals",
     body: "Questions, change requests, and the final yes—all tied to the same quote.",
   },
   {
     title: "Project history",
-    body: "A clear record of what happened and when, from the first message onward.",
+    body: "A clear record of what happened and when, from the first quote request onward.",
   },
 ] as const;
 
@@ -249,12 +249,12 @@ const PROTECTION_CARDS = [
     body: "Take notes, photos, and voice recordings during the visit so important details don't get lost on the drive home.",
   },
   {
-    title: "Customer communication history",
-    body: "Keep customer questions, quote changes, and important conversations with the job—not buried in texts and email.",
+    title: "Customer questions and approvals",
+    body: "Keep customer questions, change requests, and approvals with the job—where you can find them when you need them.",
   },
   {
     title: "Organized project timeline",
-    body: "Every key step—from the first message through the signed quote—stays in one place so you can see how the job moved forward.",
+    body: "Every key step—from the first quote request through the signed quote—stays in one place so you can see how the job moved forward.",
   },
 ] as const;
 
@@ -319,7 +319,7 @@ export default function Home() {
               lost.
             </p>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-zinc-500">
-              JobProof keeps every request in one place—from that first message to a signed
+              JobProof keeps every quote request in one place—from that first inquiry to a signed
               quote—so you look more professional, stay organized, and win more of the work you
               quote.
             </p>
@@ -528,7 +528,7 @@ export default function Home() {
               <p>
                 JobProof wasn&apos;t built as generic office software with a contractor sticker on it.
                 It was built around how jobs really start—the site visit, the follow-up questions,
-                the back-and-forth with the customer, and the moment they say yes.
+                the details that shape the quote, and the moment they say yes.
               </p>
               <p>
                 You work on your phone at the job site. You need answers fast. You don&apos;t have time
@@ -585,7 +585,7 @@ export default function Home() {
           <div className="mx-auto max-w-6xl">
             <SectionHeading
               title="Stay Protected Every Step of the Way"
-              lead="As you use JobProof, you naturally build a clear record—so you and your customers stay on the same page from the first conversation through the work."
+              lead="As you use JobProof, you naturally build a clear record—so you and your customers stay on the same page from the first quote request through the work."
             />
             <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {PROTECTION_CARDS.map((item) => (
@@ -601,8 +601,8 @@ export default function Home() {
               ))}
             </div>
             <p className="mx-auto mt-12 max-w-2xl text-center text-base leading-relaxed text-zinc-600">
-              When questions come up later, you already have a clear record of what was talked
-              about, approved, and finished—without digging through old messages or trying to
+              When questions come up later, you already have a clear record of what was requested,
+              approved, and documented—without digging through old messages or trying to
               remember every detail.
             </p>
           </div>
@@ -692,7 +692,7 @@ export default function Home() {
             </p>
             <p className="mx-auto mt-2 text-base text-zinc-400">No credit card required.</p>
             <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-zinc-400">
-              Look professional from the very first customer message.
+              Look professional from the very first quote request.
             </p>
             <div className="mt-10 flex flex-col items-center">
               <Link
