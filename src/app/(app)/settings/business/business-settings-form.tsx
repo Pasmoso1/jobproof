@@ -40,6 +40,8 @@ export function BusinessSettingsForm({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [stripeAddressWarning, setStripeAddressWarning] = useState<string | null>(null);
+  const [billingAddressNote, setBillingAddressNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -108,6 +110,8 @@ export function BusinessSettingsForm({
     e.preventDefault();
     setError(null);
     setSuccess(false);
+    setStripeAddressWarning(null);
+    setBillingAddressNote(null);
 
     const errs = validateBusinessProfileFields({
       business_name: businessName,
@@ -161,6 +165,22 @@ export function BusinessSettingsForm({
     }
 
     setSuccess(true);
+    if (
+      result &&
+      "stripeAddressSyncWarning" in result &&
+      typeof result.stripeAddressSyncWarning === "string" &&
+      result.stripeAddressSyncWarning
+    ) {
+      setStripeAddressWarning(result.stripeAddressSyncWarning);
+    }
+    if (
+      result &&
+      "billingAddressNote" in result &&
+      typeof result.billingAddressNote === "string" &&
+      result.billingAddressNote
+    ) {
+      setBillingAddressNote(result.billingAddressNote);
+    }
   }
 
   return (
@@ -186,8 +206,28 @@ export function BusinessSettingsForm({
           className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
         >
           Business settings saved successfully.
+          {billingAddressNote ? (
+            <p className="mt-2 text-green-900">{billingAddressNote}</p>
+          ) : null}
         </div>
       )}
+      {stripeAddressWarning ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p>{stripeAddressWarning}</p>
+          <p className="mt-2">
+            You can retry from{" "}
+            <Link href="/settings/billing" className="font-medium text-[#2436BB] underline">
+              Billing
+            </Link>
+            .
+          </p>
+        </div>
+      ) : null}
+
+      <p className="text-xs text-zinc-500">
+        Your business address is also used as the billing address for JobProof subscription tax.
+        Address changes apply to future subscription invoices.
+      </p>
 
       <div>
         <label htmlFor="businessName" className="block text-sm font-medium text-zinc-700">

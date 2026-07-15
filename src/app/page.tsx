@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
-import { getPlanDisplayLines } from "@/lib/billing-plan-display";
+import { getPublicPlanPriceLine } from "@/lib/billing-plan-display";
 import {
   formatActiveJobLimit,
   formatPlanStorage,
@@ -18,8 +18,8 @@ export const metadata: Metadata = {
     "JobProof helps contractors go from the first customer message to a signed quote—organized, professional, and all in one place.",
 };
 
-const SOLO_PRICING = getPlanDisplayLines("essential", "standard");
-const PRO_PRICING = getPlanDisplayLines("professional", "standard");
+const SOLO_PRICE_LINE = getPublicPlanPriceLine("essential", "standard");
+const PRO_PRICE_LINE = getPublicPlanPriceLine("professional", "standard");
 
 const SOLO_FEATURES = [
   "Customer quote requests",
@@ -399,8 +399,7 @@ export default function Home() {
                 <div>
                   <h3 className="text-2xl font-bold text-zinc-950">Solo</h3>
                   <p className="mt-2 text-3xl font-bold tracking-tight text-zinc-950">
-                    {SOLO_PRICING.afterTrialLine.replace("/mo", "")}
-                    <span className="text-lg font-semibold text-zinc-500">/month</span>
+                    {SOLO_PRICE_LINE}
                   </p>
                   <p className="mt-2 text-base font-medium text-zinc-800">
                     Perfect for independent contractors.
@@ -426,8 +425,7 @@ export default function Home() {
                   </p>
                   <h3 className="text-2xl font-bold text-zinc-950">Pro</h3>
                   <p className="mt-2 text-3xl font-bold tracking-tight text-zinc-950">
-                    {PRO_PRICING.afterTrialLine.replace("/mo", "")}
-                    <span className="text-lg font-semibold text-zinc-500">/month</span>
+                    {PRO_PRICE_LINE}
                   </p>
                   <p className="mt-2 text-base font-medium text-zinc-800">
                     Built for growing contractors.

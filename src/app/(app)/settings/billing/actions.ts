@@ -8,6 +8,14 @@ import {
   ensureStripeCustomerForProfile,
   isStripeCustomerMissingError,
 } from "@/lib/stripe-customer";
+import { syncProfileBillingAddressToStripe } from "@/lib/stripe-customer-address-sync";
+import {
+  assertExclusiveCadMonthlySubscriptionPrice,
+  logAutomaticTaxFailure,
+  STRIPE_TAX_BILLING_ADDRESS_INCOMPLETE_MESSAGE,
+  subscriptionCheckoutTaxParams,
+  validateStripeBillingAddressSource,
+} from "@/lib/stripe-subscription-tax";
 import { insertBillingEventLog } from "@/lib/billing-audit-log";
 import { trackContractorMilestoneSafe } from "@/lib/contractor-milestones";
 import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
@@ -157,12 +165,71 @@ export async function createSubscriptionCheckoutSession(params: {
       };
     }
 
+    const addressCheck = validateStripeBillingAddressSource(profile);
+    if (!addressCheck.ok) {
+      trackProductEventSafe({
+        profileId: String(profile.id),
+        eventName: PRODUCT_ANALYTICS_EVENTS.subscription_checkout_address_missing,
+        source: returnTo === "onboarding" ? "onboarding_plan" : "billing",
+        metadata: { selected_plan: params.planTier },
+      });
+      return {
+        success: false,
+        error: STRIPE_TAX_BILLING_ADDRESS_INCOMPLETE_MESSAGE,
+      };
+    }
+
+    let priceCheck;
+    try {
+      priceCheck = await assertExclusiveCadMonthlySubscriptionPrice(stripe, priceId);
+    } catch (err) {
+      logStripeError("assertExclusiveCadMonthlySubscriptionPrice", {
+        requestId: err instanceof Stripe.errors.StripeError ? err.requestId : undefined,
+        code: err instanceof Stripe.errors.StripeError ? err.code : undefined,
+        type: err instanceof Stripe.errors.StripeError ? err.type : undefined,
+      });
+      return {
+        success: false,
+        error: "Could not verify subscription pricing with Stripe. Please try again.",
+      };
+    }
+    if (!priceCheck.ok) {
+      trackProductEventSafe({
+        profileId: String(profile.id),
+        eventName: PRODUCT_ANALYTICS_EVENTS.subscription_tax_configuration_error,
+        source: returnTo === "onboarding" ? "onboarding_plan" : "billing",
+        metadata: { selected_plan: params.planTier, reason: priceCheck.code },
+      });
+      console.error("[stripe-tax] price configuration error", {
+        profile_id: profile.id,
+        price_id_suffix: priceId.slice(-6),
+        code: priceCheck.code,
+      });
+      return { success: false, error: priceCheck.error };
+    }
+
     const { customerId } = await ensureStripeCustomerForProfile(
       stripe,
       supabase,
       profile,
       user.email
     );
+
+    const syncResult = await syncProfileBillingAddressToStripe({
+      stripe,
+      supabase,
+      profile,
+      userEmail: user.email,
+      source: returnTo === "onboarding" ? "checkout_preflight" : "checkout_preflight",
+      requireCustomer: true,
+    });
+    if (!syncResult.ok) {
+      return {
+        success: false,
+        error:
+          "We could not update your billing address in Stripe for tax calculation. Check Settings → Business and try again.",
+      };
+    }
 
     const existingSub = await findBlockingJobProofSubscription(
       stripe,
@@ -187,6 +254,7 @@ export async function createSubscriptionCheckoutSession(params: {
         ? `${appUrl}/onboarding/plan?checkout=cancelled`
         : `${appUrl}/settings/billing?checkout=cancelled`;
 
+    const taxParams = subscriptionCheckoutTaxParams();
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
@@ -194,12 +262,9 @@ export async function createSubscriptionCheckoutSession(params: {
       cancel_url: cancelUrl,
       payment_method_collection: "always",
       line_items: [{ price: priceId, quantity: 1 }],
-      // TODO(Stripe Tax): When enabling SaaS tax collection for Canadian provinces,
-      // set automatic_tax: { enabled: true }, ensure customer addresses are collected
-      // (customer_update / billing_address_collection), and verify Stripe Tax is
-      // configured for the account. Do not enable until tax product work is scoped.
+      ...taxParams,
+      // JobProof-managed 14-day trial already completed (or skipped) — no Stripe trial.
       subscription_data: {
-        // JobProof-managed trial already happened — start paid subscription immediately.
         metadata: {
           profile_id: String(profile.id),
           plan_tier: params.planTier,
@@ -211,6 +276,7 @@ export async function createSubscriptionCheckoutSession(params: {
         plan_tier: params.planTier,
         pricing_version: pricingVersion,
         checkout_source: returnTo === "onboarding" ? "subscribe" : returnTo,
+        stripe_tax: "enabled",
       },
     });
 
@@ -221,11 +287,25 @@ export async function createSubscriptionCheckoutSession(params: {
       };
     }
 
+    // Tax is calculated in Checkout from the customer location + active registrations.
+    // Session create may report requires_location until the contractor confirms address —
+    // billing_address_collection=required handles that; do not treat it as a hard failure here.
+
     trackProductEventSafe({
       profileId: String(profile.id),
       eventName: PRODUCT_ANALYTICS_EVENTS.subscription_checkout_started,
       source: returnTo === "onboarding" ? "onboarding_plan" : "billing",
       metadata: { selected_plan: params.planTier, pricing_version: pricingVersion },
+    });
+    trackProductEventSafe({
+      profileId: String(profile.id),
+      eventName: PRODUCT_ANALYTICS_EVENTS.subscription_checkout_tax_enabled,
+      source: returnTo === "onboarding" ? "onboarding_plan" : "billing",
+      metadata: {
+        selected_plan: params.planTier,
+        province_code: addressCheck.address.state,
+        country: "CA",
+      },
     });
 
     return { success: true, url: session.url };
@@ -247,6 +327,22 @@ export async function createSubscriptionCheckoutSession(params: {
           success: false,
           error:
             "Stripe price not found. Check that your Stripe keys and price IDs are from the same mode.",
+        };
+      }
+      if (/automatic.?tax|customer.*location|tax.*location/i.test(err.message ?? "")) {
+        logAutomaticTaxFailure({
+          profileId: String(profile.id),
+          stripeCustomerId: profile.stripe_customer_id ?? null,
+          sessionOrSubscriptionId: null,
+          automaticTaxStatus: null,
+          disabledReason: err.code ?? "invalid_request",
+          addressComplete: validateStripeBillingAddressSource(profile).ok,
+          provinceCode: null,
+        });
+        return {
+          success: false,
+          error:
+            "Stripe Tax could not calculate tax for this checkout. Confirm your Canadian business address under Settings → Business, then try again.",
         };
       }
       return {
@@ -721,9 +817,19 @@ export async function createBillingPortalSession(): Promise<BillingPortalSession
 
   const stripe = getStripe();
   try {
+    // Re-assert JobProof business address on the Stripe Customer before portal
+    // (JobProof → Stripe is authoritative for this release).
+    await syncProfileBillingAddressToStripe({
+      stripe,
+      supabase,
+      profile,
+      source: "billing_portal_open",
+      requireCustomer: true,
+    });
+
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${resolveAppUrl()}/settings/billing`,
+      return_url: `${resolveAppUrl()}/settings/billing?portal=return`,
     });
     if (!session.url) {
       return { success: false, error: "Billing portal did not return a URL." };
@@ -750,6 +856,58 @@ export async function createBillingPortalSession(): Promise<BillingPortalSession
       };
     }
     throw err;
+  }
+}
+
+/**
+ * Retry JobProof → Stripe Customer billing address sync (subscription tax location).
+ */
+export async function retryStripeBillingAddressSync(): Promise<
+  | { success: true; message: string }
+  | { success: false; error: string }
+> {
+  const { supabase, user, profile } = await requireContractorProfile();
+  if (!String(profile.stripe_customer_id ?? "").trim()) {
+    return {
+      success: false,
+      error: "No Stripe billing customer yet. Subscribe first, or complete checkout.",
+    };
+  }
+  const addressCheck = validateStripeBillingAddressSource(profile);
+  if (!addressCheck.ok) {
+    return { success: false, error: addressCheck.error };
+  }
+  try {
+    const stripe = getStripe();
+    const result = await syncProfileBillingAddressToStripe({
+      stripe,
+      supabase,
+      profile,
+      userEmail: user.email,
+      source: "billing_address_retry",
+      requireCustomer: true,
+    });
+    if (!result.ok) {
+      return {
+        success: false,
+        error:
+          "Could not sync your billing address to Stripe. Please try again or contact support.",
+      };
+    }
+    return {
+      success: true,
+      message:
+        "Billing address synced to Stripe. Address changes apply to future subscription invoices.",
+    };
+  } catch (err) {
+    console.error("[stripe-tax] retryStripeBillingAddressSync", {
+      profile_id: profile.id,
+      error_name: err instanceof Error ? err.name : "unknown",
+    });
+    return {
+      success: false,
+      error: "Could not sync your billing address to Stripe. Please try again.",
+    };
   }
 }
 

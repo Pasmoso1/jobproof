@@ -25,6 +25,12 @@ import {
 } from "@/lib/stripe-subscription-profile-sync";
 import { BillingActionButtons, StripeConnectActionButtons } from "./billing-actions-client";
 import { refreshStripeConnectStatus, syncSubscriptionAfterStripeReturn } from "./actions";
+import { StripeBillingAddressRetryButton } from "./stripe-billing-address-retry";
+import {
+  formatBillingAddressForDisplay,
+  STRIPE_TAX_ADDRESS_FUTURE_INVOICES_NOTE,
+  validateStripeBillingAddressSource,
+} from "@/lib/stripe-subscription-tax";
 import {
   formatTrialDaysRemainingLabel,
   getTrialDaysRemaining,
@@ -106,6 +112,7 @@ export default async function BillingSettingsPage({
 
   const checkoutState = firstSearchParam(sp.checkout);
   const checkoutSessionId = firstSearchParam(sp.session_id);
+  const portalReturn = firstSearchParam(sp.portal) === "return";
   if (checkoutState === "success") {
     try {
       await syncSubscriptionAfterStripeReturn({
@@ -123,6 +130,35 @@ export default async function BillingSettingsPage({
   }
 
   const ranCheckoutSubscriptionSync = checkoutState === "success";
+  if (portalReturn && trimOrEmpty(profile.stripe_customer_id)) {
+    // JobProof → Stripe is authoritative: re-push business address after portal return
+    // rather than overwriting JobProof with Stripe Customer data.
+    try {
+      const { getStripe } = await import("@/lib/stripe");
+      const { syncProfileBillingAddressToStripe } = await import(
+        "@/lib/stripe-customer-address-sync"
+      );
+      await syncProfileBillingAddressToStripe({
+        stripe: getStripe(),
+        supabase,
+        profile,
+        userEmail: user.email,
+        source: "billing_portal_return",
+        requireCustomer: true,
+      });
+    } catch (err) {
+      console.error("[billing] portal return address sync", {
+        profile_id: profile.id,
+        error_name: err instanceof Error ? err.name : "unknown",
+      });
+    }
+    const { data: afterPortal } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
+    if (afterPortal) profile = afterPortal;
+  }
   if (
     !ranCheckoutSubscriptionSync &&
     shouldAutoSyncStripeSubscriptionOnBillingLoad(profile)
@@ -244,6 +280,20 @@ export default async function BillingSettingsPage({
   const trialDaysRemaining = getTrialDaysRemaining(profile);
   const trialDaysLabel = formatTrialDaysRemainingLabel(trialDaysRemaining);
   const trialPlanLabel = betaPlanTierLabel(resolveTrialPlanTier(profile));
+  const billingAddressDisplay = formatBillingAddressForDisplay(profile);
+  const billingAddressComplete = validateStripeBillingAddressSource(profile).ok;
+  const baseMonthlyPrice =
+    planLines?.afterTrialLine.replace(/\s*\+\s*applicable taxes/i, "") ??
+    (planTier && pricingVersion
+      ? getPlanDisplayLines(planTier, pricingVersion).afterTrialLine.replace(
+          /\s*\+\s*applicable taxes/i,
+          ""
+        )
+      : null);
+  const addressSyncError = trimOrEmpty(
+    (profile as { stripe_billing_address_sync_error?: string | null })
+      .stripe_billing_address_sync_error
+  );
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -406,6 +456,21 @@ export default async function BillingSettingsPage({
             </dd>
           </div>
           <div>
+            <dt className="text-zinc-500">Base monthly price</dt>
+            <dd className="font-medium text-zinc-900">
+              {baseMonthlyPrice ?? "—"}
+            </dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-zinc-500">Taxes</dt>
+            <dd className="font-medium text-zinc-900">Plus applicable taxes</dd>
+            <p className="mt-1 text-xs text-zinc-500">
+              Final tax is calculated by Stripe Checkout / Stripe Billing from your billing
+              address and JobProof&apos;s tax registrations. JobProof does not estimate
+              subscription tax inside the app.
+            </p>
+          </div>
+          <div>
             <dt className="text-zinc-500">
               {hasActiveSubscription ? "Status" : "Trial status"}
             </dt>
@@ -450,6 +515,33 @@ export default async function BillingSettingsPage({
             </>
           )}
           <div className="sm:col-span-2">
+            <dt className="text-zinc-500">Billing address</dt>
+            <dd className="font-medium text-zinc-900">{billingAddressDisplay}</dd>
+            <p className="mt-1 text-xs text-zinc-500">{STRIPE_TAX_ADDRESS_FUTURE_INVOICES_NOTE}</p>
+            <p className="mt-2 text-sm">
+              <Link href="/settings/business" className="font-medium text-[#2436BB] hover:underline">
+                Update business / billing address
+              </Link>
+            </p>
+            {!billingAddressComplete ? (
+              <p className="mt-2 text-xs text-amber-800">
+                Complete your business address before subscribing so Stripe Tax can calculate the
+                correct Canadian taxes.
+              </p>
+            ) : null}
+            {addressSyncError ? (
+              <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                <p>
+                  Billing address could not be synchronized to Stripe. Your JobProof address is still
+                  saved — retry sync so future invoices use the updated location.
+                </p>
+                <StripeBillingAddressRetryButton />
+              </div>
+            ) : trimOrEmpty(profile.stripe_customer_id) ? (
+              <StripeBillingAddressRetryButton />
+            ) : null}
+          </div>
+          <div className="sm:col-span-2">
             <dt className="text-zinc-500">Stripe customer</dt>
             <dd className="font-mono text-xs text-zinc-700">
               {isBetaTester ? "Not required during beta" : stripeCustomerDisplay}
@@ -459,8 +551,8 @@ export default async function BillingSettingsPage({
         {!isBetaTester ? (
           <p className="mt-3 text-xs text-zinc-600">
             {hasActiveSubscription
-              ? "Stripe will send receipts and billing emails to your account email."
-              : "No credit card is required during your free trial. Subscribe anytime from this page."}
+              ? "Stripe will send receipts and billing emails to your account email. Use Manage subscription to update payment methods or view invoices."
+              : "No credit card is required during your free trial. Subscribe anytime from this page. Stripe Checkout will show applicable taxes before payment."}
           </p>
         ) : (
           <p className="mt-3 text-xs text-zinc-600">

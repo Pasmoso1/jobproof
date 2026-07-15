@@ -403,7 +403,33 @@ export async function processStripeBillingWebhook(
             eventType: "webhook_sync",
             oldSubscriptionStatus: prevStatus,
             newSubscriptionStatus: "active",
-            metadata: { kind: "invoice_paid", invoice_id: inv.id },
+            metadata: {
+              kind: "invoice_paid",
+              invoice_id: inv.id,
+              // Tax ledger stays in Stripe; log amounts for support only.
+              currency: inv.currency ?? null,
+              subtotal:
+                typeof inv.subtotal === "number" ? inv.subtotal / 100 : null,
+              tax: (() => {
+                const totalTaxes = (
+                  inv as {
+                    total_taxes?: Array<{ amount?: number | null }> | null;
+                  }
+                ).total_taxes;
+                if (Array.isArray(totalTaxes) && totalTaxes.length > 0) {
+                  const sum = totalTaxes.reduce(
+                    (acc, row) => acc + (typeof row.amount === "number" ? row.amount : 0),
+                    0
+                  );
+                  return sum / 100;
+                }
+                return null;
+              })(),
+              total: typeof inv.total === "number" ? inv.total / 100 : null,
+              automatic_tax_status: inv.automatic_tax?.status ?? null,
+              customer_address_country: inv.customer_address?.country ?? null,
+              customer_address_state: inv.customer_address?.state ?? null,
+            },
           });
         }
       }

@@ -4,8 +4,10 @@ Use Stripe **test mode** for all checks below.
 
 ## 1) Subscription checkout
 
+- Complete business address under Settings → Business first.
 - Open `/settings/billing`.
-- Click **Choose Essential** or **Choose Professional**.
+- Click **Choose Solo / Pro** (or Essential / Professional on founder pricing).
+- Confirm Stripe Checkout collects billing address and shows **applicable taxes**.
 - Complete checkout in Stripe test mode.
 - Confirm webhook updates profile fields:
   - `stripe_customer_id`
@@ -16,6 +18,8 @@ Use Stripe **test mode** for all checks below.
   - `subscription_status`
   - `subscription_current_period_end`
   - `trial_ends_at`
+
+See also [docs/STRIPE_TAX.md](./STRIPE_TAX.md) for Stripe Tax Dashboard setup and province tests.
 
 ## 2) Failed payment + grace period
 

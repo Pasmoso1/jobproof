@@ -46,14 +46,36 @@ export type PlanDisplay = {
 };
 
 const FOUNDER: Record<BillingPlanTier, string> = {
-  essential: "$29 CAD/mo",
-  professional: "$49 CAD/mo",
+  essential: "$29 CAD/month",
+  professional: "$49 CAD/month",
 };
 
 const STANDARD: Record<BillingPlanTier, string> = {
-  essential: "$39 CAD/mo",
-  professional: "$59 CAD/mo",
+  essential: "$39 CAD/month",
+  professional: "$59 CAD/month",
 };
+
+const APPLICABLE_TAXES_SUFFIX = " + applicable taxes";
+
+/** Short display used in buttons: "$39 CAD/mo + tax" style. */
+export function getPlanPriceWithTaxesLine(
+  planTier: BillingPlanTier,
+  pricingVersion: BillingPricingVersion
+): string {
+  const base = (pricingVersion === "founder" ? FOUNDER : STANDARD)[planTier];
+  // Keep "/mo" compact for buttons while still indicating taxes.
+  const compact = base.replace("/month", "/mo");
+  return `${compact}${APPLICABLE_TAXES_SUFFIX}`;
+}
+
+/** Public/marketing: "$39 CAD/month + applicable taxes" */
+export function getPublicPlanPriceLine(
+  planTier: BillingPlanTier,
+  pricingVersion: BillingPricingVersion = "standard"
+): string {
+  const base = (pricingVersion === "founder" ? FOUNDER : STANDARD)[planTier];
+  return `${base}${APPLICABLE_TAXES_SUFFIX}`;
+}
 
 const TIER_NAME: Record<BillingPlanTier, string> = {
   essential: "Essential",
@@ -84,12 +106,13 @@ export function getPlanDisplayLines(
 ): PlanDisplay {
   const tier = TIER_NAME[planTier];
   const recurring = (pricingVersion === "founder" ? FOUNDER : STANDARD)[planTier];
+  const withTax = `${recurring}${APPLICABLE_TAXES_SUFFIX}`;
   const planLine = options?.betaTester
     ? `${tier} (Beta Tester)`
     : pricingVersion === "founder"
-      ? `${tier} Founder — ${recurring}`
-      : `${tier} — ${recurring}`;
-  return { planLine, afterTrialLine: recurring };
+      ? `${tier} Founder — ${withTax}`
+      : `${tier} — ${withTax}`;
+  return { planLine, afterTrialLine: withTax };
 }
 
 export function getPlanDisplayLinesForProfile(p: {

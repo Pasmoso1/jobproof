@@ -35,11 +35,16 @@ import { resolvePublicAppOrigin } from "@/lib/app-origin";
 import { invoiceTaxShortLabelFromAppliedAmounts } from "@/lib/invoice-tax";
 import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 import { normalizeCanadianProvince } from "@/lib/canada/provinces";
+import { normalizeCanadianPostalCode } from "@/lib/canada/postal-code";
 import { normalizeCanadianPhoneForStorage } from "@/lib/canada/phone";
 import {
   formatDateEastern,
   formatLocalDateStringEastern,
 } from "@/lib/datetime-eastern";
+import {
+  STRIPE_TAX_ADDRESS_FUTURE_INVOICES_NOTE,
+  STRIPE_TAX_ADDRESS_SYNC_FAILED_MESSAGE,
+} from "@/lib/stripe-subscription-tax";
 import { JOB_LOCKED_SIGNED_CONTRACT_MESSAGE } from "@/lib/job-contract-lock";
 import {
   validateChangeOrderDescription,
@@ -206,7 +211,7 @@ export async function updateProfileBusinessInfo(formData: FormData) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, quote_primary_trade, quote_additional_trades, plan_tier, trial_plan_tier, beta_tester, beta_plan_tier, stripe_subscription_id, subscription_status, trial_started_at, trial_ends_at, trial_email_welcome_sent_at, trial_email_started_sent_at, business_name, phone, address_line_1, city, province, postal_code"
+      "id, quote_primary_trade, quote_additional_trades, plan_tier, trial_plan_tier, beta_tester, beta_plan_tier, stripe_subscription_id, stripe_customer_id, subscription_status, trial_started_at, trial_ends_at, trial_email_welcome_sent_at, trial_email_started_sent_at, business_name, phone, address_line_1, city, province, postal_code"
     )
     .eq("user_id", user.id)
     .single();
@@ -222,7 +227,9 @@ export async function updateProfileBusinessInfo(formData: FormData) {
   const city = String(formData.get("city") ?? "").trim();
   const provinceRaw = String(formData.get("province") ?? "").trim();
   const province = normalizeCanadianProvince(provinceRaw) ?? provinceRaw;
-  const postalCode = String(formData.get("postal_code") ?? "").trim();
+  const postalCodeRaw = String(formData.get("postal_code") ?? "").trim();
+  const postalNormalized = normalizeCanadianPostalCode(postalCodeRaw);
+  const postalCode = postalNormalized ?? postalCodeRaw;
   const defaultPaymentTerms =
     String(formData.get("default_contract_payment_terms") ?? "").trim() || null;
   const defaultWarranty =
@@ -382,6 +389,45 @@ export async function updateProfileBusinessInfo(formData: FormData) {
 
   if (error) return { error: error.message };
 
+  let stripeAddressSyncWarning: string | null = null;
+  // JobProof → Stripe is authoritative for subscription tax location (when a Stripe Customer exists).
+  if (String(profile.stripe_customer_id ?? "").trim()) {
+    try {
+      const { getStripe } = await import("@/lib/stripe");
+      const { syncProfileBillingAddressToStripe } = await import(
+        "@/lib/stripe-customer-address-sync"
+      );
+      const stripe = getStripe();
+      const syncResult = await syncProfileBillingAddressToStripe({
+        stripe,
+        supabase,
+        profile: {
+          id: profile.id,
+          stripe_customer_id: profile.stripe_customer_id,
+          business_name: businessName,
+          contractor_name: contractorName,
+          address_line_1: addressLine1,
+          address_line_2: addressLine2,
+          city,
+          province,
+          postal_code: postalCode,
+        },
+        userEmail: accountEmail,
+        source: "business_settings",
+        requireCustomer: false,
+      });
+      if (!syncResult.ok) {
+        stripeAddressSyncWarning = STRIPE_TAX_ADDRESS_SYNC_FAILED_MESSAGE;
+      }
+    } catch (err) {
+      console.error("[updateProfileBusinessInfo] stripe address sync", {
+        profile_id: profile.id,
+        error_name: err instanceof Error ? err.name : "unknown",
+      });
+      stripeAddressSyncWarning = STRIPE_TAX_ADDRESS_SYNC_FAILED_MESSAGE;
+    }
+  }
+
   // Start JobProof-managed trial once plan is selected and onboarding is complete.
   try {
     const { maybeStartManagedTrial } = await import("@/lib/start-managed-trial");
@@ -408,10 +454,15 @@ export async function updateProfileBusinessInfo(formData: FormData) {
   }
 
   revalidatePath("/settings/business");
+  revalidatePath("/settings/billing");
   revalidatePath("/dashboard");
   revalidatePath("/jobs");
   revalidatePath("/onboarding/business-profile");
-  return { success: true };
+  return {
+    success: true,
+    stripeAddressSyncWarning,
+    billingAddressNote: STRIPE_TAX_ADDRESS_FUTURE_INVOICES_NOTE,
+  };
 }
 
 export async function getStorageUsage() {

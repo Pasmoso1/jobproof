@@ -225,6 +225,19 @@ export default async function AdminStripeReadinessPage() {
         </section>
 
         <section className="rounded-xl border border-zinc-200 bg-white p-5">
+          <h2 className="text-base font-semibold text-zinc-900">Stripe Tax (SaaS) checklist</h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Configure in the Stripe Dashboard — see{" "}
+            <code className="text-xs">docs/STRIPE_TAX.md</code>.
+          </p>
+          <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-zinc-700">
+            {report.stripeTaxOperatorChecklist.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="rounded-xl border border-zinc-200 bg-white p-5">
           <h2 className="text-base font-semibold text-zinc-900">New signup vs legacy beta</h2>
           <ul className="mt-3 list-inside list-disc space-y-2 text-sm text-zinc-700">
             <li>

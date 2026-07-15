@@ -76,6 +76,8 @@ export interface Profile {
   /** Optional self-reported channel from signup/early-access forms. */
   heard_about_source?: string | null;
   stripe_customer_id?: string | null;
+  stripe_billing_address_synced_at?: string | null;
+  stripe_billing_address_sync_error?: string | null;
   stripe_subscription_id?: string | null;
   stripe_price_id?: string | null;
   plan_tier?: "essential" | "professional" | null;

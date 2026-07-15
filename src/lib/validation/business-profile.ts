@@ -1,5 +1,6 @@
 import { validateCanadianPhone } from "@/lib/canada/phone";
 import { normalizeCanadianProvince } from "@/lib/canada/provinces";
+import { isValidCanadianPostalCode } from "@/lib/canada/postal-code";
 
 /** Shared client + server validation for business profile (onboarding + settings). */
 
@@ -52,6 +53,8 @@ export function validateBusinessProfileFields(
 
   if (!input.postal_code?.trim()) {
     errors.postal_code = "Postal code is required.";
+  } else if (!isValidCanadianPostalCode(input.postal_code)) {
+    errors.postal_code = "Enter a valid Canadian postal code (e.g. A1A 1A1).";
   }
 
   return errors;

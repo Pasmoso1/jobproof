@@ -89,6 +89,8 @@ export type StripeReadinessReport = {
   }>;
   allPriceIdsPresent: boolean;
   paidCheckoutReady: boolean;
+  /** Operator checklist reminder — Tax is configured in Stripe Dashboard, not env. */
+  stripeTaxOperatorChecklist: readonly string[];
   betaTesterFeatureEnabled: true;
   issues: string[];
   warnings: string[];
@@ -309,6 +311,14 @@ export function buildStripeReadinessReport(options?: {
     priceIds,
     allPriceIdsPresent,
     paidCheckoutReady,
+    stripeTaxOperatorChecklist: [
+      "Activate Stripe Tax; set Ontario origin address",
+      "Add GST/HST registration (add QST/PST/RST later when registered)",
+      "Confirm Solo/Pro Prices are CAD monthly tax-exclusive",
+      "Confirm SaaS/software product tax code on Stripe Products",
+      "Enable billing address updates in Billing Portal",
+      "Run test Checkouts per docs/STRIPE_TAX.md",
+    ],
     betaTesterFeatureEnabled: true,
     issues,
     warnings,

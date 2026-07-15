@@ -1,5 +1,18 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Stripe Tax (SaaS subscriptions)
+
+JobProof uses **Stripe Tax** for contractor subscription charges only. Operational checklist:
+
+- [docs/STRIPE_TAX.md](./docs/STRIPE_TAX.md) — Dashboard setup, provincial registrations later, migration script, test matrix
+- [docs/STRIPE_TESTING.md](./docs/STRIPE_TESTING.md) — Checkout / webhook testing
+
+Optional dry-run migration for existing subscriptions:
+
+```bash
+npx tsx --env-file=.env.local scripts/migrate-stripe-subscription-tax.ts
+```
+
 ## Getting Started
 
 First, run the development server:
