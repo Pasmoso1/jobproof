@@ -1,5 +1,15 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Partner Program
+
+Invitation-based partner referrals (not a public affiliate marketplace).
+
+- Public: `/partners`, `/partners/apply`
+- Portal: `/partner` (approved partners only)
+- Admin: `/admin/partners`
+- Cron: `POST /api/cron/partner-rewards` (Bearer `CRON_SECRET`) — qualifies 90-day rewards
+- Migration: `061_partner_portal.sql`
+
 ## Stripe Tax (SaaS subscriptions)
 
 JobProof uses **Stripe Tax** for contractor subscription charges only. Operational checklist:

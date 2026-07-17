@@ -18,6 +18,7 @@ const PROTECTED_PATHS = [
   "/customers",
   "/trial-ended",
   "/support",
+  "/partner",
 ];
 const AUTH_PATHS = ["/login", "/signup"];
 const BUSINESS_ONBOARDING_PATH = "/onboarding/business-profile";

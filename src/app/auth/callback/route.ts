@@ -2,6 +2,7 @@ import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { decodeFirstTouchCookie, FIRST_TOUCH_COOKIE_NAME } from "@/lib/attribution-first-touch";
+import { PARTNER_REF_COOKIE_NAME } from "@/lib/partners/partner-ref-cookie";
 
 /** Allow open redirects only to same-origin relative paths. */
 function isSafeRelativeRedirect(pathWithQuery: string): boolean {
@@ -41,6 +42,25 @@ export async function GET(request: NextRequest) {
           : next && isSafeRelativeRedirect(next)
             ? next
             : "/dashboard";
+
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          const { applyPartnerReferralAttributionForUser } = await import(
+            "@/lib/partners/apply-attribution"
+          );
+          await applyPartnerReferralAttributionForUser({
+            userId: user.id,
+            partnerRefCookieValue: request.cookies.get(PARTNER_REF_COOKIE_NAME)?.value,
+            source: "auth_callback_code",
+          });
+        }
+      } catch (err) {
+        console.error("[auth/callback] partner attribution", err);
+      }
+
       return NextResponse.redirect(new URL(redirectPath, request.url));
     }
 
@@ -125,6 +145,19 @@ export async function GET(request: NextRequest) {
 
         if (Object.keys(patch).length > 0) {
           await supabase.from("profiles").update(patch).eq("user_id", user.id);
+        }
+
+        try {
+          const { applyPartnerReferralAttributionForUser } = await import(
+            "@/lib/partners/apply-attribution"
+          );
+          await applyPartnerReferralAttributionForUser({
+            userId: user.id,
+            partnerRefCookieValue: request.cookies.get(PARTNER_REF_COOKIE_NAME)?.value,
+            source: "auth_callback_signup",
+          });
+        } catch (err) {
+          console.error("[auth/callback] partner attribution", err);
         }
 
         if (profile && !profile.trial_email_welcome_sent_at && user.email) {

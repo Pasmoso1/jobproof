@@ -714,6 +714,9 @@ export default function Home() {
             <Link href="/support" className="font-medium text-zinc-600 hover:text-zinc-900">
               Support
             </Link>
+            <Link href="/partners" className="font-medium text-zinc-600 hover:text-zinc-900">
+              Partners
+            </Link>
             <Link href="/privacy" className="font-medium text-zinc-600 hover:text-zinc-900">
               Privacy Policy
             </Link>

@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { FirstTouchAttributionCapture } from "@/components/first-touch-attribution-capture";
+import { PartnerRefCapture } from "@/components/partner-ref-capture";
 import MetaPageViewTracker from "@/components/MetaPageViewTracker";
 import "./globals.css";
 
@@ -78,6 +79,7 @@ fbq('track', 'PageView');
         <Suspense fallback={null}>
           <MetaPageViewTracker />
           <FirstTouchAttributionCapture />
+          <PartnerRefCapture />
         </Suspense>
         {children}
       </body>

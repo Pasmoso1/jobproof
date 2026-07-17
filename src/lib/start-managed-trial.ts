@@ -121,5 +121,24 @@ export async function maybeStartManagedTrial(
       .eq("id", profile.id);
   }
 
+  try {
+    const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+    const { markPartnerReferralTrialStarted } = await import("@/lib/partners/attribution");
+    const { syncPartnerReferralBusinessName } = await import(
+      "@/lib/partners/apply-attribution"
+    );
+    const admin = createServiceRoleClient();
+    if (admin) {
+      await markPartnerReferralTrialStarted(admin, profile.id);
+      await syncPartnerReferralBusinessName(
+        admin,
+        profile.id,
+        profile.business_name ?? null
+      );
+    }
+  } catch (err) {
+    console.error("[maybeStartManagedTrial] partner referral", err);
+  }
+
   return true;
 }

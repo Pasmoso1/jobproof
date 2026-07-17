@@ -402,6 +402,12 @@ export default async function AdminPage({
               Product analytics →
             </Link>
             <Link
+              href="/admin/partners"
+              className="inline-flex min-h-[40px] items-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+            >
+              Partners →
+            </Link>
+            <Link
               href="/admin/stripe-readiness"
               className="inline-flex min-h-[40px] items-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
             >

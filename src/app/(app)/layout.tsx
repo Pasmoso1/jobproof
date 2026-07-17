@@ -51,6 +51,29 @@ export default async function AppLayout({
     ? await getNewQuoteRequestCount(String(profile.id))
     : 0;
 
+  const email = user.email?.trim().toLowerCase() ?? "";
+  let showPartnerPortal = false;
+  if (email) {
+    if (profile?.id) {
+      const { data: byProfile } = await supabase
+        .from("partners")
+        .select("id")
+        .eq("status", "active")
+        .eq("profile_id", profile.id)
+        .maybeSingle();
+      if (byProfile) showPartnerPortal = true;
+    }
+    if (!showPartnerPortal) {
+      const { data: byEmail } = await supabase
+        .from("partners")
+        .select("id")
+        .eq("status", "active")
+        .ilike("email", email)
+        .maybeSingle();
+      if (byEmail) showPartnerPortal = true;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white">
@@ -102,6 +125,14 @@ export default async function AppLayout({
             >
               Support
             </Link>
+            {showPartnerPortal ? (
+              <Link
+                href="/partner"
+                className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
+              >
+                Partner Portal
+              </Link>
+            ) : null}
             <a
               href={getFeedbackMailtoHref()}
               className="text-sm font-medium text-zinc-600 hover:text-zinc-900"

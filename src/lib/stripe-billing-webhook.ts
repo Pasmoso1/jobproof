@@ -197,6 +197,17 @@ export async function processStripeBillingWebhook(
               pricing_version: plan?.pricingVersion ?? session.metadata?.pricing_version,
             },
           });
+
+          if (["active", "trialing", "past_due"].includes(String(newStatus))) {
+            try {
+              const { markPartnerReferralSubscriptionStarted } = await import(
+                "@/lib/partners/attribution"
+              );
+              await markPartnerReferralSubscriptionStarted(admin, String(profile.id));
+            } catch (err) {
+              console.error("[stripe-webhook] partner subscription started", err);
+            }
+          }
         }
       } else if (session.mode === "payment") {
         const invoiceId = String(session.metadata?.invoice_id ?? "");
