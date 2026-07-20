@@ -11,6 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "npx tsx --test src/lib/partners/submit-application.test.ts",
     "migrate:stripe-tax": "npx tsx --env-file=.env.local scripts/migrate-stripe-subscription-tax.ts"
   },
   "dependencies": {
