@@ -6,12 +6,8 @@ import { sendOpsNotification } from "@/lib/support/ops-notifications";
 import { sendPartnerApplicationReceivedEmail } from "@/lib/partners/emails";
 import { PARTNER_AGREEMENT_VERSION } from "@/lib/partners/constants";
 import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
-import {
-  submitPartnerApplicationCore,
-  type PartnerApplyResult,
-} from "@/lib/partners/submit-application";
-
-export type { PartnerApplyResult };
+import { submitPartnerApplicationCore } from "@/lib/partners/submit-application";
+import type { PartnerApplyResult } from "@/lib/partners/submit-application";
 
 export async function trackPartnerPublicEvent(
   event: "founding_partner_section_viewed" | "partner_agreement_viewed"

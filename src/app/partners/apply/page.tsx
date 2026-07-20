@@ -20,15 +20,24 @@ export default function PartnerApplyPage() {
     setLoading(true);
     setError(null);
     setFieldErrors({});
-    const fd = new FormData(e.currentTarget);
-    const result = await submitPartnerApplication(fd);
-    setLoading(false);
-    if (!result.success) {
-      setError(result.error);
-      if (result.fieldErrors) setFieldErrors(result.fieldErrors);
-      return;
+    try {
+      const fd = new FormData(e.currentTarget);
+      const result = await submitPartnerApplication(fd);
+      if (!result || typeof result !== "object" || !("success" in result)) {
+        setError("Could not submit your application. Please try again.");
+        return;
+      }
+      if (!result.success) {
+        setError(result.error);
+        if (result.fieldErrors) setFieldErrors(result.fieldErrors);
+        return;
+      }
+      setDone(true);
+    } catch {
+      setError("Could not submit your application. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setDone(true);
   }
 
   return (
