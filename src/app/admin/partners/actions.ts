@@ -31,13 +31,30 @@ async function requireAdminService() {
 export async function adminSetApplicationUnderReview(applicationId: string) {
   const ctx = await requireAdminService();
   if (!ctx.ok) return ctx;
-  await ctx.admin
+
+  const { data: app } = await ctx.admin
+    .from("partner_applications")
+    .select("id, status")
+    .eq("id", applicationId)
+    .maybeSingle();
+  if (!app) return { ok: false as const, error: "Application not found" };
+  if (app.status !== "submitted") {
+    return {
+      ok: false as const,
+      error: "Only submitted applications can be marked under review.",
+    };
+  }
+
+  const { error } = await ctx.admin
     .from("partner_applications")
     .update({ status: "under_review" })
     .eq("id", applicationId)
-    .in("status", ["submitted", "under_review"]);
+    .eq("status", "submitted");
+  if (error) {
+    return { ok: false as const, error: error.message };
+  }
   revalidatePath("/admin/partners");
-  return { ok: true as const };
+  return { ok: true as const, status: "under_review" as const };
 }
 
 export async function adminApprovePartnerApplication(
@@ -55,6 +72,9 @@ export async function adminApprovePartnerApplication(
   if (!app) return { ok: false as const, error: "Application not found" };
   if (app.status === "approved") return { ok: false as const, error: "Already approved" };
   if (app.status === "declined") return { ok: false as const, error: "Already declined" };
+  if (!["submitted", "under_review"].includes(app.status)) {
+    return { ok: false as const, error: "This application cannot be approved." };
+  }
   if (!app.agreement_version || !app.agreement_accepted_at) {
     return {
       ok: false as const,
@@ -122,7 +142,10 @@ export async function adminApprovePartnerApplication(
   }
 }
 
-export async function adminDeclinePartnerApplication(applicationId: string) {
+export async function adminDeclinePartnerApplication(
+  applicationId: string,
+  declineReason?: string | null
+) {
   const ctx = await requireAdminService();
   if (!ctx.ok) return ctx;
 
@@ -132,12 +155,28 @@ export async function adminDeclinePartnerApplication(applicationId: string) {
     .eq("id", applicationId)
     .maybeSingle();
   if (!app) return { ok: false as const, error: "Not found" };
+  if (app.status === "approved") {
+    return { ok: false as const, error: "Approved applications cannot be declined." };
+  }
+  if (app.status === "declined") {
+    return { ok: false as const, error: "Application is already declined." };
+  }
+  if (!["submitted", "under_review"].includes(app.status)) {
+    return { ok: false as const, error: "This application cannot be declined." };
+  }
 
+  const reason = String(declineReason ?? "").trim();
+  if (!reason) {
+    return { ok: false as const, error: "Enter a decline reason for internal records." };
+  }
+
+  const reviewedAt = new Date().toISOString();
   await ctx.admin
     .from("partner_applications")
     .update({
       status: "declined",
-      reviewed_at: new Date().toISOString(),
+      decline_reason: reason,
+      reviewed_at: reviewedAt,
       reviewed_by: ctx.email,
     })
     .eq("id", applicationId);
@@ -155,7 +194,13 @@ export async function adminDeclinePartnerApplication(applicationId: string) {
   });
 
   revalidatePath("/admin/partners");
-  return { ok: true as const };
+  return {
+    ok: true as const,
+    status: "declined" as const,
+    decline_reason: reason,
+    reviewed_at: reviewedAt,
+    reviewed_by: ctx.email,
+  };
 }
 
 export async function adminSuspendPartner(partnerId: string) {
