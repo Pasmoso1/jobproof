@@ -10,6 +10,8 @@ import {
   trackProductEventSafe,
 } from "@/lib/product-analytics";
 import {
+  logPartnerApplyAuthDiagnostics,
+  resolvePartnerApplyFlow,
   submitPartnerApplicationCore,
 } from "@/lib/partners/submit-application";
 import type { PartnerApplyResult } from "@/lib/partners/submit-application";
@@ -54,6 +56,59 @@ export async function checkPartnerUsernameAvailableAction(
   };
 }
 
+/**
+ * Trusted apply-page auth state from server getUser() (validates JWT).
+ * Never trust client-only session caches for flow selection.
+ */
+export async function getPartnerApplySessionState(): Promise<{
+  resolved: true;
+  signedIn: boolean;
+  email: string | null;
+  userId: string | null;
+  flow: "new_account" | "existing_account";
+}> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const authenticatedUser =
+    user?.id && user.email
+      ? {
+          id: user.id,
+          email: user.email.trim().toLowerCase(),
+          emailConfirmedAt: user.email_confirmed_at ?? null,
+        }
+      : null;
+  const flow = resolvePartnerApplyFlow(authenticatedUser);
+
+  logPartnerApplyAuthDiagnostics({
+    authState: authenticatedUser ? "signed_in" : "signed_out",
+    userId: authenticatedUser?.id ?? null,
+    flow,
+  });
+
+  return {
+    resolved: true,
+    signedIn: Boolean(authenticatedUser),
+    email: authenticatedUser?.email ?? null,
+    userId: authenticatedUser?.id ?? null,
+    flow,
+  };
+}
+
+/** Sign out and return to the new-account apply flow. */
+export async function signOutFromPartnerApply(): Promise<{ ok: true }> {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  logPartnerApplyAuthDiagnostics({
+    authState: "signed_out",
+    userId: null,
+    flow: "new_account",
+  });
+  return { ok: true };
+}
+
 export async function submitPartnerApplication(
   formData: FormData
 ): Promise<PartnerApplyResult> {
@@ -62,13 +117,24 @@ export async function submitPartnerApplication(
   if (!admin) {
     return {
       success: false,
-      error: "Application service is temporarily unavailable. Please try again shortly.",
+      error:
+        "Application service is temporarily unavailable. Please try again shortly.",
     };
   }
 
+  // getUser() validates the JWT with Supabase Auth — do not use getSession() alone.
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const authenticatedUser =
+    user?.id && user.email
+      ? {
+          id: user.id,
+          email: user.email.trim().toLowerCase(),
+          emailConfirmedAt: user.email_confirmed_at ?? null,
+        }
+      : null;
 
   const result = await submitPartnerApplicationCore({
     formData,
@@ -86,13 +152,7 @@ export async function submitPartnerApplication(
           }>,
       }),
     },
-    authenticatedUser: user
-      ? {
-          id: user.id,
-          email: (user.email ?? "").trim().toLowerCase(),
-          emailConfirmedAt: user.email_confirmed_at ?? null,
-        }
-      : null,
+    authenticatedUser,
     findOpenApplicationIdByEmail: async (email) => {
       const { data, error } = await admin
         .from("partner_applications")
@@ -128,7 +188,9 @@ export async function submitPartnerApplication(
         return {
           ok: false as const,
           error: created.error,
-          code: created.existingAccount ? ("existing_account" as const) : ("auth_failed" as const),
+          code: created.existingAccount
+            ? ("existing_account" as const)
+            : ("auth_failed" as const),
         };
       }
       return {
@@ -162,7 +224,9 @@ export async function submitPartnerApplication(
   const applicationId = result.applicationId;
   const organizationName = String(formData.get("organization_name") ?? "").trim();
   const contactName = String(formData.get("contact_name") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email =
+    authenticatedUser?.email ??
+    String(formData.get("email") ?? "").trim().toLowerCase();
   const phone = String(formData.get("phone") ?? "").trim();
   const website = String(formData.get("website") ?? "").trim();
   const partnerType = String(formData.get("partner_type") ?? "").trim();
@@ -191,6 +255,7 @@ export async function submitPartnerApplication(
       application_id: applicationId,
       has_username: Boolean(loginId.ok && loginId.kind === "username"),
       login_kind: loginId.ok ? loginId.kind : "unknown",
+      apply_flow: result.flow,
     },
   });
   trackProductEventSafe({
@@ -224,6 +289,7 @@ export async function submitPartnerApplication(
       { label: "Contact", value: contactName },
       { label: "Email", value: email },
       { label: "Login", value: displayLogin ?? "—" },
+      { label: "Apply flow", value: result.flow },
       { label: "Phone", value: phone || "—" },
       { label: "Website", value: website || "—" },
       { label: "Partner type", value: partnerType },
@@ -234,7 +300,9 @@ export async function submitPartnerApplication(
         label: "Auth account",
         value: result.emailVerificationSent
           ? "Created (email verification pending)"
-          : "Linked",
+          : result.flow === "existing_account"
+            ? "Existing JobProof account linked"
+            : "Linked",
       },
     ],
     messageLabel: "Promotion plan / reason",

@@ -81,17 +81,33 @@ describe("partner username auth security invariants", () => {
     assert.match(source, /reason: "email"/);
   });
 
-  it("apply page always renders password fields for guests", () => {
+  it("apply page hardens guest vs signed-in account UX", () => {
     const source = readFileSync(
       join(process.cwd(), "src/app/partners/apply/page.tsx"),
       "utf8"
     );
     assert.match(source, /Username or Email/);
     assert.match(source, /Confirm Password/);
-    assert.match(source, /passwordRequired/);
-    assert.match(source, /Show/);
-    assert.match(source, /Hide/);
-    // Guests see passwords unless auth check confirms a signed-in session.
-    assert.match(source, /authChecked \? !signedInEmail : true/);
+    assert.match(source, /Checking account/);
+    assert.match(source, /You are signed in as/);
+    assert.match(source, /Your existing JobProof password will be used/);
+    assert.match(source, /You do not need to create a/);
+    assert.match(source, /Not you\? Sign out and apply with another account/);
+    assert.match(source, /getPartnerApplySessionState/);
+    assert.match(source, /signOutFromPartnerApply/);
+    assert.match(source, /authUi\.status === "loading"/);
+    // Guests (signed_out) see password fields; signed-in users do not.
+    assert.match(source, /passwordRequired = authUi\.status === "signed_out"/);
+    assert.match(source, /readOnly/);
+  });
+
+  it("server actions use getUser not getSession for apply auth", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/app/partners/actions.ts"),
+      "utf8"
+    );
+    assert.match(source, /auth\.getUser\(\)/);
+    assert.doesNotMatch(source, /auth\.getSession\(\)/);
+    assert.match(source, /logPartnerApplyAuthDiagnostics/);
   });
 });

@@ -59,6 +59,8 @@ describe("partners actions type-erasure safety", () => {
             success: false,
             error: "stub",
           }),
+          resolvePartnerApplyFlow: () => "new_account",
+          logPartnerApplyAuthDiagnostics: () => undefined,
         };
       }
       if (id.includes("product-analytics")) {
@@ -92,6 +94,30 @@ describe("partners actions type-erasure safety", () => {
             from: () => ({
               insert: async () => ({ error: null }),
             }),
+          }),
+        };
+      }
+      if (id.includes("auth-account")) {
+        return {
+          checkPartnerUsernameAvailability: async () => ({
+            available: true,
+            reason: "ok",
+          }),
+          claimPartnerUsername: async () => ({ ok: true }),
+          createPartnerAuthUserViaSignUp: async () => ({
+            ok: false,
+            error: "stub",
+          }),
+          deletePartnerAuthUserIfOrphan: async () => undefined,
+          linkRegistryApplicationId: async () => undefined,
+          releasePartnerUsernameClaim: async () => undefined,
+        };
+      }
+      if (id.includes("partners/username")) {
+        return {
+          validatePartnerLoginIdentifier: () => ({
+            ok: false,
+            error: "stub",
           }),
         };
       }

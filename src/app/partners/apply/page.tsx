@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { JobProofLogo } from "@/components/jobproof-logo";
 import {
   PARTNER_AGREEMENT_VERSION,
@@ -14,18 +15,33 @@ import {
 } from "@/lib/partners/username";
 import {
   checkPartnerUsernameAvailableAction,
+  getPartnerApplySessionState,
+  signOutFromPartnerApply,
   submitPartnerApplication,
 } from "@/app/partners/actions";
-import { createClient } from "@/lib/supabase/client";
+
+type AuthUiState =
+  | { status: "loading" }
+  | {
+      status: "signed_out";
+      flow: "new_account";
+    }
+  | {
+      status: "signed_in";
+      flow: "existing_account";
+      email: string;
+      userId: string;
+    };
 
 export default function PartnerApplyPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [done, setDone] = useState(false);
   const [existingAccount, setExistingAccount] = useState(false);
-  const [signedInEmail, setSignedInEmail] = useState<string | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [authUi, setAuthUi] = useState<AuthUiState>({ status: "loading" });
   const [loginIdentifier, setLoginIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -37,17 +53,28 @@ export default function PartnerApplyPage() {
   const [usernameHint, setUsernameHint] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  async function refreshAuthState() {
+    setAuthUi({ status: "loading" });
+    try {
+      const state = await getPartnerApplySessionState();
+      if (state.signedIn && state.email && state.userId) {
+        setAuthUi({
+          status: "signed_in",
+          flow: "existing_account",
+          email: state.email,
+          userId: state.userId,
+        });
+      } else {
+        setAuthUi({ status: "signed_out", flow: "new_account" });
+      }
+    } catch {
+      // Fail closed to guest flow so password fields appear and server still enforces.
+      setAuthUi({ status: "signed_out", flow: "new_account" });
+    }
+  }
+
   useEffect(() => {
-    void createClient()
-      .auth.getUser()
-      .then(({ data }) => {
-        setSignedInEmail(data.user?.email?.trim().toLowerCase() ?? null);
-        setAuthChecked(true);
-      })
-      .catch(() => {
-        setSignedInEmail(null);
-        setAuthChecked(true);
-      });
+    void refreshAuthState();
   }, []);
 
   useEffect(() => {
@@ -60,7 +87,9 @@ export default function PartnerApplyPage() {
     if (looksLikeEmail(value)) {
       setUsernameStatus("email");
       setUsernameHint(
-        "You’ll sign in with this email after approval (must match the email above)."
+        authUi.status === "signed_in"
+          ? "You’ll use email sign-in with your existing JobProof account after approval."
+          : "You’ll create / use email sign-in after approval (must match the application email)."
       );
       return;
     }
@@ -89,16 +118,44 @@ export default function PartnerApplyPage() {
       });
     }, 400);
     return () => window.clearTimeout(handle);
-  }, [loginIdentifier]);
+  }, [loginIdentifier, authUi.status]);
+
+  async function onSignOut() {
+    setSigningOut(true);
+    setError(null);
+    try {
+      await signOutFromPartnerApply();
+      setPassword("");
+      setConfirmPassword("");
+      setAuthUi({ status: "signed_out", flow: "new_account" });
+      router.replace("/partners/apply");
+      router.refresh();
+      await refreshAuthState();
+    } catch {
+      setError("Could not sign out. Please try again.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (authUi.status === "loading") {
+      setError("Still checking your account. Please wait a moment.");
+      return;
+    }
     setLoading(true);
     setError(null);
     setFieldErrors({});
     setExistingAccount(false);
     try {
       const fd = new FormData(e.currentTarget);
+      // Existing-account: force trusted email into the payload.
+      if (authUi.status === "signed_in") {
+        fd.set("email", authUi.email);
+        fd.set("password", "");
+        fd.set("confirm_password", "");
+      }
       const result = await submitPartnerApplication(fd);
       if (!result || typeof result !== "object" || !("success" in result)) {
         setError("Could not submit your application. Please try again.");
@@ -118,14 +175,15 @@ export default function PartnerApplyPage() {
     }
   }
 
-  // Only skip password fields after auth check confirms an existing session.
-  // Guests (and while auth is still loading) always see password fields.
-  const passwordRequired = authChecked ? !signedInEmail : true;
+  const authLoading = authUi.status === "loading";
+  const isExistingAccount = authUi.status === "signed_in";
+  const passwordRequired = authUi.status === "signed_out";
   const passwordHint = partnerPasswordStrengthHint(password);
   const confirmMismatch =
     confirmPassword.length > 0 && password !== confirmPassword
       ? "Password and confirmation do not match."
       : null;
+  const formDisabled = authLoading || loading || signingOut;
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -145,8 +203,8 @@ export default function PartnerApplyPage() {
           Apply to become a partner
         </h1>
         <p className="mt-2 text-zinc-600">
-          Tell us about your organization and create sign-in credentials for
-          Partner Portal access after approval.
+          Tell us about your organization and set up Partner Portal sign-in for
+          after approval.
         </p>
 
         {done ? (
@@ -154,8 +212,8 @@ export default function PartnerApplyPage() {
             <p className="font-semibold">Application submitted</p>
             <p className="mt-2 text-sm">
               Thanks — we sent a confirmation email. Confirm your email if asked,
-              then you can sign in with your username or email to check application
-              status. Partner Portal access opens after approval.
+              then sign in with your username or email to check application status.
+              Partner Portal access opens after approval.
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
               <Link
@@ -173,7 +231,11 @@ export default function PartnerApplyPage() {
             </div>
           </div>
         ) : (
-          <form onSubmit={onSubmit} className="mt-8 space-y-5 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <form
+            onSubmit={onSubmit}
+            className="mt-8 space-y-5 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm"
+            aria-busy={authLoading}
+          >
             {error ? (
               <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
@@ -185,23 +247,26 @@ export default function PartnerApplyPage() {
                     >
                       Sign in with your existing JobProof account
                     </Link>{" "}
-                    , then return here to finish your partner application (password
-                    not required while signed in).
+                    , then return here to finish your partner application.
                   </p>
                 ) : null}
               </div>
             ) : null}
 
-            {signedInEmail ? (
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-                Signed in as <strong>{signedInEmail}</strong>. We&apos;ll link this
-                application to your existing account. Choose a username or email
-                below — you can keep using your current password.
+            {authLoading ? (
+              <div
+                className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700"
+                role="status"
+              >
+                Checking account…
               </div>
             ) : null}
 
             {/* Honeypot */}
-            <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
+            <div
+              className="absolute -left-[9999px] h-0 w-0 overflow-hidden"
+              aria-hidden="true"
+            >
               <label htmlFor="company_website">Company website</label>
               <input
                 id="company_website"
@@ -212,180 +277,254 @@ export default function PartnerApplyPage() {
               />
             </div>
 
-            <Field label="Organization name" name="organization_name" required error={fieldErrors.organization_name} />
-            <Field label="Contact name" name="contact_name" required error={fieldErrors.contact_name} />
-            <Field
-              label="Email"
-              name="email"
-              type="email"
-              required
-              error={fieldErrors.email}
-              defaultValue={signedInEmail ?? undefined}
-            />
-            <Field label="Phone" name="phone" type="tel" error={fieldErrors.phone} />
-            <Field label="Website" name="website" type="url" placeholder="https://" />
-
-            <div>
-              <label htmlFor="partner_type" className="block text-sm font-medium text-zinc-700">
-                Partner type <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="partner_type"
-                name="partner_type"
+            <fieldset disabled={formDisabled} className="space-y-5 disabled:opacity-70">
+              <Field
+                label="Organization name"
+                name="organization_name"
                 required
-                className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-              >
-                <option value="">Select…</option>
-                {PARTNER_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-              {fieldErrors.partner_type ? (
-                <p className="mt-1 text-sm text-red-600">{fieldErrors.partner_type}</p>
-              ) : null}
-            </div>
+                error={fieldErrors.organization_name}
+              />
+              <Field
+                label="Contact name"
+                name="contact_name"
+                required
+                error={fieldErrors.contact_name}
+              />
 
-            <Field
-              label="Estimated contractor audience size"
-              name="estimated_audience"
-              placeholder="e.g. 500 contractors in Ontario"
-            />
-
-            <TextArea
-              label="How do you plan to promote JobProof?"
-              name="promotion_plan"
-              required
-              error={fieldErrors.promotion_plan}
-            />
-            <TextArea
-              label="Why would you like to become a partner?"
-              name="reason"
-              required
-              error={fieldErrors.reason}
-            />
-
-            <div className="space-y-4 border-t border-zinc-200 pt-5">
-              <div>
-                <h2 className="text-base font-semibold text-zinc-900">Account</h2>
-                <p className="mt-1 text-sm text-zinc-600">
-                  Choose how you&apos;d like to sign in after your application is
-                  approved.
-                </p>
-                <p className="mt-2 text-sm text-zinc-600">
-                  You may use your email address or choose a unique username (4–30
-                  characters using letters, numbers, underscores, or periods).
-                </p>
-                {passwordRequired ? (
-                  <p className="mt-2 text-sm text-zinc-600">
-                    Create a password that you&apos;ll use to access your Partner
-                    Portal after approval.
-                  </p>
-                ) : null}
-              </div>
-
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium text-zinc-700">
-                  Username or Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="username"
-                  name="username"
-                  required
-                  autoComplete="username"
-                  value={loginIdentifier}
-                  onChange={(e) => setLoginIdentifier(e.target.value)}
-                  placeholder="username or you@example.com"
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-                />
-                {fieldErrors.username ? (
-                  <p className="mt-1 text-sm text-red-600">{fieldErrors.username}</p>
-                ) : usernameHint ? (
-                  <p
-                    className={`mt-1 text-sm ${
-                      usernameStatus === "available" || usernameStatus === "email"
-                        ? "text-green-700"
-                        : usernameStatus === "unavailable"
-                          ? "text-red-600"
-                          : "text-zinc-500"
-                    }`}
+              {isExistingAccount ? (
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="block text-sm font-medium text-zinc-700"
                   >
-                    {usernameStatus === "checking" ? "Checking…" : usernameHint}
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    readOnly
+                    value={authUi.email}
+                    className="mt-1 block w-full rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-zinc-900"
+                  />
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Locked to your signed-in JobProof account. This application will
+                    be linked to that account.
                   </p>
-                ) : null}
-              </div>
-
-              {passwordRequired ? (
-                <>
-                  <PasswordField
-                    id="password"
-                    name="password"
-                    label="Password"
-                    value={password}
-                    onChange={setPassword}
-                    show={showPassword}
-                    onToggleShow={() => setShowPassword((v) => !v)}
-                    error={fieldErrors.password ?? passwordHint ?? undefined}
-                    hint={`At least ${PARTNER_PASSWORD_MIN_LENGTH} characters. Passwords are stored securely by JobProof authentication — never in your application record.`}
-                    autoComplete="new-password"
-                  />
-                  <PasswordField
-                    id="confirm_password"
-                    name="confirm_password"
-                    label="Confirm Password"
-                    value={confirmPassword}
-                    onChange={setConfirmPassword}
-                    show={showConfirmPassword}
-                    onToggleShow={() => setShowConfirmPassword((v) => !v)}
-                    error={
-                      fieldErrors.confirm_password ?? confirmMismatch ?? undefined
-                    }
-                    autoComplete="new-password"
-                  />
-                </>
+                  {fieldErrors.email ? (
+                    <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+                  ) : null}
+                </div>
               ) : (
-                <>
-                  <input type="hidden" name="password" value="" />
-                  <input type="hidden" name="confirm_password" value="" />
-                </>
-              )}
-            </div>
-
-            <div>
-              <label className="flex items-start gap-3 text-sm text-zinc-700">
-                <input
-                  type="checkbox"
-                  name="agreement_accepted"
+                <Field
+                  label="Email"
+                  name="email"
+                  type="email"
                   required
-                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-[#2436BB] focus:ring-[#2436BB]"
+                  error={fieldErrors.email}
                 />
-                <span>
-                  I have read and agree to the{" "}
-                  <Link
-                    href="/partners/agreement"
-                    target="_blank"
-                    className="font-medium text-[#2436BB] hover:underline"
-                  >
-                    Partner Program Agreement
-                  </Link>{" "}
-                  (version {PARTNER_AGREEMENT_VERSION}).
-                </span>
-              </label>
-              {fieldErrors.agreement_accepted ? (
-                <p className="mt-1 text-sm text-red-600">
-                  {fieldErrors.agreement_accepted}
-                </p>
-              ) : null}
-            </div>
+              )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-[#2436BB] px-6 py-3 text-base font-semibold text-white hover:bg-[#1c2a96] disabled:opacity-60"
-            >
-              {loading ? "Submitting…" : "Submit application"}
-            </button>
+              <Field label="Phone" name="phone" type="tel" error={fieldErrors.phone} />
+              <Field label="Website" name="website" type="url" placeholder="https://" />
+
+              <div>
+                <label
+                  htmlFor="partner_type"
+                  className="block text-sm font-medium text-zinc-700"
+                >
+                  Partner type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  id="partner_type"
+                  name="partner_type"
+                  required
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                >
+                  <option value="">Select…</option>
+                  {PARTNER_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+                {fieldErrors.partner_type ? (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.partner_type}</p>
+                ) : null}
+              </div>
+
+              <Field
+                label="Estimated contractor audience size"
+                name="estimated_audience"
+                placeholder="e.g. 500 contractors in Ontario"
+              />
+
+              <TextArea
+                label="How do you plan to promote JobProof?"
+                name="promotion_plan"
+                required
+                error={fieldErrors.promotion_plan}
+              />
+              <TextArea
+                label="Why would you like to become a partner?"
+                name="reason"
+                required
+                error={fieldErrors.reason}
+              />
+
+              <div className="space-y-4 border-t border-zinc-200 pt-5">
+                <div>
+                  <h2 className="text-base font-semibold text-zinc-900">Account</h2>
+                  {isExistingAccount ? (
+                    <div className="mt-3 rounded-xl border border-[#2436BB]/25 bg-[#2436BB]/5 px-4 py-4 text-sm text-zinc-900">
+                      <p className="font-semibold text-zinc-950">
+                        You are signed in as {authUi.email}.
+                      </p>
+                      <p className="mt-2 text-zinc-700">
+                        Your existing JobProof password will be used for Partner
+                        Portal access after approval. You do not need to create a
+                        new password.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={onSignOut}
+                        disabled={signingOut}
+                        className="mt-3 text-sm font-semibold text-[#2436BB] hover:underline disabled:opacity-60"
+                      >
+                        {signingOut
+                          ? "Signing out…"
+                          : "Not you? Sign out and apply with another account."}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-sm text-zinc-600">
+                        Choose how you&apos;d like to sign in after your application
+                        is approved.
+                      </p>
+                      <p className="mt-2 text-sm text-zinc-600">
+                        You may use your email address or choose a unique username
+                        (4–30 characters using letters, numbers, underscores, or
+                        periods).
+                      </p>
+                      <p className="mt-2 text-sm text-zinc-600">
+                        Create a password that you&apos;ll use to access your Partner
+                        Portal after approval.
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="username"
+                    className="block text-sm font-medium text-zinc-700"
+                  >
+                    Username or Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="username"
+                    name="username"
+                    required
+                    autoComplete="username"
+                    value={loginIdentifier}
+                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                    placeholder="username or you@example.com"
+                    className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                  />
+                  {fieldErrors.username ? (
+                    <p className="mt-1 text-sm text-red-600">{fieldErrors.username}</p>
+                  ) : usernameHint ? (
+                    <p
+                      className={`mt-1 text-sm ${
+                        usernameStatus === "available" || usernameStatus === "email"
+                          ? "text-green-700"
+                          : usernameStatus === "unavailable"
+                            ? "text-red-600"
+                            : "text-zinc-500"
+                      }`}
+                    >
+                      {usernameStatus === "checking" ? "Checking…" : usernameHint}
+                    </p>
+                  ) : null}
+                </div>
+
+                {passwordRequired ? (
+                  <>
+                    <PasswordField
+                      id="password"
+                      name="password"
+                      label="Password"
+                      value={password}
+                      onChange={setPassword}
+                      show={showPassword}
+                      onToggleShow={() => setShowPassword((v) => !v)}
+                      error={fieldErrors.password ?? passwordHint ?? undefined}
+                      hint={`At least ${PARTNER_PASSWORD_MIN_LENGTH} characters. Passwords are stored securely by JobProof authentication — never in your application record.`}
+                      autoComplete="new-password"
+                    />
+                    <PasswordField
+                      id="confirm_password"
+                      name="confirm_password"
+                      label="Confirm Password"
+                      value={confirmPassword}
+                      onChange={setConfirmPassword}
+                      show={showConfirmPassword}
+                      onToggleShow={() => setShowConfirmPassword((v) => !v)}
+                      error={
+                        fieldErrors.confirm_password ?? confirmMismatch ?? undefined
+                      }
+                      autoComplete="new-password"
+                    />
+                  </>
+                ) : isExistingAccount ? (
+                  <>
+                    <input type="hidden" name="password" value="" />
+                    <input type="hidden" name="confirm_password" value="" />
+                  </>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="flex items-start gap-3 text-sm text-zinc-700">
+                  <input
+                    type="checkbox"
+                    name="agreement_accepted"
+                    required
+                    className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-[#2436BB] focus:ring-[#2436BB]"
+                  />
+                  <span>
+                    I have read and agree to the{" "}
+                    <Link
+                      href="/partners/agreement"
+                      target="_blank"
+                      className="font-medium text-[#2436BB] hover:underline"
+                    >
+                      Partner Program Agreement
+                    </Link>{" "}
+                    (version {PARTNER_AGREEMENT_VERSION}).
+                  </span>
+                </label>
+                {fieldErrors.agreement_accepted ? (
+                  <p className="mt-1 text-sm text-red-600">
+                    {fieldErrors.agreement_accepted}
+                  </p>
+                ) : null}
+              </div>
+
+              <button
+                type="submit"
+                disabled={formDisabled}
+                className="w-full rounded-xl bg-[#2436BB] px-6 py-3 text-base font-semibold text-white hover:bg-[#1c2a96] disabled:opacity-60"
+              >
+                {authLoading
+                  ? "Checking account…"
+                  : loading
+                    ? "Submitting…"
+                    : "Submit application"}
+              </button>
+            </fieldset>
           </form>
         )}
       </main>
@@ -438,14 +577,14 @@ function PasswordField({
           onClick={onToggleShow}
           className="absolute inset-y-0 right-0 px-3 text-sm font-medium text-[#2436BB] hover:underline"
           aria-pressed={show}
-          aria-label={show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          aria-label={
+            show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`
+          }
         >
           {show ? "Hide" : "Show"}
         </button>
       </div>
-      {hint && !error ? (
-        <p className="mt-1 text-xs text-zinc-500">{hint}</p>
-      ) : null}
+      {hint && !error ? <p className="mt-1 text-xs text-zinc-500">{hint}</p> : null}
       {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
     </div>
   );

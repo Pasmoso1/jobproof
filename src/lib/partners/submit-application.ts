@@ -16,10 +16,19 @@ export type PartnerApplyErrorCode =
   | "username_taken"
   | "validation"
   | "auth_failed"
-  | "duplicate_application";
+  | "duplicate_application"
+  | "email_mismatch"
+  | "auth_required";
+
+export type PartnerApplyFlow = "new_account" | "existing_account";
 
 export type PartnerApplyResult =
-  | { success: true; applicationId: string; emailVerificationSent?: boolean }
+  | {
+      success: true;
+      applicationId: string;
+      emailVerificationSent?: boolean;
+      flow: PartnerApplyFlow;
+    }
   | {
       success: false;
       error: string;
@@ -61,6 +70,12 @@ export type ParsedPartnerApplication = {
   companyWebsiteTrap: string;
 };
 
+export type TrustedPartnerApplySession = {
+  id: string;
+  email: string;
+  emailConfirmedAt: string | null;
+};
+
 export function parsePartnerApplicationFormData(
   formData: FormData
 ): ParsedPartnerApplication {
@@ -84,11 +99,22 @@ export function parsePartnerApplicationFormData(
   };
 }
 
+/**
+ * Flow is selected only from a trusted Auth session — never from client hints,
+ * browser-supplied auth_user_id, or “email looks familiar”.
+ */
+export function resolvePartnerApplyFlow(
+  authenticatedUser: TrustedPartnerApplySession | null | undefined
+): PartnerApplyFlow {
+  return authenticatedUser?.id && authenticatedUser.email
+    ? "existing_account"
+    : "new_account";
+}
+
 export function validatePartnerApplication(
   input: ParsedPartnerApplication,
-  options?: { requirePassword?: boolean }
+  options: { requirePassword: boolean }
 ): Record<string, string> {
-  const requirePassword = options?.requirePassword !== false;
   const fieldErrors: Record<string, string> = {};
   if (!input.organizationName) {
     fieldErrors.organization_name = "Organization name is required.";
@@ -127,7 +153,7 @@ export function validatePartnerApplication(
     fieldErrors.username = loginId.error;
   }
 
-  if (requirePassword) {
+  if (options.requirePassword) {
     const passwordError = validatePartnerPassword(
       input.password,
       input.confirmPassword
@@ -227,6 +253,23 @@ export function logPartnerApplicationInsertError(
 }
 
 /**
+ * Safe apply-flow diagnostics — never log passwords, tokens, or emails.
+ */
+export function logPartnerApplyAuthDiagnostics(input: {
+  authState: "signed_in" | "signed_out";
+  userId: string | null;
+  flow: PartnerApplyFlow;
+  logger?: Pick<Console, "info">;
+}): void {
+  const logger = input.logger ?? console;
+  logger.info("[partners] apply auth diagnostics", {
+    auth_state_resolved: input.authState,
+    authenticated_user_id: input.userId,
+    application_flow_selected: input.flow,
+  });
+}
+
+/**
  * Insert a partner application without requiring SELECT permission.
  * Generates the row id server-side so follow-up updates can use service role.
  */
@@ -267,17 +310,17 @@ export type PartnerAuthProvisionResult =
 /**
  * Multi-step application submit with Auth + username linking.
  * Passwords are never written to application rows or logs.
+ *
+ * New-account: no trusted session → password required → create Auth user.
+ * Existing-account: trusted session required → email locked to Auth email →
+ * no password accepted/required → link auth.uid().
  */
 export async function submitPartnerApplicationCore(input: {
   formData: FormData;
   insertClient: PartnerApplicationInsertClient;
   findOpenApplicationIdByEmail?: (email: string) => Promise<string | null>;
-  /** When the browser already has a signed-in user whose email matches. */
-  authenticatedUser?: {
-    id: string;
-    email: string;
-    emailConfirmedAt: string | null;
-  } | null;
+  /** Trusted session from server getUser() only — never trust client claims. */
+  authenticatedUser?: TrustedPartnerApplySession | null;
   provisionAuthUser: (args: {
     email: string;
     password: string;
@@ -297,19 +340,59 @@ export async function submitPartnerApplicationCore(input: {
   ) => Promise<void>;
   checkUsernameAvailable: (normalized: string) => Promise<boolean>;
   now?: Date;
+  logger?: Pick<Console, "info" | "error">;
 }): Promise<PartnerApplyResult> {
   const parsed = parsePartnerApplicationFormData(input.formData);
 
   // Honeypot — silent success-shaped rejection for bots.
   if (parsed.companyWebsiteTrap) {
-    return { success: true, applicationId: randomUUID() };
+    return {
+      success: true,
+      applicationId: randomUUID(),
+      flow: "new_account",
+    };
   }
 
   const session = input.authenticatedUser ?? null;
-  const sessionEmailMatches =
-    Boolean(session?.email) &&
-    session!.email.trim().toLowerCase() === parsed.email;
-  const requirePassword = !sessionEmailMatches;
+  const flow = resolvePartnerApplyFlow(session);
+
+  logPartnerApplyAuthDiagnostics({
+    authState: session ? "signed_in" : "signed_out",
+    userId: session?.id ?? null,
+    flow,
+    logger: input.logger,
+  });
+
+  // Existing-account: lock email to the trusted Auth email.
+  if (flow === "existing_account" && session) {
+    const trustedEmail = session.email.trim().toLowerCase();
+    if (parsed.email && parsed.email !== trustedEmail) {
+      return {
+        success: false,
+        error:
+          "Your application email must match the signed-in JobProof account. Sign out to apply with a different email.",
+        code: "email_mismatch",
+        fieldErrors: {
+          email:
+            "This field is locked to your signed-in account. Sign out to use another email.",
+        },
+      };
+    }
+    parsed.email = trustedEmail;
+  }
+
+  const requirePassword = flow === "new_account";
+
+  // Hard server-side gate: guests cannot submit without a password, even if the
+  // browser form omitted password fields.
+  if (flow === "new_account" && !parsed.password) {
+    return {
+      success: false,
+      error: "Password is required to create your Partner Portal account.",
+      code: "validation",
+      fieldErrors: { password: "Password is required." },
+    };
+  }
 
   const fieldErrors = validatePartnerApplication(parsed, { requirePassword });
   if (Object.keys(fieldErrors).length) {
@@ -364,10 +447,33 @@ export async function submitPartnerApplicationCore(input: {
   let emailConfirmedAt: string | null = null;
   let createdNewAuthUser = false;
 
-  if (sessionEmailMatches && session) {
+  if (flow === "existing_account") {
+    if (!session?.id) {
+      return {
+        success: false,
+        error: "Sign in is required to continue with an existing JobProof account.",
+        code: "auth_required",
+      };
+    }
+    // Never accept a client-supplied password for existing accounts.
     authUserId = session.id;
     emailConfirmedAt = session.emailConfirmedAt;
   } else {
+    if (!parsed.password || parsed.password !== parsed.confirmPassword) {
+      return {
+        success: false,
+        error: "Password and confirmation are required for new accounts.",
+        code: "validation",
+        fieldErrors: {
+          password: "Password is required.",
+          confirm_password:
+            parsed.password && parsed.password !== parsed.confirmPassword
+              ? "Password and confirmation do not match."
+              : "Confirm your password.",
+        },
+      };
+    }
+
     const provisioned = await input.provisionAuthUser({
       email: parsed.email,
       password: parsed.password,
@@ -382,9 +488,25 @@ export async function submitPartnerApplicationCore(input: {
         fieldErrors: provisioned.fieldErrors,
       };
     }
+    if (!provisioned.userId) {
+      return {
+        success: false,
+        error: "Could not create your account. Please try again.",
+        code: "auth_failed",
+      };
+    }
     authUserId = provisioned.userId;
     emailConfirmedAt = provisioned.emailConfirmedAt;
     createdNewAuthUser = provisioned.createdNewAuthUser;
+  }
+
+  // Final invariant: never insert without a trusted auth_user_id.
+  if (!authUserId) {
+    return {
+      success: false,
+      error: "Could not link an authentication account. Please try again.",
+      code: "auth_failed",
+    };
   }
 
   const agreementAcceptedAt = (input.now ?? new Date()).toISOString();
@@ -433,7 +555,7 @@ export async function submitPartnerApplicationCore(input: {
     row
   );
   if (!inserted.ok) {
-    logPartnerApplicationInsertError(inserted.error);
+    logPartnerApplicationInsertError(inserted.error, input.logger);
     if (claimedNormalized) {
       await input.releaseUsernameClaim(claimedNormalized);
     }
@@ -454,6 +576,7 @@ export async function submitPartnerApplicationCore(input: {
     success: true,
     applicationId: inserted.applicationId,
     emailVerificationSent: createdNewAuthUser && !emailConfirmedAt,
+    flow,
   };
 }
 

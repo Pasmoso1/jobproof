@@ -6,6 +6,7 @@ import {
   insertPartnerApplicationWithoutSelect,
   mapPartnerApplicationInsertError,
   parsePartnerApplicationFormData,
+  resolvePartnerApplyFlow,
   submitPartnerApplicationCore,
   type PartnerApplicationInsertClient,
 } from "@/lib/partners/submit-application";
@@ -160,6 +161,7 @@ describe("submitPartnerApplicationCore", () => {
 
     assert.equal(result.success, true);
     if (!result.success) return;
+    assert.equal(result.flow, "new_account");
     assert.ok(result.applicationId);
     assert.equal(client.selectCalled, false);
     assert.equal(client.lastRow?.username, "jordanlee");
@@ -169,6 +171,34 @@ describe("submitPartnerApplicationCore", () => {
     assert.equal("password" in (client.lastRow ?? {}), false);
     assert.equal("confirm_password" in (client.lastRow ?? {}), false);
     assert.ok(!JSON.stringify(client.lastRow).includes("secret12"));
+  });
+
+  it("rejects signed-out guests who omit a password (server-side)", async () => {
+    const client = createInsertClient();
+    const auth = authHooks();
+    let provisionCalled = false;
+    auth.hooks.provisionAuthUser = async () => {
+      provisionCalled = true;
+      return {
+        ok: false as const,
+        error: "should not provision",
+        code: "auth_failed" as const,
+      };
+    };
+
+    const result = await submitPartnerApplicationCore({
+      formData: validFormData({ password: "", confirm_password: "" }),
+      insertClient: client,
+      authenticatedUser: null,
+      ...auth.hooks,
+    });
+
+    assert.equal(result.success, false);
+    if (result.success) return;
+    assert.equal(result.code, "validation");
+    assert.ok(result.fieldErrors?.password);
+    assert.equal(provisionCalled, false);
+    assert.equal(client.lastRow, null);
   });
 
   it("rejects password confirmation mismatch", async () => {
@@ -279,9 +309,35 @@ describe("submitPartnerApplicationCore", () => {
     });
 
     assert.equal(result.success, true);
+    if (!result.success) return;
+    assert.equal(result.flow, "existing_account");
     assert.equal(provisionCalled, false);
     assert.equal(client.lastRow?.auth_user_id, "existing-user");
+    assert.equal(client.lastRow?.email, "jordan@example.com");
     assert.equal(auth.deletedUsers.length, 0);
+  });
+
+  it("rejects existing-account submissions that use a different application email", async () => {
+    const client = createInsertClient();
+    const auth = authHooks();
+    const result = await submitPartnerApplicationCore({
+      formData: validFormData({
+        email: "other@example.com",
+        password: "",
+        confirm_password: "",
+      }),
+      insertClient: client,
+      authenticatedUser: {
+        id: "existing-user",
+        email: "jordan@example.com",
+        emailConfirmedAt: "2026-01-01T00:00:00.000Z",
+      },
+      ...auth.hooks,
+    });
+    assert.equal(result.success, false);
+    if (result.success) return;
+    assert.equal(result.code, "email_mismatch");
+    assert.equal(client.lastRow, null);
   });
 
   it("accepts email as login identifier without claiming a username", async () => {
@@ -353,5 +409,19 @@ describe("insertPartnerApplicationWithoutSelect", () => {
     assert.equal(result.ok, true);
     if (!result.ok) return;
     assert.equal(result.applicationId, "app-1");
+  });
+});
+
+describe("resolvePartnerApplyFlow", () => {
+  it("selects existing_account only for trusted sessions", () => {
+    assert.equal(resolvePartnerApplyFlow(null), "new_account");
+    assert.equal(
+      resolvePartnerApplyFlow({
+        id: "u1",
+        email: "a@b.com",
+        emailConfirmedAt: null,
+      }),
+      "existing_account"
+    );
   });
 });
