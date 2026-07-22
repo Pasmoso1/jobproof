@@ -11,7 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx --test src/lib/partners/submit-application.test.ts src/lib/partners/actions-type-erasure.test.ts src/lib/partners/admin-application-review.test.ts",
+    "test": "npx tsx --test src/lib/partners/submit-application.test.ts src/lib/partners/actions-type-erasure.test.ts src/lib/partners/admin-application-review.test.ts src/lib/partners/media-center-content.test.ts",
     "migrate:stripe-tax": "npx tsx --env-file=.env.local scripts/migrate-stripe-subscription-tax.ts"
   },
   "dependencies": {
