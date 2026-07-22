@@ -50,7 +50,59 @@ export default async function AdminPartnersPage() {
       .neq("status", "declined"),
   ]);
 
-  const pendingApps = (applications ?? []).filter((a) =>
+  const applicationRows = await Promise.all(
+    (applications ?? []).map(async (a) => {
+      let emailVerified = Boolean(a.email_confirmed_at);
+      if (a.auth_user_id) {
+        try {
+          const { data: userData } = await admin.auth.admin.getUserById(
+            String(a.auth_user_id)
+          );
+          if (userData.user?.email_confirmed_at) {
+            emailVerified = true;
+            if (!a.email_confirmed_at) {
+              await admin
+                .from("partner_applications")
+                .update({
+                  email_confirmed_at: userData.user.email_confirmed_at,
+                })
+                .eq("id", a.id);
+            }
+          }
+        } catch {
+          // Ignore Auth lookup failures for admin list rendering.
+        }
+      }
+      return {
+        id: a.id,
+        organization_name: a.organization_name,
+        contact_name: a.contact_name,
+        email: a.email,
+        phone: a.phone,
+        website: a.website,
+        partner_type: partnerTypeLabel(a.partner_type),
+        estimated_audience: a.estimated_audience,
+        promotion_plan: a.promotion_plan,
+        reason: a.reason,
+        status: a.status,
+        submitted_at: a.submitted_at,
+        reviewed_at: a.reviewed_at,
+        reviewed_by: a.reviewed_by,
+        decline_reason: a.decline_reason,
+        agreement_version: a.agreement_version,
+        agreement_accepted_at: a.agreement_accepted_at,
+        created_partner_id: a.created_partner_id,
+        username: a.username ?? null,
+        auth_user_id: a.auth_user_id ?? null,
+        email_confirmed_at: a.email_confirmed_at ?? null,
+        email_verified: emailVerified,
+        auth_account_linked: Boolean(a.auth_user_id),
+        legacy_account: !a.auth_user_id || !a.username,
+      };
+    })
+  );
+
+  const pendingApps = applicationRows.filter((a) =>
     ["submitted", "under_review"].includes(a.status)
   );
   const qualified = (referrals ?? []).filter((r) => r.reward_status === "qualified");
@@ -84,26 +136,7 @@ export default async function AdminPartnersPage() {
       </div>
 
       <AdminPartnersClient
-        applications={(applications ?? []).map((a) => ({
-          id: a.id,
-          organization_name: a.organization_name,
-          contact_name: a.contact_name,
-          email: a.email,
-          phone: a.phone,
-          website: a.website,
-          partner_type: partnerTypeLabel(a.partner_type),
-          estimated_audience: a.estimated_audience,
-          promotion_plan: a.promotion_plan,
-          reason: a.reason,
-          status: a.status,
-          submitted_at: a.submitted_at,
-          reviewed_at: a.reviewed_at,
-          reviewed_by: a.reviewed_by,
-          decline_reason: a.decline_reason,
-          agreement_version: a.agreement_version,
-          agreement_accepted_at: a.agreement_accepted_at,
-          created_partner_id: a.created_partner_id,
-        }))}
+        applications={applicationRows}
         partners={(partners ?? []).map((p) => ({
           id: p.id,
           organization_name: p.organization_name,
@@ -116,6 +149,9 @@ export default async function AdminPartnersPage() {
           created_at: p.created_at,
           agreement_version: p.agreement_version,
           agreement_accepted_at: p.agreement_accepted_at,
+          username: p.username ?? null,
+          auth_user_id: p.auth_user_id ?? null,
+          legacy_account: !p.auth_user_id || !p.username,
         }))}
         referrals={(referrals ?? []).map((r) => {
           const partnersEmbed = r.partners as

@@ -96,6 +96,9 @@ export async function adminApprovePartnerApplication(
         partner_type: app.partner_type,
         agreement_version: app.agreement_version,
         agreement_accepted_at: app.agreement_accepted_at,
+        username: app.username,
+        normalized_username: app.normalized_username,
+        auth_user_id: app.auth_user_id,
       },
       {
         levelOverride: levelOverride || undefined,
@@ -111,6 +114,8 @@ export async function adminApprovePartnerApplication(
       level: created.level,
       referralCode: created.referralCode,
       referralUrl,
+      username: app.username,
+      legacyAccountSetupRequired: created.legacyAccountSetupRequired,
     });
 
     trackProductEventSafe({
@@ -374,6 +379,68 @@ export async function adminMarkReferralPaid(
       paymentDate: paidAt,
       paymentReference: input.paymentReference?.trim() || null,
     });
+  }
+
+  revalidatePath("/admin/partners");
+  return { ok: true as const };
+}
+
+export async function adminResendPartnerVerificationEmail(applicationId: string) {
+  const ctx = await requireAdminService();
+  if (!ctx.ok) return ctx;
+
+  const { data: app } = await ctx.admin
+    .from("partner_applications")
+    .select("id, email, auth_user_id")
+    .eq("id", applicationId)
+    .maybeSingle();
+  if (!app) return { ok: false as const, error: "Application not found" };
+  if (!app.auth_user_id) {
+    return {
+      ok: false as const,
+      error: "No Auth account is linked to this application.",
+    };
+  }
+
+  const redirectTo = `${resolveAppUrl()}/auth/callback?next=${encodeURIComponent("/partner/status")}`;
+  const { error } = await ctx.admin.auth.resend({
+    type: "signup",
+    email: String(app.email).trim().toLowerCase(),
+    options: { emailRedirectTo: redirectTo },
+  });
+  if (error) {
+    return {
+      ok: false as const,
+      error:
+        error.message ||
+        "Could not resend verification. Ask the applicant to use Resend on the login page.",
+    };
+  }
+
+  revalidatePath("/admin/partners");
+  return { ok: true as const };
+}
+
+export async function adminSendPartnerPasswordResetEmail(applicationId: string) {
+  const ctx = await requireAdminService();
+  if (!ctx.ok) return ctx;
+
+  const { data: app } = await ctx.admin
+    .from("partner_applications")
+    .select("id, email")
+    .eq("id", applicationId)
+    .maybeSingle();
+  if (!app) return { ok: false as const, error: "Application not found" };
+
+  const email = String(app.email).trim().toLowerCase();
+  const redirectTo = `${resolveAppUrl()}/auth/callback?next=${encodeURIComponent("/update-password")}`;
+  const { error } = await ctx.admin.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo },
+  });
+  if (error) {
+    return { ok: false as const, error: error.message };
   }
 
   revalidatePath("/admin/partners");

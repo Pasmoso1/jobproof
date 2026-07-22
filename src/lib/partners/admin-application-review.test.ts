@@ -32,6 +32,12 @@ function sampleApp(
     agreement_version: "2026-07-01",
     agreement_accepted_at: "2026-07-01T12:05:00.000Z",
     created_partner_id: null,
+    username: "jordanlee",
+    auth_user_id: "auth-1",
+    email_confirmed_at: "2026-07-01T12:10:00.000Z",
+    email_verified: true,
+    auth_account_linked: true,
+    legacy_account: false,
     ...overrides,
   };
 }

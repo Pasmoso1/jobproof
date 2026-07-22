@@ -1,7 +1,7 @@
 "use client";
 
 import { CopyContentCard } from "@/components/partners/media/copy-content-card";
-import { CopyButton } from "@/app/(partner)/partner/copy-button";
+import { CopyButton } from "@/app/(partner)/partner/(portal)/copy-button";
 
 export function SocialCaptionCard({
   title,

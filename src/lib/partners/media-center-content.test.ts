@@ -87,7 +87,7 @@ describe("partner media center route access conventions", () => {
   it("registers Media Center in partner portal navigation", async () => {
     const layoutPath = join(
       root,
-      "src/app/(partner)/partner/layout.tsx"
+      "src/app/(partner)/partner/(portal)/layout.tsx"
     );
     const source = await import("node:fs/promises").then((fs) =>
       fs.readFile(layoutPath, "utf8")
@@ -98,7 +98,10 @@ describe("partner media center route access conventions", () => {
   });
 
   it("gates the media page with the active-partner session helper", async () => {
-    const pagePath = join(root, "src/app/(partner)/partner/media/page.tsx");
+    const pagePath = join(
+      root,
+      "src/app/(partner)/partner/(portal)/media/page.tsx"
+    );
     const source = await import("node:fs/promises").then((fs) =>
       fs.readFile(pagePath, "utf8")
     );

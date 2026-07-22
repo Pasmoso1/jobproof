@@ -35,9 +35,43 @@ export async function createPartnerFromApplication(
     partner_type: string;
     agreement_version?: string | null;
     agreement_accepted_at?: string | null;
+    username?: string | null;
+    normalized_username?: string | null;
+    auth_user_id?: string | null;
   },
   options?: { levelOverride?: PartnerLevel; reviewedBy?: string }
-): Promise<{ partnerId: string; referralCode: string; level: PartnerLevel }> {
+): Promise<{
+  partnerId: string;
+  referralCode: string;
+  level: PartnerLevel;
+  legacyAccountSetupRequired: boolean;
+}> {
+  // Idempotent: if already approved with a partner row, return it.
+  const { data: existingApp } = await admin
+    .from("partner_applications")
+    .select("status, created_partner_id")
+    .eq("id", application.id)
+    .maybeSingle();
+  if (
+    existingApp?.status === "approved" &&
+    existingApp.created_partner_id
+  ) {
+    const { data: existingPartner } = await admin
+      .from("partners")
+      .select("id, referral_code, partner_level, auth_user_id, username")
+      .eq("id", existingApp.created_partner_id)
+      .maybeSingle();
+    if (existingPartner) {
+      return {
+        partnerId: String(existingPartner.id),
+        referralCode: String(existingPartner.referral_code),
+        level:
+          existingPartner.partner_level === "founding" ? "founding" : "standard",
+        legacyAccountSetupRequired: !existingPartner.auth_user_id,
+      };
+    }
+  }
+
   let level: PartnerLevel;
   if (options?.levelOverride === "founding") {
     const foundingCount = await countFoundingPartners(admin);
@@ -60,6 +94,16 @@ export async function createPartnerFromApplication(
   }
 
   const email = application.email.trim().toLowerCase();
+  const authUserId = application.auth_user_id
+    ? String(application.auth_user_id)
+    : null;
+  const username = application.username ? String(application.username) : null;
+  const normalizedUsername = application.normalized_username
+    ? String(application.normalized_username)
+    : username
+      ? username.trim().toLowerCase()
+      : null;
+  const legacyAccountSetupRequired = !authUserId || !username;
 
   const { data: partner, error } = await admin
     .from("partners")
@@ -78,12 +122,30 @@ export async function createPartnerFromApplication(
       payment_email: email,
       agreement_version: application.agreement_version ?? null,
       agreement_accepted_at: application.agreement_accepted_at ?? null,
+      username,
+      normalized_username: normalizedUsername,
+      auth_user_id: authUserId,
     })
     .select("id, referral_code, partner_level")
     .single();
 
   if (error || !partner) {
     throw new Error(error?.message ?? "Could not create partner");
+  }
+
+  if (authUserId && normalizedUsername) {
+    await admin
+      .from("partner_username_registry")
+      .upsert(
+        {
+          normalized_username: normalizedUsername,
+          username: username ?? normalizedUsername,
+          auth_user_id: authUserId,
+          application_id: application.id,
+          partner_id: partner.id,
+        },
+        { onConflict: "normalized_username" }
+      );
   }
 
   await admin
@@ -100,6 +162,7 @@ export async function createPartnerFromApplication(
     partnerId: String(partner.id),
     referralCode: String(partner.referral_code),
     level: partner.partner_level === "founding" ? "founding" : "standard",
+    legacyAccountSetupRequired,
   };
 }
 

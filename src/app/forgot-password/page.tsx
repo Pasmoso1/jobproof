@@ -3,31 +3,32 @@
 import { useState } from "react";
 import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
-import { createClient } from "@/lib/supabase/client";
+import { requestPasswordResetForUsernameOrEmail } from "@/lib/auth/credential-actions";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [message, setMessage] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/update-password`,
+    const result = await requestPasswordResetForUsernameOrEmail({
+      identifier,
     });
 
     setLoading(false);
 
-    if (error) {
-      setError(error.message);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
 
+    setMessage(result.message);
     setSent(true);
   }
 
@@ -40,9 +41,7 @@ export default function ForgotPasswordPage() {
           </Link>
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
             <h1 className="text-xl font-semibold text-zinc-900">Check your email</h1>
-            <p className="mt-3 text-sm text-zinc-600">
-              We&apos;ve sent a password reset link to <strong>{email}</strong>.
-            </p>
+            <p className="mt-3 text-sm text-zinc-600">{message}</p>
             <p className="mt-2 text-sm text-zinc-600">
               Click the link in the email to set a new password. The link may take a few minutes to arrive.
             </p>
@@ -68,7 +67,8 @@ export default function ForgotPasswordPage() {
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
           <h1 className="text-xl font-semibold text-zinc-900">Forgot password</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            Enter your email and we&apos;ll send you a link to reset your password.
+            Enter your username or email and we&apos;ll send a password reset link if
+            an account exists.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -80,19 +80,19 @@ export default function ForgotPasswordPage() {
 
             <div>
               <label
-                htmlFor="email"
+                htmlFor="identifier"
                 className="block text-sm font-medium text-zinc-700"
               >
-                Email
+                Username or email
               </label>
               <input
-                id="email"
-                type="email"
+                id="identifier"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="username or you@example.com"
+                autoComplete="username"
                 className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
               />
             </div>

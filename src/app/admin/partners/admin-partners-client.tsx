@@ -12,6 +12,8 @@ import {
   adminSetApplicationUnderReview,
   adminSuspendPartner,
   adminAdjustReferralReward,
+  adminResendPartnerVerificationEmail,
+  adminSendPartnerPasswordResetEmail,
 } from "./actions";
 import type { PartnerLevel, PartnerRewardStatus } from "@/lib/partners/constants";
 import {
@@ -43,6 +45,9 @@ type PartnerRow = {
   created_at: string;
   agreement_version: string | null;
   agreement_accepted_at: string | null;
+  username: string | null;
+  auth_user_id: string | null;
+  legacy_account: boolean;
 };
 
 type ReferralRow = {
@@ -248,6 +253,16 @@ export function AdminPartnersClient({
             declineReason={declineReason}
             onDeclineReasonChange={setDeclineReason}
             onClose={closeDetail}
+            onResendVerification={() =>
+              run("resend_verification", () =>
+                adminResendPartnerVerificationEmail(selected.id)
+              )
+            }
+            onSendPasswordReset={() =>
+              run("send_password_reset", () =>
+                adminSendPartnerPasswordResetEmail(selected.id)
+              )
+            }
             onMarkUnderReview={() =>
               run(
                 "mark_under_review",
@@ -511,6 +526,8 @@ function ApplicationDetailPanel({
   onMarkUnderReview,
   onApprove,
   onDecline,
+  onResendVerification,
+  onSendPasswordReset,
 }: {
   app: AdminApplicationDetail;
   titleId: string;
@@ -521,6 +538,8 @@ function ApplicationDetailPanel({
   onMarkUnderReview: () => void;
   onApprove: (level?: PartnerLevel | null) => void;
   onDecline: () => void;
+  onResendVerification: () => void;
+  onSendPasswordReset: () => void;
 }) {
   const actions = getApplicationReviewActions(app.status);
   const agreementOk = hasValidAgreementAcceptance(app);
@@ -594,6 +613,30 @@ function ApplicationDetailPanel({
           <DetailItem
             label="Estimated audience"
             value={displayOptionalAdminValue(app.estimated_audience)}
+          />
+          <DetailItem
+            label="Username"
+            value={displayOptionalAdminValue(app.username)}
+          />
+          <DetailItem
+            label="Auth account linked"
+            value={app.auth_account_linked ? "Yes" : "No"}
+          />
+          <DetailItem
+            label="Email verified"
+            value={app.email_verified ? "Yes" : "No"}
+          />
+          <DetailItem
+            label="Account state"
+            value={
+              app.legacy_account
+                ? "Legacy (setup / link required)"
+                : app.auth_account_linked
+                  ? app.email_verified
+                    ? "Auth linked · email verified"
+                    : "Auth linked · email unverified"
+                  : "No Auth link"
+            }
           />
           <DetailItem label="Status" value={applicationStatusLabel(app.status)} />
           <DetailItem
@@ -674,6 +717,37 @@ function ApplicationDetailPanel({
             )}
           </div>
         ) : null}
+
+        {app.legacy_account ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Legacy application: no username/Auth link on file. Approval can
+            proceed, but the partner needs a secure account setup (password
+            reset after they create/sign in with this email, or admin password-reset
+            email below). Admins cannot set or view passwords.
+          </p>
+        ) : null}
+
+        <div className="space-y-3 border-t border-zinc-200 pt-4">
+          <h4 className="text-sm font-semibold text-zinc-900">Account actions</h4>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={pending || !app.auth_account_linked}
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium disabled:opacity-60"
+              onClick={onResendVerification}
+            >
+              Resend verification email
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium disabled:opacity-60"
+              onClick={onSendPasswordReset}
+            >
+              Send password-reset email
+            </button>
+          </div>
+        </div>
 
         {!agreementOk && (actions.canApprove || actions.canDecline) ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">

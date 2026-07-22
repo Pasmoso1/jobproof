@@ -19,6 +19,12 @@ export type AdminApplicationDetail = {
   agreement_version: string | null;
   agreement_accepted_at: string | null;
   created_partner_id: string | null;
+  username: string | null;
+  auth_user_id: string | null;
+  email_confirmed_at: string | null;
+  email_verified: boolean;
+  auth_account_linked: boolean;
+  legacy_account: boolean;
 };
 
 export type ApplicationReviewActions = {
@@ -144,6 +150,10 @@ export function adminActionSuccessMessage(action: string): string {
       return "Reward approved.";
     case "mark_paid":
       return "Reward marked as paid.";
+    case "resend_verification":
+      return "Verification email resent.";
+    case "send_password_reset":
+      return "Password reset email sent.";
     default:
       return "Update saved.";
   }

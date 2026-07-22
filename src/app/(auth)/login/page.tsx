@@ -6,6 +6,10 @@ import { JobProofLogo } from "@/components/jobproof-logo";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import {
+  resendSignupConfirmation,
+  signInWithUsernameOrEmail,
+} from "@/lib/auth/credential-actions";
 
 function readLoginFlashFromLocation(): {
   authError: boolean;
@@ -26,11 +30,13 @@ function readLoginFlashFromLocation(): {
 }
 
 function LoginForm() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const [unconfirmedIdentifier, setUnconfirmedIdentifier] = useState<string | null>(
+    null
+  );
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
   const router = useRouter();
@@ -61,40 +67,40 @@ function LoginForm() {
     setResetLinkError(false);
     setConfirmed(false);
     setPasswordUpdated(false);
-    setUnconfirmedEmail(null);
+    setUnconfirmedIdentifier(null);
     setResendSuccess(false);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
+    // Admin login stays email-only via direct Supabase for clarity.
+    if (isAdminLogin) {
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: identifier.trim().toLowerCase(),
+        password,
+      });
+      setLoading(false);
+      if (signInError) {
+        setError(
+          "We couldn't sign you in. Use the email and password for an approved admin account, or reset your password."
+        );
+        return;
+      }
+      router.push(redirectTo);
+      router.refresh();
+      return;
+    }
+
+    const result = await signInWithUsernameOrEmail({
+      identifier,
       password,
     });
-
     setLoading(false);
 
-    if (signInError) {
-      const msg = signInError.message;
-      if (
-        msg.toLowerCase().includes("email not confirmed") ||
-        msg.toLowerCase().includes("email_not_confirmed")
-      ) {
-        setUnconfirmedEmail(email);
-        setError(
-          "Your email address has not been confirmed yet. Please check your inbox and click the confirmation link."
-        );
-      } else if (
-        msg.toLowerCase().includes("invalid login credentials") ||
-        msg.toLowerCase().includes("invalid_credentials")
-      ) {
-        setError(
-          isAdminLogin
-            ? "We couldn't sign you in. Use the email and password for an approved admin account, or reset your password."
-            : "We couldn't sign you in. Check your email and password, or create an account if you're new to JobProof."
-        );
-      } else {
-        setError(msg);
+    if (!result.ok) {
+      if (result.unconfirmed) {
+        setUnconfirmedIdentifier(identifier.trim());
       }
+      setError(result.error);
       return;
     }
 
@@ -103,25 +109,13 @@ function LoginForm() {
   }
 
   async function handleResendConfirmation() {
-    if (!unconfirmedEmail) return;
+    if (!unconfirmedIdentifier) return;
     setResendLoading(true);
     setResendSuccess(false);
     setError(null);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: unconfirmedEmail,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/login` },
-    });
-
+    await resendSignupConfirmation({ identifier: unconfirmedIdentifier });
     setResendLoading(false);
-
-    if (error) {
-      setError(error.message);
-      return;
-    }
-
     setResendSuccess(true);
   }
 
@@ -138,7 +132,7 @@ function LoginForm() {
           <p className="mt-1 text-sm text-zinc-500">
             {isAdminLogin
               ? "Sign in with an approved admin account."
-              : "Enter your email and password to continue."}
+              : "Enter your username or email and password to continue."}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -165,7 +159,7 @@ function LoginForm() {
             {error && (
               <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
-                {unconfirmedEmail && (
+                {unconfirmedIdentifier && (
                   <div className="mt-3 space-y-2">
                     <button
                       type="button"
@@ -177,7 +171,8 @@ function LoginForm() {
                     </button>
                     {resendSuccess && (
                       <p className="text-sm text-green-700">
-                        We sent a new confirmation email. Please check your inbox and spam folder.
+                        If that account needs verification, we sent a confirmation email.
+                        Check your inbox and spam folder.
                       </p>
                     )}
                   </div>
@@ -187,19 +182,19 @@ function LoginForm() {
 
             <div>
               <label
-                htmlFor="email"
+                htmlFor="identifier"
                 className="block text-sm font-medium text-zinc-700"
               >
-                Email
+                {isAdminLogin ? "Email" : "Username or email"}
               </label>
               <input
-                id="email"
-                type="email"
+                id="identifier"
+                type={isAdminLogin ? "email" : "text"}
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder={isAdminLogin ? "you@example.com" : "username or you@example.com"}
+                autoComplete={isAdminLogin ? "email" : "username"}
                 className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
               />
             </div>

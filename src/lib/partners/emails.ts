@@ -50,15 +50,25 @@ function wrap(bodyHtml: string): string {
 export async function sendPartnerApplicationReceivedEmail(input: {
   to: string;
   contactName: string;
+  username?: string;
 }) {
   const subject = "We received your JobProof Partner application";
+  const usernameLine = input.username
+    ? `<p>Your partner username is <strong>${escape(input.username)}</strong>. Confirm your email if prompted, then you can check your application status after signing in.</p>`
+    : "";
+  const usernameText = input.username
+    ? `\nYour partner username is ${input.username}. Confirm your email if prompted, then you can check your application status after signing in.\n`
+    : "";
+  const statusUrl = `${resolveAppUrl()}/partner/status`;
   const html = wrap(`
     <p>Hi ${escape(input.contactName)},</p>
     <p>Thanks for applying to the JobProof Partner Program. Our team will review your application and follow up by email.</p>
+    ${usernameLine}
+    <p><a href="${statusUrl}" style="color:#2436BB;">View application status</a></p>
     <p>We look forward to learning more about how you work with contractors.</p>
     <p>— The JobProof Team</p>
   `);
-  const text = `Hi ${input.contactName},\n\nThanks for applying to the JobProof Partner Program. Our team will review your application and follow up by email.\n\n— The JobProof Team\n`;
+  const text = `Hi ${input.contactName},\n\nThanks for applying to the JobProof Partner Program. Our team will review your application and follow up by email.${usernameText}\nStatus: ${statusUrl}\n\n— The JobProof Team\n`;
   return sendSimpleEmail({ to: input.to, subject, html, text });
 }
 
@@ -69,15 +79,25 @@ export async function sendPartnerApprovedEmail(input: {
   level: PartnerLevel;
   referralCode: string;
   referralUrl: string;
+  username?: string | null;
+  legacyAccountSetupRequired?: boolean;
 }) {
   const reward = input.level === "founding" ? FOUNDING_REWARD_CAD : STANDARD_REWARD_CAD;
   const portalUrl = `${resolveAppUrl()}/partner`;
+  const loginUrl = `${resolveAppUrl()}/login?next=${encodeURIComponent("/partner")}`;
+  const forgotUrl = `${resolveAppUrl()}/forgot-password`;
   const agreementUrl = `${resolveAppUrl()}/partners/agreement`;
   const subject = "Welcome to the JobProof Partner Program";
   const foundingBadge =
     input.level === "founding"
       ? '<p><span style="display:inline-block;border:1px solid #b8c0f2;background:#f4f5ff;color:#2436BB;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;">Founding Partner</span></p>'
       : "";
+  const signInCopy = input.legacyAccountSetupRequired
+    ? `<p style="font-size:13px;color:#52525b;">This is a legacy partner record. Follow the account setup instructions from our team, then sign in at <a href="${loginUrl}" style="color:#2436BB;">${escape(loginUrl)}</a>.</p>`
+    : `<p style="font-size:13px;color:#52525b;">You can sign in now with the username${input.username ? ` <strong>${escape(input.username)}</strong>` : ""} and password you chose during your application. Portal login: <a href="${loginUrl}" style="color:#2436BB;">${escape(loginUrl)}</a>. Forgot your password? <a href="${forgotUrl}" style="color:#2436BB;">Reset it here</a>.</p>`;
+  const signInText = input.legacyAccountSetupRequired
+    ? `This is a legacy partner record. Follow the account setup instructions from our team, then sign in at ${loginUrl}.`
+    : `Sign in with the username${input.username ? ` (${input.username})` : ""} and password you chose during your application.\nLogin: ${loginUrl}\nForgot password: ${forgotUrl}`;
   const html = wrap(`
     <p>Hi ${escape(input.contactName)},</p>
     <p>Your application for <strong>${escape(input.organizationName)}</strong> has been approved.</p>
@@ -87,10 +107,10 @@ export async function sendPartnerApprovedEmail(input: {
     <p><strong>Referral code:</strong> ${escape(input.referralCode)}</p>
     <p><a href="${portalUrl}" style="display:inline-block;margin-top:12px;background:#2436BB;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">Open Partner Portal</a></p>
     <p><a href="${agreementUrl}" style="color:#2436BB;">View the Partner Program Agreement</a></p>
-    <p style="font-size:13px;color:#52525b;">Sign in (or create an account) with <strong>${escape(input.to)}</strong> to access the portal.</p>
+    ${signInCopy}
     <p>— The JobProof Team</p>
   `);
-  const text = `Hi ${input.contactName},\n\nYour JobProof Partner application is approved (${partnerLevelLabel(input.level)}, $${reward} CAD per qualified referral). A referral qualifies after 90 consecutive days as a paying JobProof subscriber. Rewards are reviewed and paid manually; there are no recurring commissions.\n\nReferral link: ${input.referralUrl}\nCode: ${input.referralCode}\nPortal: ${portalUrl}\nAgreement: ${agreementUrl}\n\n— The JobProof Team\n`;
+  const text = `Hi ${input.contactName},\n\nYour JobProof Partner application is approved (${partnerLevelLabel(input.level)}, $${reward} CAD per qualified referral). A referral qualifies after 90 consecutive days as a paying JobProof subscriber. Rewards are reviewed and paid manually; there are no recurring commissions.\n\nReferral link: ${input.referralUrl}\nCode: ${input.referralCode}\nPortal: ${portalUrl}\nAgreement: ${agreementUrl}\n\n${signInText}\n\n— The JobProof Team\n`;
   return sendSimpleEmail({ to: input.to, subject, html, text });
 }
 
