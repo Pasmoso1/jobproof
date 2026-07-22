@@ -21,7 +21,7 @@ import {
   linkRegistryApplicationId,
   releasePartnerUsernameClaim,
 } from "@/lib/partners/auth-account";
-import { validatePartnerUsername } from "@/lib/partners/username";
+import { validatePartnerLoginIdentifier } from "@/lib/partners/username";
 
 export async function trackPartnerPublicEvent(
   event: "founding_partner_section_viewed" | "partner_agreement_viewed"
@@ -45,7 +45,12 @@ export async function checkPartnerUsernameAvailableAction(
   const result = await checkPartnerUsernameAvailability(username);
   return {
     available: result.available,
-    reason: result.reason === "ok" ? undefined : result.reason,
+    reason:
+      result.reason === "ok" || result.reason === "email"
+        ? result.reason === "email"
+          ? "email"
+          : undefined
+        : result.reason,
   };
 }
 
@@ -167,7 +172,15 @@ export async function submitPartnerApplication(
   const promotionPlan = String(formData.get("promotion_plan") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
   const usernameRaw = String(formData.get("username") ?? "").trim();
-  const usernameOk = validatePartnerUsername(usernameRaw);
+  const loginId = validatePartnerLoginIdentifier(usernameRaw, {
+    applicationEmail: email,
+  });
+  const displayLogin =
+    loginId.ok && loginId.kind === "username"
+      ? loginId.username
+      : loginId.ok && loginId.kind === "email"
+        ? loginId.email
+        : undefined;
 
   trackProductEventSafe({
     profileId: null,
@@ -176,7 +189,8 @@ export async function submitPartnerApplication(
     metadata: {
       partner_type: partnerType,
       application_id: applicationId,
-      has_username: usernameOk.ok,
+      has_username: Boolean(loginId.ok && loginId.kind === "username"),
+      login_kind: loginId.ok ? loginId.kind : "unknown",
     },
   });
   trackProductEventSafe({
@@ -192,7 +206,7 @@ export async function submitPartnerApplication(
   const confirm = await sendPartnerApplicationReceivedEmail({
     to: email,
     contactName,
-    username: usernameOk.ok ? usernameOk.username : undefined,
+    username: displayLogin,
   });
   if (confirm.ok) {
     await admin
@@ -209,7 +223,7 @@ export async function submitPartnerApplication(
       { label: "Organization", value: organizationName },
       { label: "Contact", value: contactName },
       { label: "Email", value: email },
-      { label: "Username", value: usernameOk.ok ? usernameOk.username : "—" },
+      { label: "Login", value: displayLogin ?? "—" },
       { label: "Phone", value: phone || "—" },
       { label: "Website", value: website || "—" },
       { label: "Partner type", value: partnerType },

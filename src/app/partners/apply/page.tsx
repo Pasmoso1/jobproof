@@ -9,8 +9,8 @@ import {
 } from "@/lib/partners/constants";
 import {
   PARTNER_PASSWORD_MIN_LENGTH,
-  PARTNER_USERNAME_MAX_LENGTH,
-  PARTNER_USERNAME_MIN_LENGTH,
+  looksLikeEmail,
+  partnerPasswordStrengthHint,
 } from "@/lib/partners/username";
 import {
   checkPartnerUsernameAvailableAction,
@@ -25,9 +25,14 @@ export default function PartnerApplyPage() {
   const [done, setDone] = useState(false);
   const [existingAccount, setExistingAccount] = useState(false);
   const [signedInEmail, setSignedInEmail] = useState<string | null>(null);
-  const [username, setUsername] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
+  const [loginIdentifier, setLoginIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<
-    "idle" | "checking" | "available" | "unavailable"
+    "idle" | "checking" | "available" | "unavailable" | "email"
   >("idle");
   const [usernameHint, setUsernameHint] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -37,12 +42,29 @@ export default function PartnerApplyPage() {
       .auth.getUser()
       .then(({ data }) => {
         setSignedInEmail(data.user?.email?.trim().toLowerCase() ?? null);
+        setAuthChecked(true);
+      })
+      .catch(() => {
+        setSignedInEmail(null);
+        setAuthChecked(true);
       });
   }, []);
 
   useEffect(() => {
-    const value = username.trim();
-    if (value.length < PARTNER_USERNAME_MIN_LENGTH) {
+    const value = loginIdentifier.trim();
+    if (!value) {
+      setUsernameStatus("idle");
+      setUsernameHint(null);
+      return;
+    }
+    if (looksLikeEmail(value)) {
+      setUsernameStatus("email");
+      setUsernameHint(
+        "You’ll sign in with this email after approval (must match the email above)."
+      );
+      return;
+    }
+    if (value.length < 4) {
       setUsernameStatus("idle");
       setUsernameHint(null);
       return;
@@ -67,7 +89,7 @@ export default function PartnerApplyPage() {
       });
     }, 400);
     return () => window.clearTimeout(handle);
-  }, [username]);
+  }, [loginIdentifier]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -96,7 +118,14 @@ export default function PartnerApplyPage() {
     }
   }
 
-  const passwordRequired = !signedInEmail;
+  // Only skip password fields after auth check confirms an existing session.
+  // Guests (and while auth is still loading) always see password fields.
+  const passwordRequired = authChecked ? !signedInEmail : true;
+  const passwordHint = partnerPasswordStrengthHint(password);
+  const confirmMismatch =
+    confirmPassword.length > 0 && password !== confirmPassword
+      ? "Password and confirmation do not match."
+      : null;
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -116,7 +145,7 @@ export default function PartnerApplyPage() {
           Apply to become a partner
         </h1>
         <p className="mt-2 text-zinc-600">
-          Tell us about your organization and choose a username and password for
+          Tell us about your organization and create sign-in credentials for
           Partner Portal access after approval.
         </p>
 
@@ -125,8 +154,8 @@ export default function PartnerApplyPage() {
             <p className="font-semibold">Application submitted</p>
             <p className="mt-2 text-sm">
               Thanks — we sent a confirmation email. Confirm your email if asked,
-              then you can sign in with your username to check application status.
-              Partner Portal access opens after approval.
+              then you can sign in with your username or email to check application
+              status. Partner Portal access opens after approval.
             </p>
             <div className="mt-4 flex flex-wrap gap-3">
               <Link
@@ -166,13 +195,13 @@ export default function PartnerApplyPage() {
             {signedInEmail ? (
               <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
                 Signed in as <strong>{signedInEmail}</strong>. We&apos;ll link this
-                application to your existing account. Choose a partner username
+                application to your existing account. Choose a username or email
                 below — you can keep using your current password.
               </div>
             ) : null}
 
             {/* Honeypot */}
-            <div className="hidden" aria-hidden="true">
+            <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
               <label htmlFor="company_website">Company website</label>
               <input
                 id="company_website"
@@ -241,34 +270,41 @@ export default function PartnerApplyPage() {
               <div>
                 <h2 className="text-base font-semibold text-zinc-900">Account</h2>
                 <p className="mt-1 text-sm text-zinc-600">
-                  Choose a partner username ({PARTNER_USERNAME_MIN_LENGTH}–
-                  {PARTNER_USERNAME_MAX_LENGTH} characters: letters, numbers,
-                  underscores, periods). After approval you&apos;ll sign in with
-                  this username and your password.
+                  Choose how you&apos;d like to sign in after your application is
+                  approved.
                 </p>
+                <p className="mt-2 text-sm text-zinc-600">
+                  You may use your email address or choose a unique username (4–30
+                  characters using letters, numbers, underscores, or periods).
+                </p>
+                {passwordRequired ? (
+                  <p className="mt-2 text-sm text-zinc-600">
+                    Create a password that you&apos;ll use to access your Partner
+                    Portal after approval.
+                  </p>
+                ) : null}
               </div>
 
               <div>
                 <label htmlFor="username" className="block text-sm font-medium text-zinc-700">
-                  Username <span className="text-red-500">*</span>
+                  Username or Email <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="username"
                   name="username"
                   required
                   autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  minLength={PARTNER_USERNAME_MIN_LENGTH}
-                  maxLength={PARTNER_USERNAME_MAX_LENGTH}
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                  value={loginIdentifier}
+                  onChange={(e) => setLoginIdentifier(e.target.value)}
+                  placeholder="username or you@example.com"
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
                 />
                 {fieldErrors.username ? (
                   <p className="mt-1 text-sm text-red-600">{fieldErrors.username}</p>
                 ) : usernameHint ? (
                   <p
                     className={`mt-1 text-sm ${
-                      usernameStatus === "available"
+                      usernameStatus === "available" || usernameStatus === "email"
                         ? "text-green-700"
                         : usernameStatus === "unavailable"
                           ? "text-red-600"
@@ -282,50 +318,31 @@ export default function PartnerApplyPage() {
 
               {passwordRequired ? (
                 <>
-                  <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-zinc-700">
-                      Password <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="password"
-                      name="password"
-                      type="password"
-                      required
-                      autoComplete="new-password"
-                      minLength={PARTNER_PASSWORD_MIN_LENGTH}
-                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-                    />
-                    <p className="mt-1 text-xs text-zinc-500">
-                      At least {PARTNER_PASSWORD_MIN_LENGTH} characters. Passwords are
-                      stored securely by JobProof authentication — never in your
-                      application record.
-                    </p>
-                    {fieldErrors.password ? (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.password}</p>
-                    ) : null}
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="confirm_password"
-                      className="block text-sm font-medium text-zinc-700"
-                    >
-                      Confirm password <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      id="confirm_password"
-                      name="confirm_password"
-                      type="password"
-                      required
-                      autoComplete="new-password"
-                      minLength={PARTNER_PASSWORD_MIN_LENGTH}
-                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-                    />
-                    {fieldErrors.confirm_password ? (
-                      <p className="mt-1 text-sm text-red-600">
-                        {fieldErrors.confirm_password}
-                      </p>
-                    ) : null}
-                  </div>
+                  <PasswordField
+                    id="password"
+                    name="password"
+                    label="Password"
+                    value={password}
+                    onChange={setPassword}
+                    show={showPassword}
+                    onToggleShow={() => setShowPassword((v) => !v)}
+                    error={fieldErrors.password ?? passwordHint ?? undefined}
+                    hint={`At least ${PARTNER_PASSWORD_MIN_LENGTH} characters. Passwords are stored securely by JobProof authentication — never in your application record.`}
+                    autoComplete="new-password"
+                  />
+                  <PasswordField
+                    id="confirm_password"
+                    name="confirm_password"
+                    label="Confirm Password"
+                    value={confirmPassword}
+                    onChange={setConfirmPassword}
+                    show={showConfirmPassword}
+                    onToggleShow={() => setShowConfirmPassword((v) => !v)}
+                    error={
+                      fieldErrors.confirm_password ?? confirmMismatch ?? undefined
+                    }
+                    autoComplete="new-password"
+                  />
                 </>
               ) : (
                 <>
@@ -372,6 +389,64 @@ export default function PartnerApplyPage() {
           </form>
         )}
       </main>
+    </div>
+  );
+}
+
+function PasswordField({
+  id,
+  name,
+  label,
+  value,
+  onChange,
+  show,
+  onToggleShow,
+  error,
+  hint,
+  autoComplete,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  show: boolean;
+  onToggleShow: () => void;
+  error?: string;
+  hint?: string;
+  autoComplete?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-zinc-700">
+        {label} <span className="text-red-500">*</span>
+      </label>
+      <div className="relative mt-1">
+        <input
+          id={id}
+          name={name}
+          type={show ? "text" : "password"}
+          required
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete={autoComplete}
+          minLength={PARTNER_PASSWORD_MIN_LENGTH}
+          className="block w-full rounded-lg border border-zinc-300 px-4 py-2.5 pr-20 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+        />
+        <button
+          type="button"
+          onClick={onToggleShow}
+          className="absolute inset-y-0 right-0 px-3 text-sm font-medium text-[#2436BB] hover:underline"
+          aria-pressed={show}
+          aria-label={show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+        >
+          {show ? "Hide" : "Show"}
+        </button>
+      </div>
+      {hint && !error ? (
+        <p className="mt-1 text-xs text-zinc-500">{hint}</p>
+      ) : null}
+      {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
     </div>
   );
 }

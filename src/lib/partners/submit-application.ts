@@ -5,8 +5,8 @@ import {
 } from "@/lib/partners/constants";
 import { validateCanadianPhone } from "@/lib/canada/phone";
 import {
+  validatePartnerLoginIdentifier,
   validatePartnerPassword,
-  validatePartnerUsername,
 } from "@/lib/partners/username";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -120,9 +120,11 @@ export function validatePartnerApplication(
       "You must read and accept the Partner Program Agreement.";
   }
 
-  const usernameResult = validatePartnerUsername(input.username);
-  if (!usernameResult.ok) {
-    fieldErrors.username = usernameResult.error;
+  const loginId = validatePartnerLoginIdentifier(input.username, {
+    applicationEmail: input.email,
+  });
+  if (!loginId.ok) {
+    fieldErrors.username = loginId.error;
   }
 
   if (requirePassword) {
@@ -147,8 +149,8 @@ export function buildPartnerApplicationInsertRow(
     applicationId?: string;
     agreementAcceptedAt?: string;
     agreementVersion?: string;
-    username: string;
-    normalizedUsername: string;
+    username: string | null;
+    normalizedUsername: string | null;
     authUserId: string;
     emailConfirmedAt?: string | null;
   }
@@ -322,12 +324,14 @@ export async function submitPartnerApplicationCore(input: {
     };
   }
 
-  const usernameValidated = validatePartnerUsername(parsed.username);
-  if (!usernameValidated.ok) {
+  const loginId = validatePartnerLoginIdentifier(parsed.username, {
+    applicationEmail: parsed.email,
+  });
+  if (!loginId.ok) {
     return {
       success: false,
-      error: usernameValidated.error,
-      fieldErrors: { username: usernameValidated.error },
+      error: loginId.error,
+      fieldErrors: { username: loginId.error },
       code: "validation",
     };
   }
@@ -344,16 +348,16 @@ export async function submitPartnerApplicationCore(input: {
     }
   }
 
-  const available = await input.checkUsernameAvailable(
-    usernameValidated.normalized
-  );
-  if (!available) {
-    return {
-      success: false,
-      error: "That username is already taken. Please choose another.",
-      code: "username_taken",
-      fieldErrors: { username: "That username is already taken." },
-    };
+  if (loginId.kind === "username") {
+    const available = await input.checkUsernameAvailable(loginId.normalized);
+    if (!available) {
+      return {
+        success: false,
+        error: "That username is already taken. Please choose another.",
+        code: "username_taken",
+        fieldErrors: { username: "That username is already taken." },
+      };
+    }
   }
 
   let authUserId: string;
@@ -367,7 +371,8 @@ export async function submitPartnerApplicationCore(input: {
     const provisioned = await input.provisionAuthUser({
       email: parsed.email,
       password: parsed.password,
-      username: usernameValidated.username,
+      username:
+        loginId.kind === "username" ? loginId.username : parsed.email,
     });
     if (!provisioned.ok) {
       return {
@@ -386,36 +391,41 @@ export async function submitPartnerApplicationCore(input: {
   const row = buildPartnerApplicationInsertRow(parsed, {
     agreementAcceptedAt,
     agreementVersion: PARTNER_AGREEMENT_VERSION,
-    username: usernameValidated.username,
-    normalizedUsername: usernameValidated.normalized,
+    username: loginId.kind === "username" ? loginId.username : null,
+    normalizedUsername:
+      loginId.kind === "username" ? loginId.normalized : null,
     authUserId,
     emailConfirmedAt,
   });
   const applicationId = String(row.id);
 
-  const claimed = await input.claimUsername({
-    username: usernameValidated.username,
-    normalized: usernameValidated.normalized,
-    authUserId,
-    applicationId,
-  });
-  if (!claimed.ok) {
-    if (createdNewAuthUser && input.deleteOrphanAuthUser) {
-      await input.deleteOrphanAuthUser(authUserId);
-    }
-    if (claimed.code === "23505") {
+  let claimedNormalized: string | null = null;
+  if (loginId.kind === "username") {
+    const claimed = await input.claimUsername({
+      username: loginId.username,
+      normalized: loginId.normalized,
+      authUserId,
+      applicationId,
+    });
+    if (!claimed.ok) {
+      if (createdNewAuthUser && input.deleteOrphanAuthUser) {
+        await input.deleteOrphanAuthUser(authUserId);
+      }
+      if (claimed.code === "23505") {
+        return {
+          success: false,
+          error: "That username is already taken. Please choose another.",
+          code: "username_taken",
+          fieldErrors: { username: "That username is already taken." },
+        };
+      }
       return {
         success: false,
-        error: "That username is already taken. Please choose another.",
+        error: "Could not reserve that username. Please try again.",
         code: "username_taken",
-        fieldErrors: { username: "That username is already taken." },
       };
     }
-    return {
-      success: false,
-      error: "Could not reserve that username. Please try again.",
-      code: "username_taken",
-    };
+    claimedNormalized = loginId.normalized;
   }
 
   const inserted = await insertPartnerApplicationWithoutSelect(
@@ -424,16 +434,18 @@ export async function submitPartnerApplicationCore(input: {
   );
   if (!inserted.ok) {
     logPartnerApplicationInsertError(inserted.error);
-    await input.releaseUsernameClaim(usernameValidated.normalized);
+    if (claimedNormalized) {
+      await input.releaseUsernameClaim(claimedNormalized);
+    }
     if (createdNewAuthUser && input.deleteOrphanAuthUser) {
       await input.deleteOrphanAuthUser(authUserId);
     }
     return mapPartnerApplicationInsertError(inserted.error);
   }
 
-  if (input.linkRegistryApplication) {
+  if (claimedNormalized && input.linkRegistryApplication) {
     await input.linkRegistryApplication(
-      usernameValidated.normalized,
+      claimedNormalized,
       inserted.applicationId
     );
   }

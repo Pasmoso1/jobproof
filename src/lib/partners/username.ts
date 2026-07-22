@@ -1,4 +1,4 @@
-/** Partner username validation and reserved-name rules. */
+/** Partner username / login-identifier validation and reserved-name rules. */
 
 export const PARTNER_USERNAME_MIN_LENGTH = 4;
 export const PARTNER_USERNAME_MAX_LENGTH = 30;
@@ -23,9 +23,14 @@ export const RESERVED_PARTNER_USERNAMES = [
 ] as const;
 
 const USERNAME_RE = /^[a-z0-9][a-z0-9._]*$/i;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function normalizePartnerUsername(raw: string): string {
   return String(raw ?? "").trim().toLowerCase();
+}
+
+export function looksLikeEmail(value: string): boolean {
+  return String(value ?? "").includes("@");
 }
 
 export function validatePartnerUsername(
@@ -60,6 +65,57 @@ export function validatePartnerUsername(
   return { ok: true, username, normalized };
 }
 
+/**
+ * Account login identifier: either a partner username or an email address.
+ * Email logins use Supabase Auth email sign-in (no username registry claim).
+ */
+export function validatePartnerLoginIdentifier(
+  raw: string,
+  options?: { applicationEmail?: string }
+):
+  | {
+      ok: true;
+      kind: "username";
+      username: string;
+      normalized: string;
+    }
+  | {
+      ok: true;
+      kind: "email";
+      email: string;
+    }
+  | { ok: false; error: string } {
+  const value = String(raw ?? "").trim();
+  if (!value) {
+    return { ok: false, error: "Enter a username or email address." };
+  }
+
+  if (looksLikeEmail(value)) {
+    const email = value.toLowerCase();
+    if (!EMAIL_RE.test(email)) {
+      return { ok: false, error: "Enter a valid email address." };
+    }
+    const applicationEmail = options?.applicationEmail?.trim().toLowerCase();
+    if (applicationEmail && email !== applicationEmail) {
+      return {
+        ok: false,
+        error:
+          "When using email to sign in, it must match the email on this application.",
+      };
+    }
+    return { ok: true, kind: "email", email };
+  }
+
+  const usernameResult = validatePartnerUsername(value);
+  if (!usernameResult.ok) return usernameResult;
+  return {
+    ok: true,
+    kind: "username",
+    username: usernameResult.username,
+    normalized: usernameResult.normalized,
+  };
+}
+
 export function validatePartnerPassword(
   password: string,
   confirmPassword: string
@@ -74,6 +130,11 @@ export function validatePartnerPassword(
   return null;
 }
 
-export function looksLikeEmail(value: string): boolean {
-  return value.includes("@");
+/** Client-side password strength hint (does not replace confirm check). */
+export function partnerPasswordStrengthHint(password: string): string | null {
+  if (!password) return null;
+  if (password.length < PARTNER_PASSWORD_MIN_LENGTH) {
+    return `Password must be at least ${PARTNER_PASSWORD_MIN_LENGTH} characters.`;
+  }
+  return null;
 }

@@ -71,4 +71,27 @@ describe("partner username auth security invariants", () => {
     assert.match(source, /getPartnerAccountStatusForCurrentUser/);
     assert.match(source, /emailVerified/);
   });
+
+  it("availability action treats emails as available without registry lookup", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/lib/partners/auth-account.ts"),
+      "utf8"
+    );
+    assert.match(source, /looksLikeEmail/);
+    assert.match(source, /reason: "email"/);
+  });
+
+  it("apply page always renders password fields for guests", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/app/partners/apply/page.tsx"),
+      "utf8"
+    );
+    assert.match(source, /Username or Email/);
+    assert.match(source, /Confirm Password/);
+    assert.match(source, /passwordRequired/);
+    assert.match(source, /Show/);
+    assert.match(source, /Hide/);
+    // Guests see passwords unless auth check confirms a signed-in session.
+    assert.match(source, /authChecked \? !signedInEmail : true/);
+  });
 });

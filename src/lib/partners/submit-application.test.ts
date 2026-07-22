@@ -284,6 +284,28 @@ describe("submitPartnerApplicationCore", () => {
     assert.equal(auth.deletedUsers.length, 0);
   });
 
+  it("accepts email as login identifier without claiming a username", async () => {
+    const client = createInsertClient();
+    const auth = authHooks();
+    let claimCalled = false;
+    auth.hooks.claimUsername = async () => {
+      claimCalled = true;
+      return { ok: true as const };
+    };
+
+    const result = await submitPartnerApplicationCore({
+      formData: validFormData({ username: "jordan@example.com" }),
+      insertClient: client,
+      ...auth.hooks,
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(claimCalled, false);
+    assert.equal(client.lastRow?.username, null);
+    assert.equal(client.lastRow?.normalized_username, null);
+    assert.equal(client.lastRow?.auth_user_id, "auth-user-1");
+  });
+
   it("silently accepts honeypot submissions without inserting", async () => {
     const client = createInsertClient();
     const auth = authHooks();

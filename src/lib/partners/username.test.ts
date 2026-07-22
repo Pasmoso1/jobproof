@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   looksLikeEmail,
   normalizePartnerUsername,
+  validatePartnerLoginIdentifier,
   validatePartnerPassword,
   validatePartnerUsername,
 } from "@/lib/partners/username";
@@ -38,5 +39,23 @@ describe("partner username validation", () => {
   it("detects email-shaped identifiers", () => {
     assert.equal(looksLikeEmail("a@b.com"), true);
     assert.equal(looksLikeEmail("jordanlee"), false);
+  });
+
+  it("accepts email login identifiers matching application email", () => {
+    const result = validatePartnerLoginIdentifier("Jordan@Example.com", {
+      applicationEmail: "jordan@example.com",
+    });
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.equal(result.kind, "email");
+    if (result.kind !== "email") return;
+    assert.equal(result.email, "jordan@example.com");
+  });
+
+  it("rejects email login identifiers that differ from application email", () => {
+    const result = validatePartnerLoginIdentifier("other@example.com", {
+      applicationEmail: "jordan@example.com",
+    });
+    assert.equal(result.ok, false);
   });
 });

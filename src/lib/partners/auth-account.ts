@@ -1,18 +1,27 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { resolveAppUrl } from "@/lib/stripe";
-import { normalizePartnerUsername } from "@/lib/partners/username";
-import { validatePartnerUsername } from "@/lib/partners/username";
+import {
+  looksLikeEmail,
+  normalizePartnerUsername,
+  validatePartnerUsername,
+} from "@/lib/partners/username";
 
 export type UsernameAvailability = {
   available: boolean;
-  reason?: "invalid" | "reserved" | "taken" | "ok";
+  reason?: "invalid" | "reserved" | "taken" | "ok" | "email";
 };
 
 export async function checkPartnerUsernameAvailability(
   rawUsername: string
 ): Promise<UsernameAvailability> {
-  const validated = validatePartnerUsername(rawUsername);
+  const trimmed = String(rawUsername ?? "").trim();
+  if (looksLikeEmail(trimmed)) {
+    // Email login identifiers are not claimed in the username registry.
+    return { available: true, reason: "email" };
+  }
+
+  const validated = validatePartnerUsername(trimmed);
   if (!validated.ok) {
     return {
       available: false,
