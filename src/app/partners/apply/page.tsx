@@ -19,6 +19,15 @@ import {
   signOutFromPartnerApply,
   submitPartnerApplication,
 } from "@/app/partners/actions";
+import type { PartnerApplyFlow } from "@/lib/partners/submit-application";
+import {
+  PARTNER_APPLY_PAGE_INTRO,
+  PARTNER_APPLY_PAGE_TITLE,
+  PARTNER_APPLY_SUCCESS_CTA_RETURN,
+  PARTNER_APPLY_SUCCESS_CTA_STATUS,
+  getPartnerApplyStatusCheckHref,
+  getPartnerApplySuccessCopy,
+} from "@/lib/partners/apply-success-copy";
 
 type AuthUiState =
   | { status: "loading" }
@@ -40,6 +49,8 @@ export default function PartnerApplyPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [done, setDone] = useState(false);
+  const [submittedFlow, setSubmittedFlow] =
+    useState<PartnerApplyFlow>("new_account");
   const [existingAccount, setExistingAccount] = useState(false);
   const [authUi, setAuthUi] = useState<AuthUiState>({ status: "loading" });
   const [loginIdentifier, setLoginIdentifier] = useState("");
@@ -88,8 +99,8 @@ export default function PartnerApplyPage() {
       setUsernameStatus("email");
       setUsernameHint(
         authUi.status === "signed_in"
-          ? "You’ll use email sign-in with your existing JobProof account after approval."
-          : "You’ll create / use email sign-in after approval (must match the application email)."
+          ? "You’ll use email sign-in with your existing JobProof account to check status."
+          : "You’ll use this email to sign in and check status (must match the application email)."
       );
       return;
     }
@@ -167,7 +178,10 @@ export default function PartnerApplyPage() {
         if (result.code === "existing_account") setExistingAccount(true);
         return;
       }
+      setSubmittedFlow(result.flow);
       setDone(true);
+      // Refresh auth so the status CTA can route signed-in users directly.
+      await refreshAuthState();
     } catch {
       setError("Could not submit your application. Please try again.");
     } finally {
@@ -184,6 +198,10 @@ export default function PartnerApplyPage() {
       ? "Password and confirmation do not match."
       : null;
   const formDisabled = authLoading || loading || signingOut;
+  const successCopy = getPartnerApplySuccessCopy(submittedFlow);
+  const statusCheckHref = getPartnerApplyStatusCheckHref(
+    authUi.status === "signed_in"
+  );
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -200,33 +218,32 @@ export default function PartnerApplyPage() {
 
       <main className="mx-auto max-w-2xl px-6 py-12 sm:px-8">
         <h1 className="text-3xl font-bold tracking-tight text-zinc-950">
-          Apply to become a partner
+          {PARTNER_APPLY_PAGE_TITLE}
         </h1>
-        <p className="mt-2 text-zinc-600">
-          Tell us about your organization and set up Partner Portal sign-in for
-          after approval.
-        </p>
+        <p className="mt-2 text-zinc-600">{PARTNER_APPLY_PAGE_INTRO}</p>
 
         {done ? (
-          <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-6 text-green-950">
-            <p className="font-semibold">Application submitted</p>
-            <p className="mt-2 text-sm">
-              Thanks — we sent a confirmation email. Confirm your email if asked,
-              then sign in with your username or email to check application status.
-              Partner Portal access opens after approval.
+          <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-5 sm:p-6 text-green-950">
+            <p className="text-base font-semibold sm:text-lg">
+              {successCopy.heading}
             </p>
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className="mt-3 space-y-3 text-sm leading-relaxed sm:text-[15px]">
+              {successCopy.paragraphs.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Link
-                href={`/login?next=${encodeURIComponent("/partner/status")}`}
-                className="inline-block text-sm font-medium text-[#2436BB] hover:underline"
+                href={statusCheckHref}
+                className="inline-flex items-center justify-center rounded-xl bg-[#2436BB] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2"
               >
-                Sign in to check status
+                {PARTNER_APPLY_SUCCESS_CTA_STATUS}
               </Link>
               <Link
                 href="/partners"
-                className="inline-block text-sm font-medium text-[#2436BB] hover:underline"
+                className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2"
               >
-                Back to Partner Program
+                {PARTNER_APPLY_SUCCESS_CTA_RETURN}
               </Link>
             </div>
           </div>
