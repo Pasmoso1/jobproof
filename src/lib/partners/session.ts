@@ -203,17 +203,50 @@ export async function getPartnerAccountStatusForCurrentUser(): Promise<PartnerAc
     }
   }
 
-  const { data: application } = await lookup
+  const { data: applicationByAuth } = await lookup
     .from("partner_applications")
     .select(
-      "id, status, organization_name, username, email_confirmed_at, created_partner_id"
+      "id, status, organization_name, username, email_confirmed_at, created_partner_id, email, auth_user_id"
     )
     .eq("auth_user_id", user.id)
     .order("submitted_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
+  const application =
+    applicationByAuth ??
+    (email
+      ? (
+          await lookup
+            .from("partner_applications")
+            .select(
+              "id, status, organization_name, username, email_confirmed_at, created_partner_id, email, auth_user_id"
+            )
+            .ilike("email", email)
+            .is("auth_user_id", null)
+            .order("submitted_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        ).data
+      : null);
+
   if (application) {
+    // Best-effort legacy backfill after trusted email match (auth_user_id was null).
+    if (
+      admin &&
+      !application.auth_user_id &&
+      email &&
+      String(application.email ?? "")
+        .trim()
+        .toLowerCase() === email
+    ) {
+      await admin
+        .from("partner_applications")
+        .update({ auth_user_id: user.id })
+        .eq("id", application.id)
+        .is("auth_user_id", null);
+    }
+
     const appStatus = String(application.status);
     if (
       appStatus === "submitted" ||
