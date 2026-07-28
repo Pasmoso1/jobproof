@@ -1,24 +1,20 @@
 # Partner media kit assets
 
-Source brand sheet:
+Canonical logo masters (do not recreate or recolour):
 
-- `public/media-kit/source/JobProofLG.png`
+- `source/png-logos-transparent-1.png` (uploaded package sheet)
+- `source/jobproof-shield-source.png`
 
-Generate cropped PNG exports:
+Generate / refresh exports:
 
 ```bash
-node scripts/generate-partner-media-kit.mjs
+node scripts/build-partner-media-kit.mjs
 ```
 
-Crop coordinates live in `scripts/generate-partner-media-kit.mjs`. After changing them, re-run the script and visually inspect exports under:
+Folders:
 
-- `public/media-kit/logos/`
-- `public/media-kit/icons/`
-- `public/media-kit/favicons/`
+- `logos/` `icons/` `favicons/` `social/` `email/` `website/` `print/` `brand/`
 
-Formats intentionally omitted until truthful source files exist:
+Intentionally pending until vector masters exist:
 
-- SVG
-- PDF
-- ICO
-- ZIP pack
+- Logo SVG / logo PDF packs (favicon SVG is available)

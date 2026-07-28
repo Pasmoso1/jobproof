@@ -4,14 +4,16 @@ import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-  ABOUT_JOBPROOF_BLOCKS,
+  BRAND_GUIDELINES_ASSET,
   COMING_SOON_RESOURCES,
   MEDIA_BRAND_ASSETS,
   MEDIA_CENTER_NOTICE,
-  NEWSLETTER_FEATURE_ARTICLE,
+  MEDIA_EMAIL_RESOURCES,
+  MEDIA_PRINT_ASSETS,
+  MEDIA_SOCIAL_ASSETS,
+  MEDIA_WEBSITE_ASSETS,
+  PARTNER_COPY_LIBRARY,
   PARTNER_LINK_TOKEN,
-  QUICK_PITCH_BLOCKS,
-  SOCIAL_CAPTION_BLOCKS,
   buildMediaCenterFaqs,
   partnerRewardFaqAnswer,
   personalizePartnerCopy,
@@ -19,43 +21,72 @@ import {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
+function assertAssetFilesExist(
+  assets: Array<{
+    downloads: Array<{ href: string }>;
+    previewSrc: string;
+  }>
+) {
+  for (const asset of assets) {
+    const preview = join(root, "public", asset.previewSrc.replace(/^\//, ""));
+    assert.equal(existsSync(preview), true, `missing preview ${asset.previewSrc}`);
+    for (const download of asset.downloads) {
+      assert.ok(download.href.startsWith("/media-kit/"));
+      const absolute = join(root, "public", download.href.replace(/^\//, ""));
+      assert.equal(existsSync(absolute), true, `missing ${download.href}`);
+    }
+  }
+}
+
 describe("partner media center content", () => {
   it("includes required sections and approved notice copy", () => {
     assert.match(MEDIA_CENTER_NOTICE, /approved assets/i);
-    assert.ok(ABOUT_JOBPROOF_BLOCKS.some((b) => b.id === "full-description"));
-    assert.ok(QUICK_PITCH_BLOCKS.some((b) => b.id === "60-second"));
-    assert.ok(SOCIAL_CAPTION_BLOCKS.length >= 6);
-    assert.match(NEWSLETTER_FEATURE_ARTICLE.title, /Better Business Systems/i);
+    assert.ok(MEDIA_BRAND_ASSETS.length >= 7);
+    assert.ok(MEDIA_SOCIAL_ASSETS.length >= 5);
+    assert.ok(MEDIA_WEBSITE_ASSETS.length >= 5);
+    assert.ok(MEDIA_PRINT_ASSETS.length >= 4);
+    assert.ok(MEDIA_EMAIL_RESOURCES.length >= 3);
+    assert.ok(PARTNER_COPY_LIBRARY.length >= 8);
+    assert.ok(BRAND_GUIDELINES_ASSET.downloads.length > 0);
   });
 
-  it("points brand downloads at real public asset files", () => {
-    for (const asset of MEDIA_BRAND_ASSETS) {
-      for (const download of asset.downloads) {
-        assert.ok(download.href.startsWith("/media-kit/"));
-        const absolute = join(root, "public", download.href.replace(/^\//, ""));
-        assert.equal(existsSync(absolute), true, `missing ${download.href}`);
-      }
+  it("points brand and media downloads at real public asset files", () => {
+    assertAssetFilesExist(MEDIA_BRAND_ASSETS);
+    assertAssetFilesExist(MEDIA_SOCIAL_ASSETS);
+    assertAssetFilesExist(MEDIA_WEBSITE_ASSETS);
+    assertAssetFilesExist(MEDIA_PRINT_ASSETS);
+    assertAssetFilesExist([BRAND_GUIDELINES_ASSET]);
+    for (const email of MEDIA_EMAIL_RESOURCES) {
+      if (!email.htmlHref) continue;
+      const absolute = join(root, "public", email.htmlHref.replace(/^\//, ""));
+      assert.equal(existsSync(absolute), true, `missing ${email.htmlHref}`);
     }
   });
 
-  it("does not give coming-soon resources fake download links", () => {
+  it("does not label real assets as coming soon", () => {
     for (const resource of COMING_SOON_RESOURCES) {
       assert.ok(!("href" in resource));
       assert.ok(resource.title.length > 0);
+      assert.ok(
+        !MEDIA_BRAND_ASSETS.some((a) => a.name === resource.title),
+        `brand asset incorrectly coming soon: ${resource.title}`
+      );
     }
   });
 
-  it("personalizes captions with the partner referral URL when available", () => {
-    const sample = SOCIAL_CAPTION_BLOCKS[0]!;
-    assert.match(sample.body, new RegExp(PARTNER_LINK_TOKEN.replace(/[[\]]/g, "\\$&")));
+  it("personalizes copy with the partner referral URL when available", () => {
+    const sample = PARTNER_COPY_LIBRARY.find((b) =>
+      b.body.includes(PARTNER_LINK_TOKEN)
+    );
+    assert.ok(sample);
     const personalized = personalizePartnerCopy(
-      sample.body,
+      sample!.body,
       "https://jobproof.ca/signup?ref=ABC123"
     );
     assert.doesNotMatch(personalized, /\[PARTNER LINK\]/);
     assert.match(personalized, /https:\/\/jobproof\.ca\/signup\?ref=ABC123/);
     assert.equal(
-      personalizePartnerCopy(sample.body, null).includes(PARTNER_LINK_TOKEN),
+      personalizePartnerCopy(sample!.body, null).includes(PARTNER_LINK_TOKEN),
       true
     );
   });
@@ -106,7 +137,8 @@ describe("partner media center route access conventions", () => {
       fs.readFile(pagePath, "utf8")
     );
     assert.match(source, /getActivePartnerForCurrentUser/);
-    assert.match(source, /redirect\("\/login\?next=\/partner\/media"\)/);
-    assert.match(source, /Partner Media Center/);
+    assert.match(source, /Brand Assets/);
+    assert.match(source, /Social Media Kit/);
+    assert.match(source, /Partner Copy Library/);
   });
 });

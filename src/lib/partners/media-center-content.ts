@@ -13,8 +13,10 @@ export type MediaAsset = {
   previewSrc: string;
   previewAlt: string;
   dimensionsLabel: string;
+  recommendedUse: string;
+  availableFormats: string;
+  previewTone?: "light" | "dark" | "checkered";
   downloads: Array<{ label: string; href: string; fileName: string }>;
-  comingSoonFormats?: string[];
 };
 
 export type CopyBlock = {
@@ -41,6 +43,16 @@ export type MediaFaqItem = {
   answer: string;
 };
 
+export type EmailResource = {
+  id: string;
+  title: string;
+  description: string;
+  htmlHref?: string;
+  htmlFileName?: string;
+  textBody: string;
+  subjects?: string[];
+};
+
 export const MEDIA_CENTER_NOTICE =
   "Please use only the approved assets and wording provided here. Do not alter the JobProof logo, make unsupported product claims, or imply that JobProof endorses your business.";
 
@@ -60,7 +72,7 @@ export const MEDIA_CENTER_PERSONALITY = [
   "Helpful",
 ] as const;
 
-/** Canonical brand colours verified against JobProofLG.png and app tokens. */
+/** Canonical brand colours verified against JobProof logo assets. */
 export const MEDIA_CENTER_BRAND_COLORS: BrandColor[] = [
   {
     name: "JobProof Blue",
@@ -70,12 +82,12 @@ export const MEDIA_CENTER_BRAND_COLORS: BrandColor[] = [
   {
     name: "Bright Blue",
     hex: "#2C37EC",
-    note: "Accent blue from the brand sheet.",
+    note: "Accent blue from the brand assets.",
   },
   {
     name: "Soft Teal",
     hex: "#4DB6AC",
-    note: "Supporting teal from the brand sheet.",
+    note: "Supporting teal from the brand assets.",
   },
   {
     name: "Proof Teal",
@@ -85,7 +97,7 @@ export const MEDIA_CENTER_BRAND_COLORS: BrandColor[] = [
   {
     name: "Accent Orange",
     hex: "#F28C38",
-    note: "Shield highlight accent.",
+    note: "Shield highlight and CTA accent.",
   },
   {
     name: "White",
@@ -117,11 +129,14 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
   {
     id: "primary-horizontal",
     name: "Primary Horizontal Logo",
-    description:
-      "Suggested use: websites, newsletters, presentations, and larger placements.",
+    description: "Full-colour horizontal lockup for primary brand placements.",
+    recommendedUse:
+      "Websites, presentations, newsletters, and larger digital placements.",
+    availableFormats: "PNG · transparent",
     previewSrc: "/media-kit/logos/jobproof-primary-horizontal.png",
     previewAlt: "JobProof primary horizontal logo",
-    dimensionsLabel: "PNG · transparent · large lockup",
+    dimensionsLabel: "Large transparent PNG",
+    previewTone: "checkered",
     downloads: [
       {
         label: "Download PNG",
@@ -129,15 +144,17 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
         fileName: "jobproof-primary-horizontal.png",
       },
     ],
-    comingSoonFormats: ["SVG", "PDF"],
   },
   {
     id: "secondary-horizontal",
     name: "Secondary Horizontal Logo",
-    description: "Suggested use: compact website and marketing placements.",
+    description: "Medium horizontal lockup for everyday marketing use.",
+    recommendedUse: "Website headers, partner pages, and mid-size placements.",
+    availableFormats: "PNG · transparent",
     previewSrc: "/media-kit/logos/jobproof-secondary-horizontal.png",
     previewAlt: "JobProof secondary horizontal logo",
-    dimensionsLabel: "PNG · transparent · medium lockup",
+    dimensionsLabel: "Medium transparent PNG",
+    previewTone: "checkered",
     downloads: [
       {
         label: "Download PNG",
@@ -145,15 +162,17 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
         fileName: "jobproof-secondary-horizontal.png",
       },
     ],
-    comingSoonFormats: ["SVG"],
   },
   {
     id: "compact-horizontal",
     name: "Compact Horizontal Logo",
-    description: "Suggested use: narrow headers, sponsor rows, and email graphics.",
+    description: "Narrow lockup for constrained layouts.",
+    recommendedUse: "Email headers, sponsor rows, and compact navigation.",
+    availableFormats: "PNG · transparent",
     previewSrc: "/media-kit/logos/jobproof-compact-horizontal.png",
     previewAlt: "JobProof compact horizontal logo",
-    dimensionsLabel: "PNG · ~320px wide",
+    dimensionsLabel: "Compact transparent PNG",
+    previewTone: "checkered",
     downloads: [
       {
         label: "Download PNG",
@@ -165,11 +184,14 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
   {
     id: "shield-icon",
     name: "Shield Icon",
-    description:
-      "Suggested use: profile images, app references, social graphics, and small placements.",
+    description: "Standalone JobProof shield mark.",
+    recommendedUse:
+      "Profile images, app references, social avatars, and small placements.",
+    availableFormats: "PNG · 1024 / 512 / 256 / 128 / 64 / 32",
     previewSrc: "/media-kit/icons/jobproof-shield-256.png",
     previewAlt: "JobProof shield icon",
-    dimensionsLabel: "PNG · 1024 / 512 / 256 / 128 / 64 / 32",
+    dimensionsLabel: "Multiple PNG sizes",
+    previewTone: "checkered",
     downloads: [
       {
         label: "1024×1024",
@@ -206,10 +228,13 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
   {
     id: "app-light",
     name: "Light App Icon",
-    description: "Suggested use: white or light backgrounds.",
+    description: "Shield on a light square for light surfaces.",
+    recommendedUse: "White or light backgrounds and app-style placements.",
+    availableFormats: "PNG · 512×512",
     previewSrc: "/media-kit/icons/jobproof-app-light-512.png",
     previewAlt: "JobProof light app icon",
-    dimensionsLabel: "PNG · 512×512",
+    dimensionsLabel: "512×512 PNG",
+    previewTone: "light",
     downloads: [
       {
         label: "Download PNG",
@@ -221,10 +246,13 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
   {
     id: "app-dark",
     name: "Dark App Icon",
-    description: "Suggested use: dark backgrounds and app-style placements.",
+    description: "Shield on a dark square for dark surfaces.",
+    recommendedUse: "Dark backgrounds and app-style placements.",
+    availableFormats: "PNG · 512×512",
     previewSrc: "/media-kit/icons/jobproof-app-dark-512.png",
     previewAlt: "JobProof dark app icon",
-    dimensionsLabel: "PNG · 512×512",
+    dimensionsLabel: "512×512 PNG",
+    previewTone: "dark",
     downloads: [
       {
         label: "Download PNG",
@@ -236,10 +264,13 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
   {
     id: "favicons",
     name: "Favicons",
-    description: "Small site icons for browsers and bookmarks.",
+    description: "Browser and bookmark icons from the approved favicon pack.",
+    recommendedUse: "Website tabs, bookmarks, and PWA icons.",
+    availableFormats: "PNG · ICO · SVG",
     previewSrc: "/media-kit/favicons/jobproof-favicon-32.png",
     previewAlt: "JobProof favicon",
-    dimensionsLabel: "PNG · 32×32 and 16×16",
+    dimensionsLabel: "16 / 32 / 96 PNG · ICO · SVG",
+    previewTone: "light",
     downloads: [
       {
         label: "32×32 PNG",
@@ -251,204 +282,455 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
         href: "/media-kit/favicons/jobproof-favicon-16.png",
         fileName: "jobproof-favicon-16.png",
       },
-    ],
-    comingSoonFormats: ["ICO"],
-  },
-  {
-    id: "source-sheet",
-    name: "Source Brand Sheet",
-    description: "Original JobProof logo sheet for reference and future replacements.",
-    previewSrc: "/media-kit/icons/jobproof-shield-128.png",
-    previewAlt: "JobProof brand mark preview",
-    dimensionsLabel: "PNG · full source sheet",
-    downloads: [
       {
-        label: "Download source sheet",
-        href: "/media-kit/source/JobProofLG.png",
-        fileName: "JobProofLG.png",
+        label: "96×96 PNG",
+        href: "/media-kit/favicons/jobproof-favicon-96.png",
+        fileName: "jobproof-favicon-96.png",
+      },
+      {
+        label: "Download ICO",
+        href: "/media-kit/favicons/jobproof-favicon.ico",
+        fileName: "jobproof-favicon.ico",
+      },
+      {
+        label: "Download SVG",
+        href: "/media-kit/favicons/jobproof-favicon.svg",
+        fileName: "jobproof-favicon.svg",
       },
     ],
-    comingSoonFormats: ["ZIP pack"],
   },
 ];
 
-export const ABOUT_JOBPROOF_BLOCKS: CopyBlock[] = [
+export const BRAND_GUIDELINES_ASSET: MediaAsset = {
+  id: "brand-guidelines",
+  name: "Brand Guidelines",
+  description:
+    "Approved logo usage, spacing, colour palette, backgrounds, typography, and tone of voice.",
+  recommendedUse: "Share with designers, marketers, and co-branded partners.",
+  availableFormats: "PDF",
+  previewSrc: "/media-kit/logos/jobproof-secondary-horizontal.png",
+  previewAlt: "JobProof brand guidelines preview",
+  dimensionsLabel: "PDF download",
+  previewTone: "light",
+  downloads: [
+    {
+      label: "Download PDF",
+      href: "/media-kit/brand/jobproof-brand-guidelines.pdf",
+      fileName: "jobproof-brand-guidelines.pdf",
+    },
+  ],
+};
+
+export const MEDIA_SOCIAL_ASSETS: MediaAsset[] = [
   {
-    id: "short-description",
-    title: "Short description",
-    intendedUse: "Bios, directories, and short introductions.",
-    body: "JobProof helps contractors win more jobs, get paid faster, and protect every project with one professional business platform.",
+    id: "facebook-post",
+    name: "Facebook Post",
+    description: "Square graphic for Facebook feed posts.",
+    recommendedUse: "Organic posts and paid Facebook placements.",
+    availableFormats: "PNG · 1080×1080",
+    previewSrc: "/media-kit/social/jobproof-facebook-post-1080.png",
+    previewAlt: "JobProof Facebook post graphic",
+    dimensionsLabel: "1080×1080",
+    downloads: [
+      {
+        label: "Download PNG",
+        href: "/media-kit/social/jobproof-facebook-post-1080.png",
+        fileName: "jobproof-facebook-post-1080.png",
+      },
+    ],
   },
   {
-    id: "standard-description",
-    title: "Standard description",
-    intendedUse: "Websites, partner pages, and general marketing.",
-    body: "JobProof is an all-in-one contractor business platform that helps manage each stage of the customer journey—from quote requests and professional estimates to approvals, contracts, customer communication, change orders, project records, invoices, and payment protection. Instead of juggling disconnected tools and paperwork, contractors can keep their work organized in one place while delivering a more professional customer experience.",
+    id: "instagram-post",
+    name: "Instagram Post",
+    description: "Square graphic for Instagram feed posts.",
+    recommendedUse: "Instagram feed and carousel covers.",
+    availableFormats: "PNG · 1080×1080",
+    previewSrc: "/media-kit/social/jobproof-instagram-post-1080.png",
+    previewAlt: "JobProof Instagram post graphic",
+    dimensionsLabel: "1080×1080",
+    downloads: [
+      {
+        label: "Download PNG",
+        href: "/media-kit/social/jobproof-instagram-post-1080.png",
+        fileName: "jobproof-instagram-post-1080.png",
+      },
+    ],
   },
   {
-    id: "full-description",
-    title: "Full description",
-    intendedUse: "Longer introductions, newsletters, and press-style blurbs.",
-    body: `JobProof is a Canadian contractor business platform designed to help independent contractors and growing trade businesses operate more professionally, efficiently, and confidently.
-
-Contractors often manage leads, quotes, contracts, customer communication, job records, change orders, invoices, and payment follow-up through a mixture of paper documents, text messages, spreadsheets, email, and separate software tools. JobProof brings these important parts of the customer journey together in one organized platform.
-
-The platform is being built to help contractors respond to opportunities faster, prepare professional customer-facing documents, maintain clear approvals and project records, manage changes, invoice accurately, and preserve the information needed to protect their work. This can reduce administrative friction, improve the customer experience, and give contractors better visibility into each job from the first request through final payment.
-
-JobProof is intended for independent contractors and small trade businesses, including renovators, landscapers, roofers, painters, plumbers, electricians, HVAC professionals, and other service-based contractors.
-
-The JobProof mission is simple: help contractors win more jobs, get paid faster, and protect every project.`,
+    id: "instagram-story",
+    name: "Instagram Story",
+    description: "Vertical story graphic.",
+    recommendedUse: "Instagram and Facebook Stories.",
+    availableFormats: "PNG · 1080×1920",
+    previewSrc: "/media-kit/social/jobproof-instagram-story-1080x1920.png",
+    previewAlt: "JobProof Instagram story graphic",
+    dimensionsLabel: "1080×1920",
+    downloads: [
+      {
+        label: "Download PNG",
+        href: "/media-kit/social/jobproof-instagram-story-1080x1920.png",
+        fileName: "jobproof-instagram-story-1080x1920.png",
+      },
+    ],
+  },
+  {
+    id: "linkedin-graphic",
+    name: "LinkedIn Graphic",
+    description: "Landscape graphic for LinkedIn posts.",
+    recommendedUse: "LinkedIn organic posts and company updates.",
+    availableFormats: "PNG · 1200×627",
+    previewSrc: "/media-kit/social/jobproof-linkedin-1200x627.png",
+    previewAlt: "JobProof LinkedIn graphic",
+    dimensionsLabel: "1200×627",
+    downloads: [
+      {
+        label: "Download PNG",
+        href: "/media-kit/social/jobproof-linkedin-1200x627.png",
+        fileName: "jobproof-linkedin-1200x627.png",
+      },
+    ],
+  },
+  {
+    id: "twitter-graphic",
+    name: "X / Twitter Graphic",
+    description: "Wide graphic for X posts.",
+    recommendedUse: "X / Twitter feed posts and cards.",
+    availableFormats: "PNG · 1600×900",
+    previewSrc: "/media-kit/social/jobproof-twitter-1600x900.png",
+    previewAlt: "JobProof X / Twitter graphic",
+    dimensionsLabel: "1600×900",
+    downloads: [
+      {
+        label: "Download PNG",
+        href: "/media-kit/social/jobproof-twitter-1600x900.png",
+        fileName: "jobproof-twitter-1600x900.png",
+      },
+    ],
   },
 ];
 
-export const QUICK_PITCH_BLOCKS: CopyBlock[] = [
+export const MEDIA_WEBSITE_ASSETS: MediaAsset[] = [
   {
-    id: "one-line",
-    title: "One-line pitch",
-    intendedUse: "Headlines, captions, and short intros.",
-    body: "Win more jobs. Get paid faster. Protect every project.",
+    id: "banner-1920",
+    name: "1920px Banner",
+    description: "Wide website hero banner.",
+    recommendedUse: "Partner sites and landing page heroes.",
+    availableFormats: "PNG · 1920×480",
+    previewSrc: "/media-kit/website/jobproof-banner-1920.png",
+    previewAlt: "JobProof 1920px website banner",
+    dimensionsLabel: "1920×480",
+    downloads: [
+      {
+        label: "Download PNG",
+        href: "/media-kit/website/jobproof-banner-1920.png",
+        fileName: "jobproof-banner-1920.png",
+      },
+    ],
   },
   {
-    id: "15-second",
-    title: "15-second pitch",
-    intendedUse: "Quick verbal introductions.",
-    body: "JobProof is an all-in-one business platform built for contractors. It helps organize the customer journey from the first quote request through project approvals, invoicing, payment, and business protection.",
+    id: "banner-1600",
+    name: "1600px Banner",
+    description: "Standard website banner.",
+    recommendedUse: "Website headers and campaign pages.",
+    availableFormats: "PNG · 1600×400",
+    previewSrc: "/media-kit/website/jobproof-banner-1600.png",
+    previewAlt: "JobProof 1600px website banner",
+    dimensionsLabel: "1600×400",
+    downloads: [
+      {
+        label: "Download PNG",
+        href: "/media-kit/website/jobproof-banner-1600.png",
+        fileName: "jobproof-banner-1600.png",
+      },
+    ],
   },
   {
-    id: "30-second",
-    title: "30-second pitch",
-    intendedUse: "Networking conversations and short videos.",
-    body: "JobProof helps independent contractors and growing trade businesses replace scattered paperwork, messages, spreadsheets, and disconnected apps with one professional platform. It supports the customer journey from quoting and approvals through project records, change orders, invoicing, and payment protection, helping contractors save time, improve the customer experience, and protect their work.",
+    id: "banner-728x90",
+    name: "728×90 Banner",
+    description: "Leaderboard display banner.",
+    recommendedUse: "Association sites and ad placements.",
+    availableFormats: "PNG · 728×90",
+    previewSrc: "/media-kit/website/jobproof-banner-728x90.png",
+    previewAlt: "JobProof 728x90 banner",
+    dimensionsLabel: "728×90",
+    downloads: [
+      {
+        label: "Download PNG",
+        href: "/media-kit/website/jobproof-banner-728x90.png",
+        fileName: "jobproof-banner-728x90.png",
+      },
+    ],
   },
   {
-    id: "60-second",
-    title: "60-second pitch",
-    intendedUse: "Longer speaking opportunities and webinars.",
-    body: "Running a contracting business involves much more than completing the physical work. Contractors also need to respond to leads, prepare professional quotes, secure approvals, communicate with customers, manage changes, keep reliable project records, invoice accurately, and follow up on payment. JobProof is being built to bring that customer journey together in one professional contractor platform. The goal is to help contractors operate more efficiently, present a stronger customer experience, get paid with greater confidence, and maintain the records needed to protect every project.",
+    id: "banner-300x250",
+    name: "300×250 Banner",
+    description: "Medium rectangle display banner.",
+    recommendedUse: "Sidebars and content embeds.",
+    availableFormats: "PNG · 300×250",
+    previewSrc: "/media-kit/website/jobproof-banner-300x250.png",
+    previewAlt: "JobProof 300x250 banner",
+    dimensionsLabel: "300×250",
+    downloads: [
+      {
+        label: "Download PNG",
+        href: "/media-kit/website/jobproof-banner-300x250.png",
+        fileName: "jobproof-banner-300x250.png",
+      },
+    ],
+  },
+  {
+    id: "banner-160x600",
+    name: "160×600 Banner",
+    description: "Wide skyscraper display banner.",
+    recommendedUse: "Sidebar advertising and directory sites.",
+    availableFormats: "PNG · 160×600",
+    previewSrc: "/media-kit/website/jobproof-banner-160x600.png",
+    previewAlt: "JobProof 160x600 banner",
+    dimensionsLabel: "160×600",
+    downloads: [
+      {
+        label: "Download PNG",
+        href: "/media-kit/website/jobproof-banner-160x600.png",
+        fileName: "jobproof-banner-160x600.png",
+      },
+    ],
+  },
+];
+
+export const MEDIA_PRINT_ASSETS: MediaAsset[] = [
+  {
+    id: "flyer-letter",
+    name: "8.5×11 Flyer",
+    description: "Letter-size flyer at print resolution.",
+    recommendedUse: "Handouts, leave-behinds, and association desks.",
+    availableFormats: "PDF · PNG · 300 DPI",
+    previewSrc: "/media-kit/print/jobproof-flyer-letter.png",
+    previewAlt: "JobProof letter flyer",
+    dimensionsLabel: "8.5×11 · 300 DPI",
+    downloads: [
+      {
+        label: "Download PDF",
+        href: "/media-kit/print/jobproof-flyer-letter.pdf",
+        fileName: "jobproof-flyer-letter.pdf",
+      },
+      {
+        label: "Download PNG",
+        href: "/media-kit/print/jobproof-flyer-letter.png",
+        fileName: "jobproof-flyer-letter.png",
+      },
+    ],
+  },
+  {
+    id: "rack-card",
+    name: "Rack Card",
+    description: "Tall rack card for display stands.",
+    recommendedUse: "Trade shows, lobbies, and partner counters.",
+    availableFormats: "PDF · PNG · 300 DPI",
+    previewSrc: "/media-kit/print/jobproof-rack-card.png",
+    previewAlt: "JobProof rack card",
+    dimensionsLabel: "4×9 · 300 DPI",
+    downloads: [
+      {
+        label: "Download PDF",
+        href: "/media-kit/print/jobproof-rack-card.pdf",
+        fileName: "jobproof-rack-card.pdf",
+      },
+      {
+        label: "Download PNG",
+        href: "/media-kit/print/jobproof-rack-card.png",
+        fileName: "jobproof-rack-card.png",
+      },
+    ],
+  },
+  {
+    id: "flyer-halfpage",
+    name: "Half-page Flyer",
+    description: "Compact half-page promotional flyer.",
+    recommendedUse: "Inserts, folders, and event packages.",
+    availableFormats: "PDF · PNG · 300 DPI",
+    previewSrc: "/media-kit/print/jobproof-flyer-halfpage.png",
+    previewAlt: "JobProof half-page flyer",
+    dimensionsLabel: "Half-page · 300 DPI",
+    downloads: [
+      {
+        label: "Download PDF",
+        href: "/media-kit/print/jobproof-flyer-halfpage.pdf",
+        fileName: "jobproof-flyer-halfpage.pdf",
+      },
+      {
+        label: "Download PNG",
+        href: "/media-kit/print/jobproof-flyer-halfpage.png",
+        fileName: "jobproof-flyer-halfpage.png",
+      },
+    ],
+  },
+  {
+    id: "poster",
+    name: "Poster",
+    description: "Large-format poster for events.",
+    recommendedUse: "Workshops, booths, and community events.",
+    availableFormats: "PDF · PNG · 300 DPI",
+    previewSrc: "/media-kit/print/jobproof-poster.png",
+    previewAlt: "JobProof poster",
+    dimensionsLabel: "11×17 · 300 DPI",
+    downloads: [
+      {
+        label: "Download PDF",
+        href: "/media-kit/print/jobproof-poster.pdf",
+        fileName: "jobproof-poster.pdf",
+      },
+      {
+        label: "Download PNG",
+        href: "/media-kit/print/jobproof-poster.png",
+        fileName: "jobproof-poster.png",
+      },
+    ],
   },
 ];
 
 const PARTNER_LINK_TOKEN = "[PARTNER LINK]";
 
-export const SOCIAL_CAPTION_BLOCKS: CopyBlock[] = [
+export const MEDIA_EMAIL_RESOURCES: EmailResource[] = [
   {
-    id: "business-growth",
-    title: "Business growth",
-    intendedUse: "LinkedIn, Facebook, and newsletter social posts.",
-    body: `Strong contracting businesses need strong systems. JobProof helps contractors organize the customer journey, respond professionally, stay on top of project details, and build a business that is easier to manage and grow. Learn more through my partner link: ${PARTNER_LINK_TOKEN}`,
-  },
-  {
-    id: "professionalism",
-    title: "Professionalism",
-    intendedUse: "Posts about customer experience and reputation.",
-    body: `Customers notice how a contractor communicates, quotes, documents, and follows up. JobProof is designed to help contractors deliver a more organized and professional experience from the first request through final payment. Learn more: ${PARTNER_LINK_TOKEN}`,
-  },
-  {
-    id: "get-paid-faster",
-    title: "Get paid faster",
-    intendedUse: "Posts about invoicing and payment follow-up.",
-    body: `Getting the work done is only part of running a successful contracting business. Clear approvals, organized records, accurate invoices, and professional follow-up can make payment easier. JobProof brings those steps together in one contractor-focused platform. ${PARTNER_LINK_TOKEN}`,
-  },
-  {
-    id: "protect-every-project",
-    title: "Protect every project",
-    intendedUse: "Posts about documentation and approvals.",
-    body: `Verbal agreements and scattered messages can create problems when a project changes. JobProof helps contractors keep important job information, approvals, changes, and records organized so they are better prepared if questions arise. ${PARTNER_LINK_TOKEN}`,
-  },
-  {
-    id: "all-in-one-platform",
-    title: "All-in-one platform",
-    intendedUse: "Posts about simplifying contractor workflows.",
-    body: `Quotes in one place. Messages somewhere else. Photos on a phone. Invoices in another app. JobProof is being built to bring the contractor customer journey together in one professional platform. ${PARTNER_LINK_TOKEN}`,
-  },
-  {
-    id: "canadian-company",
-    title: "Canadian company",
-    intendedUse: "Posts highlighting JobProof as a Canadian platform.",
-    body: `JobProof is a Canadian contractor business platform built to help independent contractors and growing trade businesses win more jobs, get paid faster, and protect every project. Learn more through my partner link: ${PARTNER_LINK_TOKEN}`,
-  },
-];
+    id: "introduction-email",
+    title: "Introduction email",
+    description: "HTML and plain-text introduction partners can send to contractors.",
+    htmlHref: "/media-kit/email/introduction-email.html",
+    htmlFileName: "introduction-email.html",
+    textBody: `Help contractors win more jobs and get paid faster
 
-export const NEWSLETTER_BLOCKS: CopyBlock[] = [
-  {
-    id: "newsletter-100",
-    title: "100-word version",
-    intendedUse: "Short newsletter blurbs and email intros.",
-    body: "Contractors need more than tools for completing the physical work. They also need reliable systems for handling quote requests, customer approvals, project changes, records, invoices, and payment follow-up. JobProof is a Canadian contractor business platform being built to bring those important parts of the customer journey together in one professional place. The platform is designed to help independent contractors and growing trade businesses save time, create a stronger customer experience, maintain clearer project records, and protect the work they have completed. JobProof’s mission is to help contractors win more jobs, get paid faster, and protect every project.",
+JobProof is an all-in-one contractor platform for quotes, contracts, change orders, invoices, documentation, and dispute protection—so contractors can present a professional image and protect every project.
+
+Share JobProof: ${PARTNER_LINK_TOKEN}`,
+    subjects: [
+      "A simpler way for contractors to quote, contract, and get paid",
+      "Help your network look more professional on every job",
+      "Quotes, contracts, change orders, and invoices—in one place",
+    ],
   },
   {
-    id: "newsletter-250",
-    title: "250-word version",
-    intendedUse: "Medium newsletter sections.",
-    body: `Contractors often enter the trades because they are skilled at the work—not because they want to spend evenings managing paperwork, searching through messages, building quotes, tracking changes, preparing invoices, and following up on payment.
+    id: "referral-email",
+    title: "Referral email",
+    description: "Short personal referral note with your partner link.",
+    htmlHref: "/media-kit/email/referral-email.html",
+    htmlFileName: "referral-email.html",
+    textBody: `Hi,
 
-Yet those administrative responsibilities can have a major effect on whether a contracting business appears professional, remains organized, and gets paid properly.
+I wanted to share JobProof with you. It’s built for contractors who need professional quotes, contracts, change orders, invoices, documentation, and clearer payment workflows—with records that support dispute protection.
 
-JobProof is a Canadian contractor business platform being built to bring the customer journey together in one organized place. Instead of relying on scattered text messages, paper documents, spreadsheets, email threads, photo folders, and disconnected apps, contractors can maintain a clearer record of each project from the initial opportunity through final payment.
+Learn more: ${PARTNER_LINK_TOKEN}
 
-The platform is intended to support important business activities such as quote requests, professional customer documents, approvals, customer communication, project records, change management, invoicing, and payment protection. By creating a more consistent process, contractors can save administrative time, deliver a better customer experience, and reduce the risk created by incomplete or disorganized records.
+Happy to answer questions if helpful.`,
+  },
+  {
+    id: "reminder-email",
+    title: "Reminder email",
+    description: "Follow-up reminder for contacts who already received an intro.",
+    htmlHref: "/media-kit/email/reminder-email.html",
+    htmlFileName: "reminder-email.html",
+    textBody: `Hi,
 
-JobProof is designed for independent contractors and growing trade businesses, including renovators, landscapers, roofers, painters, plumbers, electricians, HVAC professionals, and other service-based contractors.
+Quick reminder about JobProof—the contractor platform for quotes, contracts, change orders, invoices, and job documentation that helps teams look professional and get paid with more confidence.
 
-Its mission is straightforward: help contractors win more jobs, get paid faster, and protect every project.`,
+Here’s the link again: ${PARTNER_LINK_TOKEN}`,
   },
 ];
 
-/** Approved long-form newsletter article (~450–550 words). */
-export const NEWSLETTER_FEATURE_ARTICLE = {
-  id: "newsletter-500",
-  title: "Why Better Business Systems Matter for Contractors",
-  intendedUse: "Feature newsletter article or blog-style partner content.",
-  body: `Why Better Business Systems Matter for Contractors
+export const EMAIL_SUBJECT_SUGGESTIONS = [
+  "A simpler way for contractors to quote, contract, and get paid",
+  "Help your network look more professional on every job",
+  "Quotes, contracts, change orders, and invoices—in one place",
+  "Protect every project with clearer documentation",
+  "Share JobProof with contractors who want faster payments",
+  "From first quote to final invoice—without the paperwork scramble",
+  "A Canadian platform built for growing trade businesses",
+] as const;
 
-Most contractors start their businesses because they are skilled at the work itself. Framing, wiring, finishing, landscaping, and installation take focus, experience, and pride. What often becomes harder over time is everything around the job: responding to quote requests, preparing professional estimates, securing approvals, managing changes, keeping notes and photos organized, invoicing accurately, and following up on payment.
+export const PARTNER_COPY_LIBRARY: CopyBlock[] = [
+  {
+    id: "tagline",
+    title: "Tagline",
+    intendedUse: "Headlines and short brand lines.",
+    body: "Win more jobs. Get paid faster. Protect every project.",
+  },
+  {
+    id: "one-sentence",
+    title: "One sentence",
+    intendedUse: "Bios, directories, and short intros.",
+    body: "JobProof helps contractors manage quotes, contracts, change orders, invoices, and documentation in one professional platform.",
+  },
+  {
+    id: "short-description",
+    title: "Short description",
+    intendedUse: "Website snippets and partner directories.",
+    body: "JobProof is an all-in-one contractor platform for quotes, contracts, change orders, invoices, documentation, and dispute protection—helping teams look professional and get paid with more confidence.",
+  },
+  {
+    id: "long-description",
+    title: "Long description",
+    intendedUse: "About pages, newsletters, and press-style blurbs.",
+    body: `JobProof is a Canadian contractor business platform designed to help independent contractors and growing trade businesses operate more professionally and confidently.
 
-When those steps live across paper notes, text threads, email inboxes, spreadsheets, camera rolls, and separate apps, important details can get lost. A customer may remember a conversation differently than the contractor does. A change discussed on site may never make it into a clear written record. An invoice can be delayed because the supporting details are scattered. None of that means a contractor is careless. It usually means the business outgrew informal systems.
+Instead of juggling disconnected tools for quoting, approvals, change orders, job records, invoicing, and payment follow-up, JobProof brings the customer journey together in one place. Contractors can present a stronger professional image, keep clearer documentation, and protect every project with organized records.
 
-An organized customer journey helps. From the first inquiry through quoting, approvals, project updates, change orders, invoicing, and payment follow-up, each step works better when information stays connected. Contractors can respond more quickly, present a clearer professional image, reduce back-and-forth, and keep stronger records if questions arise later. Customers also benefit when communication feels consistent and easy to follow.
+JobProof is intended for renovators, landscapers, roofers, painters, plumbers, electricians, HVAC professionals, and other service-based contractors.`,
+  },
+  {
+    id: "facebook-copy",
+    title: "Facebook",
+    intendedUse: "Facebook posts and captions.",
+    body: `Contractors deserve systems that match the quality of their work. JobProof helps with quotes, contracts, change orders, invoices, and documentation—so you can look professional, get paid faster, and protect every project. Learn more: ${PARTNER_LINK_TOKEN}`,
+  },
+  {
+    id: "instagram-copy",
+    title: "Instagram",
+    intendedUse: "Instagram captions.",
+    body: `From first quote to final invoice—keep the job organized. JobProof supports contracts, change orders, documentation, and faster payments for contractors who want a more professional image. ${PARTNER_LINK_TOKEN}`,
+  },
+  {
+    id: "linkedin-copy",
+    title: "LinkedIn",
+    intendedUse: "LinkedIn posts.",
+    body: `Growing contracting businesses need clear systems for quoting, contracting, change management, invoicing, and documentation. JobProof is built to support that journey in one professional platform—helping contractors win more work, get paid faster, and protect every project. ${PARTNER_LINK_TOKEN}`,
+  },
+  {
+    id: "website-copy",
+    title: "Website",
+    intendedUse: "Partner website sections.",
+    body: `JobProof is the contractor platform for quotes, contracts, change orders, invoices, documentation, and dispute-ready records. Share it with contractors who want a more professional customer experience and stronger payment confidence.`,
+  },
+  {
+    id: "email-copy",
+    title: "Email",
+    intendedUse: "Email body snippets.",
+    body: `I recommend JobProof for contractors who want professional quotes and contracts, clearer change orders, organized documentation, and smoother invoicing. You can explore it here: ${PARTNER_LINK_TOKEN}`,
+  },
+  {
+    id: "sms-copy",
+    title: "SMS",
+    intendedUse: "Short text messages.",
+    body: `JobProof helps contractors with quotes, contracts, invoices & documentation. Check it out: ${PARTNER_LINK_TOKEN}`,
+  },
+  {
+    id: "referral-cta",
+    title: "Referral CTA",
+    intendedUse: "Buttons, banners, and closing lines.",
+    body: `Ready to run jobs more professionally? Start with JobProof: ${PARTNER_LINK_TOKEN}`,
+  },
+];
 
-JobProof is a Canadian contractor business platform being built to support that journey in one place. It is designed for independent contractors and growing trade businesses—including renovators, landscapers, roofers, painters, plumbers, electricians, HVAC professionals, and similar service-based contractors—who want a more professional way to manage the business side of their work.
-
-Better systems do not replace craftsmanship. They support it. When administrative work is easier to manage, contractors can spend more attention on the jobs that matter, present themselves more confidently, and protect the projects they complete. JobProof’s mission is simple: help contractors win more jobs, get paid faster, and protect every project.
-
-If you work with contractors who are ready for a clearer process, share JobProof through your partner referral link: ${PARTNER_LINK_TOKEN}`,
-} as const;
-
+/** Resources that do not yet have production files. */
 export const COMING_SOON_RESOURCES: ComingSoonResource[] = [
-  {
-    id: "overview-one-pager",
-    title: "One-page JobProof overview",
-    description: "A printable summary partners can share with contractors.",
-  },
-  {
-    id: "referral-overview",
-    title: "Referral program overview",
-    description: "A short leave-behind explaining how partner referrals work.",
-  },
-  {
-    id: "trade-show-flyer",
-    title: "Trade-show flyer",
-    description: "Print-ready flyer for events and association booths.",
-  },
-  {
-    id: "partner-qr",
-    title: "Partner QR code",
-    description: "A downloadable QR graphic for your personal referral link.",
-  },
-  {
-    id: "email-signature",
-    title: "Email signature graphic",
-    description: "A compact brand graphic for partner email signatures.",
-  },
-  {
-    id: "event-poster",
-    title: "Event poster",
-    description: "A larger-format poster for workshops and community events.",
-  },
   {
     id: "webinar-deck",
     title: "Webinar presentation",
     description: "Approved slides for partner webinars and lunch-and-learns.",
+  },
+  {
+    id: "logo-svg-pack",
+    title: "Logo SVG / PDF pack",
+    description:
+      "Vector logo exports will be added when official SVG/PDF masters are available. PNG logo files are ready now.",
   },
 ];
 
@@ -513,3 +795,37 @@ export const MEDIA_CONTACT = {
 } as const;
 
 export { PARTNER_LINK_TOKEN };
+
+/** @deprecated Kept for older tests/imports — prefer PARTNER_COPY_LIBRARY. */
+export const ABOUT_JOBPROOF_BLOCKS = PARTNER_COPY_LIBRARY.filter((b) =>
+  ["short-description", "long-description", "one-sentence"].includes(b.id)
+);
+
+/** @deprecated Prefer PARTNER_COPY_LIBRARY tagline / pitches. */
+export const QUICK_PITCH_BLOCKS: CopyBlock[] = [
+  {
+    id: "one-line",
+    title: "One-line pitch",
+    intendedUse: "Headlines, captions, and short intros.",
+    body: "Win more jobs. Get paid faster. Protect every project.",
+  },
+  {
+    id: "15-second",
+    title: "15-second pitch",
+    intendedUse: "Quick verbal introductions.",
+    body: "JobProof is an all-in-one business platform built for contractors. It helps organize quotes, contracts, change orders, invoices, documentation, and payment protection in one place.",
+  },
+];
+
+/** @deprecated Prefer PARTNER_COPY_LIBRARY social entries. */
+export const SOCIAL_CAPTION_BLOCKS = PARTNER_COPY_LIBRARY.filter((b) =>
+  ["facebook-copy", "instagram-copy", "linkedin-copy"].includes(b.id)
+);
+
+export const NEWSLETTER_BLOCKS: CopyBlock[] = [];
+export const NEWSLETTER_FEATURE_ARTICLE = {
+  id: "newsletter-500",
+  title: "Partner copy library",
+  intendedUse: "See Partner Copy Library section.",
+  body: PARTNER_COPY_LIBRARY.find((b) => b.id === "long-description")?.body ?? "",
+} as const;

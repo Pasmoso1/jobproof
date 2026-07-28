@@ -1,0 +1,929 @@
+/**
+ * Build production Partner Media Kit assets from uploaded JobProof logo masters.
+ *
+ * Logo artwork is never recolored, redrawn, stretched, or AI-generated.
+ * Only copy, trim, resize (uniform), and composite onto layouts.
+ *
+ * Run: node scripts/build-partner-media-kit.mjs
+ */
+import fs from "node:fs";
+import path from "node:path";
+import sharp from "sharp";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+
+const ROOT = path.resolve(import.meta.dirname, "..");
+const DOWNLOADS = path.join(process.env.USERPROFILE || process.env.HOME || "", "Downloads");
+
+const COLORS = {
+  blue: "#2436BB",
+  brightBlue: "#2C37EC",
+  softTeal: "#4DB6AC",
+  proofTeal: "#4DBACC",
+  orange: "#F28C38",
+  navy: "#1A2558",
+  white: "#FFFFFF",
+  zinc50: "#FAFAFA",
+  zinc100: "#F4F4F5",
+  zinc700: "#3F3F46",
+  zinc900: "#18181B",
+};
+
+const OUT = {
+  root: path.join(ROOT, "public/media-kit"),
+  logos: path.join(ROOT, "public/media-kit/logos"),
+  icons: path.join(ROOT, "public/media-kit/icons"),
+  favicons: path.join(ROOT, "public/media-kit/favicons"),
+  social: path.join(ROOT, "public/media-kit/social"),
+  email: path.join(ROOT, "public/media-kit/email"),
+  website: path.join(ROOT, "public/media-kit/website"),
+  print: path.join(ROOT, "public/media-kit/print"),
+  brand: path.join(ROOT, "public/media-kit/brand"),
+  source: path.join(ROOT, "public/media-kit/source"),
+};
+
+const MASTERS = {
+  /** Uploaded transparent PNG logo package — canonical source only. */
+  sheetTransparent: path.join(DOWNLOADS, "Png.LogosTransparent", "1.png"),
+  shieldSheet: path.join(DOWNLOADS, "Png.LogosTransparent", "2.png"),
+  faviconDir: path.join(DOWNLOADS, "favicon"),
+};
+
+function ensureDirs() {
+  for (const dir of Object.values(OUT)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function mustExist(file) {
+  if (!fs.existsSync(file)) throw new Error(`Missing required master: ${file}`);
+}
+
+async function writePng(pipeline, dest) {
+  await pipeline.png({ compressionLevel: 9, adaptiveFiltering: true }).toFile(dest);
+  const meta = await sharp(dest).metadata();
+  console.log("wrote", path.relative(ROOT, dest), `${meta.width}x${meta.height}`);
+}
+
+/** Remove sheet background while preserving white logo strokes (checkmark, Job). */
+async function extractLogoKeepWhites(
+  input,
+  { threshold = 245, sampleStep = 2, pad = 20 } = {}
+) {
+  const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({
+    resolveWithObject: true,
+  });
+  const w = info.width;
+  const h = info.height;
+  const out = Buffer.from(data);
+  const isWhite = (i) =>
+    out[i] >= threshold &&
+    out[i + 1] >= threshold &&
+    out[i + 2] >= threshold &&
+    out[i + 3] > 0;
+
+  const colored = [];
+  for (let y = 0; y < h; y += sampleStep) {
+    for (let x = 0; x < w; x += sampleStep) {
+      const i = (y * w + x) * 4;
+      if (out[i + 3] < 10) continue;
+      if (!isWhite(i)) colored.push([x, y]);
+    }
+  }
+
+  const hull = convexHull(colored);
+  let cx = 0;
+  let cy = 0;
+  for (const p of hull) {
+    cx += p[0];
+    cy += p[1];
+  }
+  cx /= hull.length;
+  cy /= hull.length;
+  const expanded = hull.map(([x, y]) => {
+    const dx = x - cx;
+    const dy = y - cy;
+    const len = Math.hypot(dx, dy) || 1;
+    return [Math.round(x + (dx / len) * pad), Math.round(y + (dy / len) * pad)];
+  });
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (!isWhite(i)) continue;
+      if (!pointInHull(x + 0.5, y + 0.5, expanded)) out[i + 3] = 0;
+    }
+  }
+
+  return sharp(out, { raw: { width: w, height: h, channels: 4 } })
+    .trim({ threshold: 1 })
+    .png()
+    .toBuffer();
+}
+
+function cross(o, a, b) {
+  return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+}
+
+function convexHull(points) {
+  const sorted = points.slice().sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  if (sorted.length <= 1) return sorted;
+  const lower = [];
+  for (const p of sorted) {
+    while (
+      lower.length >= 2 &&
+      cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0
+    ) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (
+      upper.length >= 2 &&
+      cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0
+    ) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+  upper.pop();
+  lower.pop();
+  return lower.concat(upper);
+}
+
+function pointInHull(x, y, hull) {
+  let inside = false;
+  for (let i = 0, j = hull.length - 1; i < hull.length; j = i++) {
+    const xi = hull[i][0];
+    const yi = hull[i][1];
+    const xj = hull[j][0];
+    const yj = hull[j][1];
+    const intersect =
+      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi || 1e-9) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+async function resizeContain(input, width, height, background = { r: 0, g: 0, b: 0, alpha: 0 }) {
+  return sharp(input)
+    .resize(width, height, { fit: "contain", background })
+    .png({ compressionLevel: 9, adaptiveFiltering: true });
+}
+
+async function prepareLogos() {
+  mustExist(MASTERS.sheetTransparent);
+  mustExist(MASTERS.shieldSheet);
+
+  fs.copyFileSync(
+    MASTERS.sheetTransparent,
+    path.join(OUT.source, "png-logos-transparent-1.png")
+  );
+  fs.copyFileSync(MASTERS.shieldSheet, path.join(OUT.source, "jobproof-shield-source.png"));
+
+  // Primary horizontal — crop left lockup from uploaded sheet; keep white logo strokes
+  const leftSheet = await sharp(MASTERS.sheetTransparent)
+    .extract({ left: 80, top: 420, width: 1000, height: 900 })
+    .png()
+    .toBuffer();
+  const primaryBuf = await extractLogoKeepWhites(leftSheet, { pad: 16 });
+  await writePng(sharp(primaryBuf), path.join(OUT.logos, "jobproof-primary-horizontal.png"));
+
+  // Secondary / compact — uniform scale of the same artwork (no recolour / stretch)
+  await writePng(
+    sharp(primaryBuf).resize({ width: 1600, fit: "inside", withoutEnlargement: true }),
+    path.join(OUT.logos, "jobproof-secondary-horizontal.png")
+  );
+  await writePng(
+    sharp(primaryBuf).resize({ width: 640, fit: "inside", withoutEnlargement: true }),
+    path.join(OUT.logos, "jobproof-compact-horizontal.png")
+  );
+
+  // Shield — from uploaded transparent package
+  const shieldBuf = await extractLogoKeepWhites(
+    await sharp(MASTERS.shieldSheet).png().toBuffer(),
+    { pad: 28 }
+  );
+  const shieldMaster = path.join(OUT.icons, "jobproof-shield-1024.png");
+  await writePng(
+    sharp(shieldBuf).resize(1024, 1024, {
+      fit: "contain",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    }),
+    shieldMaster
+  );
+
+  for (const size of [512, 256, 128, 64, 32]) {
+    await writePng(
+      await resizeContain(shieldMaster, size, size),
+      path.join(OUT.icons, `jobproof-shield-${size}.png`)
+    );
+  }
+
+  // App icons — composite real shield onto light/dark pads (shield unchanged)
+  const shield512 = await sharp(shieldMaster)
+    .resize(400, 400, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+
+  await writePng(
+    sharp({
+      create: {
+        width: 512,
+        height: 512,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      },
+    }).composite([{ input: shield512, gravity: "centre" }]),
+    path.join(OUT.icons, "jobproof-app-light-512.png")
+  );
+
+  await writePng(
+    sharp({
+      create: {
+        width: 512,
+        height: 512,
+        channels: 4,
+        background: { r: 26, g: 37, b: 88, alpha: 1 },
+      },
+    }).composite([{ input: shield512, gravity: "centre" }]),
+    path.join(OUT.icons, "jobproof-app-dark-512.png")
+  );
+}
+
+async function prepareFavicons() {
+  const dir = MASTERS.faviconDir;
+  if (fs.existsSync(dir)) {
+    const map = {
+      "favicon.ico": "jobproof-favicon.ico",
+      "favicon.svg": "jobproof-favicon.svg",
+      "favicon-96x96.png": "jobproof-favicon-96.png",
+      "apple-touch-icon.png": "jobproof-apple-touch-icon.png",
+      "web-app-manifest-192x192.png": "jobproof-web-app-192.png",
+      "web-app-manifest-512x512.png": "jobproof-web-app-512.png",
+    };
+    for (const [src, dest] of Object.entries(map)) {
+      const from = path.join(dir, src);
+      if (fs.existsSync(from)) {
+        fs.copyFileSync(from, path.join(OUT.favicons, dest));
+        console.log("copied", path.relative(ROOT, path.join(OUT.favicons, dest)));
+      }
+    }
+  }
+
+  const shield32 = path.join(OUT.icons, "jobproof-shield-32.png");
+  await writePng(await resizeContain(shield32, 32, 32), path.join(OUT.favicons, "jobproof-favicon-32.png"));
+  await writePng(await resizeContain(shield32, 16, 16), path.join(OUT.favicons, "jobproof-favicon-16.png"));
+}
+
+function hexRgb(hex) {
+  const h = hex.replace("#", "");
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
+}
+
+function textSvg({
+  width,
+  height,
+  lines,
+  fontSize = 48,
+  fill = COLORS.white,
+  fontWeight = 700,
+  y = 80,
+  x = 64,
+  lineHeight = 1.2,
+  maxWidth,
+  textAnchor = "start",
+}) {
+  const escaped = lines
+    .map((line, i) => {
+      const yy = y + i * fontSize * lineHeight;
+      const safe = String(line)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      return `<text x="${x}" y="${yy}" fill="${fill}" font-size="${fontSize}" font-weight="${fontWeight}" font-family="Arial, Helvetica, sans-serif" text-anchor="${textAnchor}"${maxWidth ? ` textLength="${maxWidth}" lengthAdjust="spacingAndGlyphs"` : ""}>${safe}</text>`;
+    })
+    .join("");
+  return Buffer.from(
+    `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${escaped}</svg>`
+  );
+}
+
+function featurePillsSvg(width, height, features, startY) {
+  const pillH = 44;
+  const gap = 14;
+  const pills = features
+    .map((label, i) => {
+      const y = startY + i * (pillH + gap);
+      const safe = label.replace(/&/g, "&amp;");
+      return `
+        <rect x="64" y="${y}" width="420" height="${pillH}" rx="10" fill="rgba(255,255,255,0.14)"/>
+        <text x="84" y="${y + 29}" fill="#FFFFFF" font-size="20" font-weight="600" font-family="Arial, Helvetica, sans-serif">${safe}</text>
+      `;
+    })
+    .join("");
+  return Buffer.from(
+    `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${pills}</svg>`
+  );
+}
+
+async function composeSocialGraphic({
+  width,
+  height,
+  fileName,
+  headline,
+  subhead,
+  features = [],
+  logoWidth,
+}) {
+  const blue = hexRgb(COLORS.blue);
+  const orange = hexRgb(COLORS.orange);
+  const teal = hexRgb(COLORS.proofTeal);
+
+  const base = await sharp({
+    create: {
+      width,
+      height,
+      channels: 3,
+      background: blue,
+    },
+  })
+    .png()
+    .toBuffer();
+
+  // Accent bars (layout only — not logo artwork)
+  const accent = Buffer.from(`
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="${width}" height="12" fill="${COLORS.orange}"/>
+      <rect x="0" y="${height - 12}" width="${width}" height="12" fill="${COLORS.proofTeal}"/>
+      <circle cx="${width - 80}" cy="80" r="120" fill="rgba(255,255,255,0.06)"/>
+      <circle cx="40" cy="${height - 40}" r="90" fill="rgba(77,186,204,0.12)"/>
+    </svg>
+  `);
+
+  const logoPath = path.join(OUT.logos, "jobproof-primary-horizontal.png");
+  const logoBuf = await sharp(logoPath)
+    .resize({ width: logoWidth, fit: "inside" })
+    .png()
+    .toBuffer();
+
+  const headlineSvg = textSvg({
+    width,
+    height,
+    lines: headline,
+    fontSize: width >= 1200 ? 56 : 48,
+    y: Math.round(height * 0.28),
+    x: 64,
+    lineHeight: 1.15,
+  });
+
+  const subSvg = textSvg({
+    width,
+    height,
+    lines: [subhead],
+    fontSize: 26,
+    fontWeight: 500,
+    fill: "rgba(255,255,255,0.92)",
+    y: Math.round(height * 0.28) + headline.length * 64 + 24,
+    x: 64,
+  });
+
+  const composites = [
+    { input: accent, top: 0, left: 0 },
+    { input: logoBuf, top: 40, left: 48 },
+    { input: headlineSvg, top: 0, left: 0 },
+    { input: subSvg, top: 0, left: 0 },
+  ];
+
+  if (features.length) {
+    composites.push({
+      input: featurePillsSvg(width, height, features, Math.round(height * 0.55)),
+      top: 0,
+      left: 0,
+    });
+  }
+
+  const ctaY = height - 90;
+  const cta = Buffer.from(`
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect x="64" y="${ctaY}" width="280" height="48" rx="10" fill="${COLORS.orange}"/>
+      <text x="204" y="${ctaY + 31}" fill="#FFFFFF" font-size="20" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Start with JobProof</text>
+    </svg>
+  `);
+  composites.push({ input: cta, top: 0, left: 0 });
+
+  // Silence unused vars from destructuring for lint in node
+  void orange;
+  void teal;
+
+  await writePng(
+    sharp(base).composite(composites),
+    path.join(OUT.social, fileName)
+  );
+}
+
+async function buildSocial() {
+  await composeSocialGraphic({
+    width: 1080,
+    height: 1080,
+    fileName: "jobproof-facebook-post-1080.png",
+    headline: ["Win more jobs.", "Get paid faster."],
+    subhead: "Quotes · Contracts · Invoices · Dispute protection",
+    features: ["Professional estimates & approvals", "Change orders & documentation", "Fast, organized payments"],
+    logoWidth: 420,
+  });
+
+  await composeSocialGraphic({
+    width: 1080,
+    height: 1080,
+    fileName: "jobproof-instagram-post-1080.png",
+    headline: ["One platform for", "every job."],
+    subhead: "From first quote to final payment",
+    features: ["Contracts & change orders", "Invoices & proof of work", "Protect every project"],
+    logoWidth: 420,
+  });
+
+  await composeSocialGraphic({
+    width: 1080,
+    height: 1920,
+    fileName: "jobproof-instagram-story-1080x1920.png",
+    headline: ["Look more", "professional.", "Protect every", "project."],
+    subhead: "Built for contractors who want clearer systems",
+    features: ["Quotes & contracts", "Change orders", "Invoices & payments", "Dispute-ready records"],
+    logoWidth: 480,
+  });
+
+  await composeSocialGraphic({
+    width: 1200,
+    height: 627,
+    fileName: "jobproof-linkedin-1200x627.png",
+    headline: ["The contractor platform", "for growth and protection."],
+    subhead: "Quotes · Contracts · Change Orders · Invoices · Documentation",
+    features: [],
+    logoWidth: 380,
+  });
+
+  await composeSocialGraphic({
+    width: 1600,
+    height: 900,
+    fileName: "jobproof-twitter-1600x900.png",
+    headline: ["Run jobs with", "professional systems."],
+    subhead: "Fast payments. Clear records. Stronger customer experience.",
+    features: [],
+    logoWidth: 420,
+  });
+}
+
+async function buildWebsiteBanners() {
+  const specs = [
+    { w: 1920, h: 480, file: "jobproof-banner-1920.png", logoW: 520 },
+    { w: 1600, h: 400, file: "jobproof-banner-1600.png", logoW: 440 },
+    { w: 728, h: 90, file: "jobproof-banner-728x90.png", logoW: 200 },
+    { w: 300, h: 250, file: "jobproof-banner-300x250.png", logoW: 220 },
+    { w: 160, h: 600, file: "jobproof-banner-160x600.png", logoW: 130 },
+  ];
+
+  const logoPath = path.join(OUT.logos, "jobproof-primary-horizontal.png");
+
+  for (const spec of specs) {
+    const { w, h, file, logoW } = spec;
+    const blue = hexRgb(COLORS.blue);
+    const logoBuf = await sharp(logoPath)
+      .resize({ width: logoW, fit: "inside" })
+      .png()
+      .toBuffer();
+
+    const isTall = h > w;
+    const isShort = h <= 100;
+
+    let overlay;
+    if (isShort) {
+      overlay = Buffer.from(`
+        <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+          <rect x="${w - 210}" y="22" width="180" height="46" rx="8" fill="${COLORS.orange}"/>
+          <text x="${w - 120}" y="51" fill="#fff" font-size="16" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Try JobProof</text>
+        </svg>
+      `);
+    } else if (isTall) {
+      overlay = Buffer.from(`
+        <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+          <text x="20" y="280" fill="#fff" font-size="22" font-weight="700" font-family="Arial, Helvetica, sans-serif">Win more jobs</text>
+          <text x="20" y="312" fill="rgba(255,255,255,0.9)" font-size="16" font-family="Arial, Helvetica, sans-serif">Get paid faster</text>
+          <rect x="20" y="${h - 80}" width="120" height="40" rx="8" fill="${COLORS.orange}"/>
+          <text x="80" y="${h - 54}" fill="#fff" font-size="14" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Learn more</text>
+        </svg>
+      `);
+    } else if (w === 300) {
+      overlay = Buffer.from(`
+        <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+          <text x="24" y="140" fill="#fff" font-size="22" font-weight="700" font-family="Arial, Helvetica, sans-serif">Quotes to invoices</text>
+          <text x="24" y="168" fill="rgba(255,255,255,0.9)" font-size="14" font-family="Arial, Helvetica, sans-serif">in one platform</text>
+          <rect x="24" y="195" width="140" height="36" rx="8" fill="${COLORS.orange}"/>
+          <text x="94" y="218" fill="#fff" font-size="14" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Get started</text>
+        </svg>
+      `);
+    } else {
+      overlay = Buffer.from(`
+        <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+          <text x="64" y="${Math.round(h * 0.55)}" fill="#fff" font-size="${w > 1400 ? 48 : 36}" font-weight="700" font-family="Arial, Helvetica, sans-serif">Win more jobs. Get paid faster. Protect every project.</text>
+          <text x="64" y="${Math.round(h * 0.55) + 44}" fill="rgba(255,255,255,0.9)" font-size="22" font-family="Arial, Helvetica, sans-serif">Quotes · Contracts · Change Orders · Invoices · Documentation</text>
+          <rect x="64" y="${h - 90}" width="220" height="48" rx="10" fill="${COLORS.orange}"/>
+          <text x="174" y="${h - 59}" fill="#fff" font-size="18" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Start with JobProof</text>
+        </svg>
+      `);
+    }
+
+    const logoTop = isTall ? 40 : isShort ? Math.round((h - 50) / 2) : 36;
+    const logoLeft = isTall ? 15 : 48;
+
+    await writePng(
+      sharp({
+        create: { width: w, height: h, channels: 3, background: blue },
+      }).composite([
+        {
+          input: Buffer.from(`
+            <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="${w}" height="6" fill="${COLORS.orange}"/>
+              <rect x="0" y="${h - 6}" width="${w}" height="6" fill="${COLORS.proofTeal}"/>
+            </svg>
+          `),
+          top: 0,
+          left: 0,
+        },
+        { input: logoBuf, top: logoTop, left: logoLeft },
+        { input: overlay, top: 0, left: 0 },
+      ]),
+      path.join(OUT.website, file)
+    );
+  }
+}
+
+async function pngToPdf(pngPath, pdfPath, pageWidthPt, pageHeightPt) {
+  const doc = await PDFDocument.create();
+  const bytes = fs.readFileSync(pngPath);
+  const image = await doc.embedPng(bytes);
+  const page = doc.addPage([pageWidthPt, pageHeightPt]);
+  page.drawImage(image, {
+    x: 0,
+    y: 0,
+    width: pageWidthPt,
+    height: pageHeightPt,
+  });
+  fs.writeFileSync(pdfPath, await doc.save());
+  console.log("wrote", path.relative(ROOT, pdfPath));
+}
+
+async function buildPrintFlyer({
+  widthPx,
+  heightPx,
+  pngName,
+  pdfName,
+  pageW,
+  pageH,
+  title,
+  bullets,
+}) {
+  const logoPath = path.join(OUT.logos, "jobproof-primary-horizontal.png");
+  const logoBuf = await sharp(logoPath)
+    .resize({ width: Math.round(widthPx * 0.45), fit: "inside" })
+    .png()
+    .toBuffer();
+
+  const bulletText = bullets
+    .map((b, i) => {
+      const y = Math.round(heightPx * 0.38) + i * 70;
+      return `<text x="96" y="${y}" fill="${COLORS.zinc900}" font-size="36" font-family="Arial, Helvetica, sans-serif">•  ${b.replace(/&/g, "&amp;")}</text>`;
+    })
+    .join("");
+
+  const overlay = Buffer.from(`
+    <svg width="${widthPx}" height="${heightPx}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="${widthPx}" height="${heightPx}" fill="${COLORS.white}"/>
+      <rect width="${widthPx}" height="28" fill="${COLORS.blue}"/>
+      <rect y="${heightPx - 28}" width="${widthPx}" height="28" fill="${COLORS.orange}"/>
+      <text x="96" y="${Math.round(heightPx * 0.28)}" fill="${COLORS.navy}" font-size="64" font-weight="700" font-family="Arial, Helvetica, sans-serif">${title.replace(/&/g, "&amp;")}</text>
+      ${bulletText}
+      <text x="96" y="${heightPx - 160}" fill="${COLORS.blue}" font-size="32" font-weight="700" font-family="Arial, Helvetica, sans-serif">jobproof.ca</text>
+      <text x="96" y="${heightPx - 110}" fill="${COLORS.zinc700}" font-size="26" font-family="Arial, Helvetica, sans-serif">Replace [PARTNER LINK] with your referral URL</text>
+    </svg>
+  `);
+
+  const pngPath = path.join(OUT.print, pngName);
+  await writePng(
+    sharp(overlay).composite([{ input: logoBuf, top: 80, left: 80 }]),
+    pngPath
+  );
+  await pngToPdf(pngPath, path.join(OUT.print, pdfName), pageW, pageH);
+}
+
+async function buildPrint() {
+  // 300 DPI sizes
+  await buildPrintFlyer({
+    widthPx: 2550,
+    heightPx: 3300,
+    pngName: "jobproof-flyer-letter.png",
+    pdfName: "jobproof-flyer-letter.pdf",
+    pageW: 612,
+    pageH: 792,
+    title: "Run your contracting business with confidence",
+    bullets: [
+      "Professional quotes and contracts",
+      "Change orders and job documentation",
+      "Invoices and faster payments",
+      "Records that support dispute protection",
+    ],
+  });
+
+  await buildPrintFlyer({
+    widthPx: 1200,
+    heightPx: 2700,
+    pngName: "jobproof-rack-card.png",
+    pdfName: "jobproof-rack-card.pdf",
+    pageW: 288,
+    pageH: 648,
+    title: "JobProof for contractors",
+    bullets: [
+      "Quotes & contracts",
+      "Change orders",
+      "Invoices & payments",
+      "Protect every project",
+    ],
+  });
+
+  await buildPrintFlyer({
+    widthPx: 2550,
+    heightPx: 1650,
+    pngName: "jobproof-flyer-halfpage.png",
+    pdfName: "jobproof-flyer-halfpage.pdf",
+    pageW: 612,
+    pageH: 396,
+    title: "Win more jobs. Get paid faster.",
+    bullets: [
+      "All-in-one contractor platform",
+      "Clear approvals and documentation",
+      "Professional image for every customer",
+    ],
+  });
+
+  await buildPrintFlyer({
+    widthPx: 3300,
+    heightPx: 5100,
+    pngName: "jobproof-poster.png",
+    pdfName: "jobproof-poster.pdf",
+    pageW: 792,
+    pageH: 1224,
+    title: "Help contractors work like pros",
+    bullets: [
+      "Quotes · Contracts · Change Orders",
+      "Invoices · Documentation · Payments",
+      "Dispute protection for every project",
+      "Share your partner referral link today",
+    ],
+  });
+}
+
+async function buildBrandGuidelinesPdf() {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const page = doc.addPage([612, 792]);
+  const blue = rgb(0.141, 0.212, 0.733);
+  const navy = rgb(0.102, 0.145, 0.345);
+  const zinc = rgb(0.25, 0.25, 0.28);
+
+  let y = 740;
+  const draw = (text, size, f = font, color = zinc) => {
+    page.drawText(text, { x: 48, y, size, font: f, color, maxWidth: 516 });
+    y -= size + 10;
+  };
+
+  page.drawRectangle({ x: 0, y: 762, width: 612, height: 30, color: blue });
+  page.drawText("JobProof Brand Guidelines", {
+    x: 48,
+    y: 772,
+    size: 14,
+    font: fontBold,
+    color: rgb(1, 1, 1),
+  });
+
+  draw("Partner Media Kit", 22, fontBold, navy);
+  draw("Use only approved assets. Do not alter the JobProof logo.", 11);
+  y -= 8;
+
+  draw("Approved logo usage", 14, fontBold, navy);
+  for (const line of [
+    "• Use the supplied full-colour logo files",
+    "• Maintain the original aspect ratio",
+    "• Leave clear space around the mark",
+    "• Use high-resolution files for large placements",
+    "• Place on backgrounds with strong contrast",
+  ]) {
+    draw(line, 11);
+  }
+  y -= 6;
+
+  draw("Minimum spacing & size", 14, fontBold, navy);
+  draw("• Keep clear space at least equal to the shield height around the logo", 11);
+  draw("• Digital minimum width: 120px for horizontal logo, 32px for shield", 11);
+  draw("• Print minimum width: 1.25 in for horizontal logo, 0.4 in for shield", 11);
+  y -= 6;
+
+  draw("Colour palette (from JobProof branding)", 14, fontBold, navy);
+  for (const line of [
+    "• JobProof Blue  #2436BB",
+    "• Bright Blue    #2C37EC",
+    "• Soft Teal      #4DB6AC",
+    "• Proof Teal     #4DBACC",
+    "• Accent Orange  #F28C38",
+    "• White          #FFFFFF",
+  ]) {
+    draw(line, 11);
+  }
+  y -= 6;
+
+  draw("Acceptable backgrounds", 14, fontBold, navy);
+  draw("• White, light neutrals, or solid brand blue/navy with strong contrast", 11);
+  draw("• Photography only when the logo remains fully legible", 11);
+  y -= 6;
+
+  draw("Unacceptable modifications", 14, fontBold, navy);
+  for (const line of [
+    "• Stretching, compressing, rotating, or cropping the logo",
+    "• Recolouring or rearranging the shield and wordmark",
+    "• Adding shadows, outlines, or effects",
+    "• Placing over busy imagery that reduces legibility",
+  ]) {
+    draw(line, 11);
+  }
+  y -= 6;
+
+  draw("Typography & tone of voice", 14, fontBold, navy);
+  draw("• Prefer clean modern sans-serif type in partner materials", 11);
+  draw("• Tone: professional, trustworthy, contractor-first, clear, helpful", 11);
+  draw("• Emphasize quotes, contracts, change orders, invoices, documentation,", 11);
+  draw("  dispute protection, fast payments, and a professional image", 11);
+  y -= 10;
+
+  draw("Questions: partners@jobproof.ca", 11, fontBold, blue);
+
+  // Embed logo at bottom
+  const logoBytes = fs.readFileSync(path.join(OUT.logos, "jobproof-compact-horizontal.png"));
+  const logo = await doc.embedPng(logoBytes);
+  const lw = 160;
+  const lh = (logo.height / logo.width) * lw;
+  page.drawImage(logo, { x: 48, y: 48, width: lw, height: lh });
+
+  const out = path.join(OUT.brand, "jobproof-brand-guidelines.pdf");
+  fs.writeFileSync(out, await doc.save());
+  console.log("wrote", path.relative(ROOT, out));
+}
+
+function writeEmailResources() {
+  const introHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Introducing JobProof</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#18181b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f4f5;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4e4e7;">
+        <tr><td style="background:#2436BB;padding:20px 28px;">
+          <img src="https://jobproof.ca/media-kit/logos/jobproof-compact-horizontal.png" alt="JobProof" width="200" style="display:block;border:0;height:auto;"/>
+        </td></tr>
+        <tr><td style="padding:28px;">
+          <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#1A2558;">Help contractors win more jobs and get paid faster</h1>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#3f3f46;">
+            JobProof is an all-in-one contractor platform for quotes, contracts, change orders, invoices, documentation, and dispute protection—so contractors can present a professional image and protect every project.
+          </p>
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#3f3f46;">
+            If you work with contractors who are ready for clearer systems, share JobProof with them:
+          </p>
+          <a href="[PARTNER LINK]" style="display:inline-block;background:#F28C38;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 20px;border-radius:8px;">Explore JobProof</a>
+        </td></tr>
+        <tr><td style="padding:16px 28px 28px;font-size:12px;color:#71717a;">
+          Replace [PARTNER LINK] with your personal referral URL from the Partner Portal.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+`;
+
+  const introText = `Help contractors win more jobs and get paid faster
+
+JobProof is an all-in-one contractor platform for quotes, contracts, change orders, invoices, documentation, and dispute protection—so contractors can present a professional image and protect every project.
+
+Share JobProof: [PARTNER LINK]
+
+Replace [PARTNER LINK] with your personal referral URL from the Partner Portal.
+`;
+
+  const referralHtml = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"/><title>JobProof referral</title></head>
+<body style="font-family:Arial,Helvetica,sans-serif;color:#18181b;line-height:1.6;padding:24px;">
+  <p>Hi,</p>
+  <p>I wanted to share JobProof with you. It’s built for contractors who need professional quotes, contracts, change orders, invoices, documentation, and clearer payment workflows—with records that support dispute protection.</p>
+  <p>You can learn more here: <a href="[PARTNER LINK]">[PARTNER LINK]</a></p>
+  <p>Happy to answer questions if helpful.</p>
+</body>
+</html>
+`;
+
+  const referralText = `Hi,
+
+I wanted to share JobProof with you. It’s built for contractors who need professional quotes, contracts, change orders, invoices, documentation, and clearer payment workflows—with records that support dispute protection.
+
+Learn more: [PARTNER LINK]
+
+Happy to answer questions if helpful.
+`;
+
+  const reminderHtml = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"/><title>JobProof reminder</title></head>
+<body style="font-family:Arial,Helvetica,sans-serif;color:#18181b;line-height:1.6;padding:24px;">
+  <p>Hi,</p>
+  <p>Quick reminder about JobProof—the contractor platform for quotes, contracts, change orders, invoices, and job documentation that helps teams look professional and get paid with more confidence.</p>
+  <p>Here’s the link again: <a href="[PARTNER LINK]">[PARTNER LINK]</a></p>
+</body>
+</html>
+`;
+
+  const reminderText = `Hi,
+
+Quick reminder about JobProof—the contractor platform for quotes, contracts, change orders, invoices, and job documentation that helps teams look professional and get paid with more confidence.
+
+Here’s the link again: [PARTNER LINK]
+`;
+
+  const subjects = `JobProof partner email — subject line suggestions
+
+1. A simpler way for contractors to quote, contract, and get paid
+2. Help your network look more professional on every job
+3. Quotes, contracts, change orders, and invoices—in one place
+4. Protect every project with clearer documentation
+5. Share JobProof with contractors who want faster payments
+6. From first quote to final invoice—without the paperwork scramble
+7. A Canadian platform built for growing trade businesses
+`;
+
+  fs.writeFileSync(path.join(OUT.email, "introduction-email.html"), introHtml);
+  fs.writeFileSync(path.join(OUT.email, "introduction-email.txt"), introText);
+  fs.writeFileSync(path.join(OUT.email, "referral-email.html"), referralHtml);
+  fs.writeFileSync(path.join(OUT.email, "referral-email.txt"), referralText);
+  fs.writeFileSync(path.join(OUT.email, "reminder-email.html"), reminderHtml);
+  fs.writeFileSync(path.join(OUT.email, "reminder-email.txt"), reminderText);
+  fs.writeFileSync(path.join(OUT.email, "subject-line-suggestions.txt"), subjects);
+  console.log("wrote email resources in public/media-kit/email/");
+}
+
+async function main() {
+  ensureDirs();
+  await prepareLogos();
+  await prepareFavicons();
+  await buildSocial();
+  await buildWebsiteBanners();
+  await buildPrint();
+  await buildBrandGuidelinesPdf();
+  writeEmailResources();
+
+  fs.writeFileSync(
+    path.join(OUT.root, "README.md"),
+    `# Partner media kit assets
+
+Canonical logo masters (do not recreate or recolour):
+
+- \`source/png-logos-transparent-1.png\` (uploaded package sheet)
+- \`source/jobproof-shield-source.png\`
+
+Generate / refresh exports:
+
+\`\`\`bash
+node scripts/build-partner-media-kit.mjs
+\`\`\`
+
+Folders:
+
+- \`logos/\` \`icons/\` \`favicons/\` \`social/\` \`email/\` \`website/\` \`print/\` \`brand/\`
+
+Intentionally pending until vector masters exist:
+
+- Logo SVG / logo PDF packs (favicon SVG is available)
+`
+  );
+  console.log("Media kit build complete.");
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
