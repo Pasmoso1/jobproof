@@ -14,6 +14,7 @@ const NAV = [
   { href: "/partner/referrals", label: "Referrals" },
   { href: "/partner/payments", label: "Payments" },
   { href: "/partner/media", label: "Media Center" },
+  { href: "/partner/studio", label: "Marketing Studio" },
   { href: "/partner/resources", label: "Resources" },
   { href: "/partner/training", label: "Training" },
   { href: "/partner/faq", label: "FAQ" },
