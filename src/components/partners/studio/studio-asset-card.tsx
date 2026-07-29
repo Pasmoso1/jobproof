@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { StudioCampaignAssetRow } from "@/lib/partners/studio/actions";
+import type { StudioCampaignAssetRow } from "@/lib/partners/studio/types";
 import { recordStudioDownload } from "@/lib/partners/studio/actions";
 
 async function copyText(value: string) {

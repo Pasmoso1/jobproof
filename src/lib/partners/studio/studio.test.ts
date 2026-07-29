@@ -171,3 +171,127 @@ describe("partner marketing studio route wiring", () => {
     assert.match(sql, /ENABLE ROW LEVEL SECURITY/);
   });
 });
+
+describe("partner marketing studio actions type-erasure safety", () => {
+  const actionsPath = join(root, "src/lib/partners/studio/actions.ts");
+  const bannedTypeNames = [
+    "StudioAudienceId",
+    "StudioThemeId",
+    "StudioStyleId",
+    "StudioCopyVariantId",
+    "StudioGoalId",
+    "StudioPlatformId",
+  ] as const;
+
+  it("use-server actions module does not export or re-export TypeScript-only types", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(actionsPath, "utf8")
+    );
+
+    assert.match(source, /^["']use server["']/m);
+    assert.doesNotMatch(source, /\bexport\s+type\b/);
+    assert.doesNotMatch(source, /\bexport\s+interface\b/);
+    assert.doesNotMatch(source, /\bexport\s+type\s*\{/);
+
+    for (const name of bannedTypeNames) {
+      assert.doesNotMatch(
+        source,
+        new RegExp(`export\\s+type\\s*\\{[^}]*\\b${name}\\b`),
+        `must not re-export ${name}`
+      );
+      assert.doesNotMatch(
+        source,
+        new RegExp(`export\\s*\\{[^}]*\\b${name}\\b`),
+        `must not value-export ${name}`
+      );
+      // Types may only appear via `import type`
+      const valueImport = new RegExp(
+        `import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from`
+      );
+      if (valueImport.test(source)) {
+        assert.match(
+          source,
+          new RegExp(`import\\s+type\\s*\\{[^}]*\\b${name}\\b`),
+          `${name} must use import type, not a value import`
+        );
+        assert.doesNotMatch(
+          source,
+          new RegExp(
+            `import\\s*\\{(?:(?!type)[^}])*\\b${name}\\b[^}]*\\}\\s*from\\s*["']@/lib/partners/studio/catalog["']`
+          ),
+          `${name} must not be mixed into a runtime catalog import`
+        );
+      }
+    }
+
+    assert.match(source, /export async function createStudioCampaign/);
+    assert.match(source, /export async function regenerateStudioCampaignCopy/);
+    assert.match(source, /export async function uploadPartnerStudioLogo/);
+  });
+
+  it("transpiled studio actions module erases Studio*Id type identifiers", async () => {
+    const ts = await import("typescript");
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(actionsPath, "utf8")
+    );
+    const code = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2020,
+        esModuleInterop: true,
+        verbatimModuleSyntax: true,
+        isolatedModules: true,
+      },
+      fileName: "actions.ts",
+    }).outputText;
+
+    for (const name of bannedTypeNames) {
+      assert.doesNotMatch(code, new RegExp(`\\b${name}\\b`), name);
+    }
+    assert.match(code, /\bcreateStudioCampaign\b/);
+    assert.match(code, /\blistPartnerCampaigns\b/);
+  });
+
+  it("studio UI imports Studio*Id types from catalog, not actions", async () => {
+    const files = [
+      "src/components/partners/studio/studio-campaign-wizard.tsx",
+      "src/components/partners/studio/studio-copy-variant-bar.tsx",
+      "src/components/partners/studio/studio-asset-card.tsx",
+      "src/app/(partner)/partner/(portal)/studio/page.tsx",
+      "src/app/(partner)/partner/(portal)/studio/create/page.tsx",
+      "src/app/(partner)/partner/(portal)/studio/history/page.tsx",
+      "src/app/(partner)/partner/(portal)/studio/campaigns/[campaignId]/page.tsx",
+    ];
+
+    for (const rel of files) {
+      const source = await import("node:fs/promises").then((fs) =>
+        fs.readFile(join(root, rel), "utf8")
+      );
+      for (const name of bannedTypeNames) {
+        assert.doesNotMatch(
+          source,
+          new RegExp(
+            `import\\s+(type\\s+)?\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*["']@/lib/partners/studio/actions["']`
+          ),
+          `${rel} must not import ${name} from actions.ts`
+        );
+      }
+      assert.doesNotMatch(
+        source,
+        /import\s+type\s*\{[^}]*StudioCampaignAssetRow[^}]*\}\s*from\s*["']@\/lib\/partners\/studio\/actions["']/,
+        `${rel} must not import StudioCampaignAssetRow from actions.ts`
+      );
+    }
+
+    const wizard = await import("node:fs/promises").then((fs) =>
+      fs.readFile(
+        join(root, "src/components/partners/studio/studio-campaign-wizard.tsx"),
+        "utf8"
+      )
+    );
+    assert.match(
+      wizard,
+      /import\s*\{[^}]*type\s+StudioThemeId[^}]*\}\s*from\s*["']@\/lib\/partners\/studio\/catalog["']/
+    );
+  });
+});

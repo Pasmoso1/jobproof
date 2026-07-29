@@ -18,21 +18,18 @@ import {
   studioOptionLabel,
   STUDIO_AUDIENCES,
   STUDIO_THEMES,
-  type StudioAudienceId,
-  type StudioCopyVariantId,
-  type StudioGoalId,
-  type StudioPlatformId,
-  type StudioStyleId,
-  type StudioThemeId,
 } from "@/lib/partners/studio/catalog";
-
-export type StudioActionResult =
-  | { ok: true; campaignId: string }
-  | { ok: false; error: string };
-
-export type StudioLogoResult =
-  | { ok: true; logoUrl: string | null }
-  | { ok: false; error: string };
+import type {
+  StudioAudienceId,
+  StudioThemeId,
+} from "@/lib/partners/studio/catalog";
+import type {
+  StudioActionResult,
+  StudioCampaignAssetRow,
+  StudioCampaignDetail,
+  StudioCampaignListItem,
+  StudioLogoResult,
+} from "@/lib/partners/studio/types";
 
 const LOGO_BUCKET = "partner-logos";
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
@@ -382,22 +379,6 @@ async function getPartnerLogoSignedUrl(storagePath: string): Promise<string | nu
   return data.signedUrl;
 }
 
-export type StudioCampaignListItem = {
-  id: string;
-  name: string;
-  theme: string;
-  audience: string;
-  goal: string;
-  style: string;
-  platforms: string[];
-  referral_url: string;
-  created_at: string;
-  clicks_count: number;
-  signups_count: number;
-  qualified_referrals_count: number;
-  revenue_earned_cad: number;
-};
-
 export async function listPartnerCampaigns(): Promise<StudioCampaignListItem[]> {
   const session = await getActivePartnerForCurrentUser();
   if (!session) return [];
@@ -414,39 +395,6 @@ export async function listPartnerCampaigns(): Promise<StudioCampaignListItem[]> 
   if (error || !data) return [];
   return data as StudioCampaignListItem[];
 }
-
-export type StudioCampaignAssetRow = {
-  id: string;
-  platform: string;
-  asset_kind: string;
-  title: string;
-  preview_src: string | null;
-  download_href: string | null;
-  download_file_name: string | null;
-  secondary_download_href: string | null;
-  secondary_download_file_name: string | null;
-  caption: string | null;
-  post_body: string | null;
-  email_html: string | null;
-  email_text: string | null;
-  email_subject: string | null;
-  sort_order: number;
-};
-
-export type StudioCampaignDetail = {
-  id: string;
-  name: string;
-  theme: string;
-  audience: string;
-  goal: string;
-  style: string;
-  platforms: string[];
-  referral_url: string;
-  referral_code: string;
-  copy_variant: string;
-  created_at: string;
-  assets: StudioCampaignAssetRow[];
-};
 
 export async function getPartnerCampaignDetail(
   campaignId: string
@@ -479,13 +427,3 @@ export async function getPartnerCampaignDetail(
     assets: (assets ?? []) as StudioCampaignAssetRow[],
   };
 }
-
-// Re-export types used by the wizard for convenience
-export type {
-  StudioThemeId,
-  StudioAudienceId,
-  StudioGoalId,
-  StudioPlatformId,
-  StudioStyleId,
-  StudioCopyVariantId,
-};
