@@ -1,5 +1,5 @@
 /**
- * Generate Partner Media Center logo assets from the brand sheet.
+ * Generate Partner Media Centre logo assets from the brand sheet.
  *
  * Source: public/media-kit/source/JobProofLG.png
  * Run: node scripts/generate-partner-media-kit.mjs

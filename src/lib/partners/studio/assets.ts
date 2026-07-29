@@ -20,7 +20,7 @@ export type CampaignAssetDraft = {
   metadata: Record<string, unknown>;
 };
 
-/** Map platforms to existing Media Center assets — do not duplicate files. */
+/** Map platforms to existing Media Centre assets — do not duplicate files. */
 const PLATFORM_MEDIA: Record<
   StudioPlatformId,
   {

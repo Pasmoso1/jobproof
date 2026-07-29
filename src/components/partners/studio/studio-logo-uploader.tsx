@@ -56,12 +56,12 @@ export function StudioLogoUploader({
 
       {logoUrl ? (
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="flex h-24 w-full items-center justify-center rounded-xl border border-zinc-100 bg-zinc-50 p-3 sm:w-40">
+          <div className="flex h-24 w-full items-center justify-center overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50 p-4 sm:w-44">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={logoUrl}
               alt={`${organizationName} logo`}
-              className="max-h-20 max-w-full object-contain"
+              className="h-full max-h-20 w-full object-contain object-center"
             />
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">

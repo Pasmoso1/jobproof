@@ -115,7 +115,7 @@ describe("partner media center content", () => {
 });
 
 describe("partner media center route access conventions", () => {
-  it("registers Media Center in partner portal navigation", async () => {
+  it("registers Media Centre in partner portal navigation", async () => {
     const layoutPath = join(
       root,
       "src/app/(partner)/partner/(portal)/layout.tsx"
@@ -124,7 +124,8 @@ describe("partner media center route access conventions", () => {
       fs.readFile(layoutPath, "utf8")
     );
     assert.match(source, /href: "\/partner\/media"/);
-    assert.match(source, /Media Center/);
+    assert.match(source, /Media Centre/);
+    assert.doesNotMatch(source, /Media Center/);
     assert.match(source, /getActivePartnerForCurrentUser/);
   });
 

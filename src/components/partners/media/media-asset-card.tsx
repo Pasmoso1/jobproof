@@ -31,13 +31,13 @@ export function MediaAssetCard({
         Use native <img> to avoid Next/Image width/height collapse on small screens.
       */}
       <div
-        className={`flex min-h-[140px] w-full items-center justify-center p-4 sm:min-h-[160px] sm:p-5 ${TONE_CLASS[tone]}`}
+        className={`flex min-h-[140px] w-full items-center justify-center overflow-hidden p-5 sm:min-h-[168px] sm:p-6 ${TONE_CLASS[tone]}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={asset.previewSrc}
           alt={asset.previewAlt}
-          className="max-h-28 w-auto max-w-full object-contain sm:max-h-32"
+          className="h-full max-h-32 w-full object-contain object-center sm:max-h-36"
           loading="lazy"
           decoding="async"
         />

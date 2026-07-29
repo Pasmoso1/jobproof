@@ -44,6 +44,12 @@ const OUT = {
 const MASTERS = {
   /** Uploaded transparent PNG logo package — canonical source only. */
   sheetTransparent: path.join(DOWNLOADS, "Png.LogosTransparent", "1.png"),
+  /** Dedicated full horizontal lockup from the same package (preferred). */
+  primaryHorizontal: path.join(
+    DOWNLOADS,
+    "Png.LogosTransparent",
+    "jobproof-logo.png.png"
+  ),
   shieldSheet: path.join(DOWNLOADS, "Png.LogosTransparent", "2.png"),
   faviconDir: path.join(DOWNLOADS, "favicon"),
 };
@@ -171,6 +177,83 @@ async function resizeContain(input, width, height, background = { r: 0, g: 0, b:
     .png({ compressionLevel: 9, adaptiveFiltering: true });
 }
 
+/** Ensure transparent safe padding so the wordmark never touches the canvas edge. */
+async function ensureSafePadding(input, padding = 24) {
+  const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({
+    resolveWithObject: true,
+  });
+  const w = info.width;
+  const h = info.height;
+  let minX = w;
+  let maxX = 0;
+  let minY = h;
+  let maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] <= 20) continue;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < minX) return Buffer.from(input);
+
+  const leftPad = Math.max(0, padding - minX);
+  const rightPad = Math.max(0, padding - (w - 1 - maxX));
+  const topPad = Math.max(0, padding - minY);
+  const bottomPad = Math.max(0, padding - (h - 1 - maxY));
+
+  return sharp(input)
+    .extend({
+      top: topPad,
+      bottom: bottomPad,
+      left: leftPad,
+      right: rightPad,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .png()
+    .toBuffer();
+}
+
+/** Find non-white content bounds on a white sheet (left horizontal lockup). */
+async function findNonWhiteBounds(inputPath, { xMaxRatio = 0.7, whiteThreshold = 245 } = {}) {
+  const { data, info } = await sharp(inputPath).ensureAlpha().raw().toBuffer({
+    resolveWithObject: true,
+  });
+  const w = info.width;
+  const h = info.height;
+  const xLimit = Math.floor(w * xMaxRatio);
+  let minX = w;
+  let maxX = 0;
+  let minY = h;
+  let maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < xLimit; x++) {
+      const i = (y * w + x) * 4;
+      if (data[i + 3] < 20) continue;
+      if (
+        data[i] >= whiteThreshold &&
+        data[i + 1] >= whiteThreshold &&
+        data[i + 2] >= whiteThreshold
+      ) {
+        continue;
+      }
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < minX) throw new Error(`No logo content found in ${inputPath}`);
+  const margin = 30;
+  const left = Math.max(0, minX - margin);
+  const top = Math.max(0, minY - margin);
+  const width = Math.min(w - left, maxX - minX + 1 + margin * 2);
+  const height = Math.min(h - top, maxY - minY + 1 + margin * 2);
+  return { left, top, width, height, contentWidth: maxX - minX + 1 };
+}
+
 async function prepareLogos() {
   mustExist(MASTERS.sheetTransparent);
   mustExist(MASTERS.shieldSheet);
@@ -181,28 +264,59 @@ async function prepareLogos() {
   );
   fs.copyFileSync(MASTERS.shieldSheet, path.join(OUT.source, "jobproof-shield-source.png"));
 
-  // Primary horizontal — crop left lockup from uploaded sheet; keep white logo strokes
-  const leftSheet = await sharp(MASTERS.sheetTransparent)
-    .extract({ left: 80, top: 420, width: 1000, height: 900 })
-    .png()
-    .toBuffer();
-  const primaryBuf = await extractLogoKeepWhites(leftSheet, { pad: 16 });
+  // Primary horizontal — prefer dedicated full lockup; fall back to auto-bounds on sheet.
+  // Dedicated master is already transparent with the full wordmark — do not run
+  // extractLogoKeepWhites on it (that path is for white sheet crops only).
+  let primaryClean;
+  if (fs.existsSync(MASTERS.primaryHorizontal)) {
+    fs.copyFileSync(
+      MASTERS.primaryHorizontal,
+      path.join(OUT.source, "jobproof-logo-horizontal-source.png")
+    );
+    primaryClean = await sharp(MASTERS.primaryHorizontal).png().toBuffer();
+    console.log("using dedicated horizontal master:", path.basename(MASTERS.primaryHorizontal));
+  } else {
+    const bounds = await findNonWhiteBounds(MASTERS.sheetTransparent);
+    console.log("auto horizontal crop bounds", bounds);
+    const cropped = await sharp(MASTERS.sheetTransparent)
+      .extract({
+        left: bounds.left,
+        top: bounds.top,
+        width: bounds.width,
+        height: bounds.height,
+      })
+      .png()
+      .toBuffer();
+    primaryClean = await extractLogoKeepWhites(cropped, { pad: 18 });
+  }
+
+  const primaryBuf = await ensureSafePadding(primaryClean, 32);
   await writePng(sharp(primaryBuf), path.join(OUT.logos, "jobproof-primary-horizontal.png"));
 
-  // Secondary / compact — uniform scale of the same artwork (no recolour / stretch)
+  // Secondary — same artwork, slightly tighter outer padding (still full wordmark)
+  const secondaryBuf = await ensureSafePadding(primaryClean, 16);
   await writePng(
-    sharp(primaryBuf).resize({ width: 1600, fit: "inside", withoutEnlargement: true }),
+    sharp(secondaryBuf).resize({ width: 1600, fit: "inside", withoutEnlargement: true }),
     path.join(OUT.logos, "jobproof-secondary-horizontal.png")
   );
-  await writePng(
-    sharp(primaryBuf).resize({ width: 640, fit: "inside", withoutEnlargement: true }),
-    path.join(OUT.logos, "jobproof-compact-horizontal.png")
-  );
+
+  // Compact — reduced outer padding only; never crop the brand name
+  const compactPadded = await ensureSafePadding(primaryClean, 8);
+  const compactResized = await sharp(compactPadded)
+    .resize({ width: 640, fit: "inside", withoutEnlargement: true })
+    .png()
+    .toBuffer();
+  // Re-apply minimum transparent padding after resize so the right edge never clips.
+  const compactBuf = await ensureSafePadding(compactResized, 8);
+  await writePng(sharp(compactBuf), path.join(OUT.logos, "jobproof-compact-horizontal.png"));
 
   // Shield — from uploaded transparent package
-  const shieldBuf = await extractLogoKeepWhites(
-    await sharp(MASTERS.shieldSheet).png().toBuffer(),
-    { pad: 28 }
+  const shieldBuf = await ensureSafePadding(
+    await extractLogoKeepWhites(
+      await sharp(MASTERS.shieldSheet).png().toBuffer(),
+      { pad: 28 }
+    ),
+    24
   );
   const shieldMaster = path.join(OUT.icons, "jobproof-shield-1024.png");
   await writePng(
@@ -367,9 +481,21 @@ async function composeSocialGraphic({
 
   const logoPath = path.join(OUT.logos, "jobproof-primary-horizontal.png");
   const logoBuf = await sharp(logoPath)
-    .resize({ width: logoWidth, fit: "inside" })
+    .resize({
+      width: Math.min(logoWidth, width - 96),
+      fit: "inside",
+      withoutEnlargement: true,
+    })
     .png()
     .toBuffer();
+  const logoMeta = await sharp(logoBuf).metadata();
+  const logoTop = 40;
+  const logoLeft = 48;
+  if ((logoMeta.width ?? 0) + logoLeft > width - 24) {
+    throw new Error(
+      `Logo too wide for ${fileName}: ${logoMeta.width}px in ${width}px canvas`
+    );
+  }
 
   const headlineSvg = textSvg({
     width,
@@ -394,7 +520,7 @@ async function composeSocialGraphic({
 
   const composites = [
     { input: accent, top: 0, left: 0 },
-    { input: logoBuf, top: 40, left: 48 },
+    { input: logoBuf, top: logoTop, left: logoLeft },
     { input: headlineSvg, top: 0, left: 0 },
     { input: subSvg, top: 0, left: 0 },
   ];

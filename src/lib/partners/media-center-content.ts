@@ -129,7 +129,8 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
   {
     id: "primary-horizontal",
     name: "Primary Horizontal Logo",
-    description: "Full-colour horizontal lockup for primary brand placements.",
+    description:
+      "Full standard horizontal lockup with generous safe spacing for websites, presentations, and large placements.",
     recommendedUse:
       "Websites, presentations, newsletters, and larger digital placements.",
     availableFormats: "PNG · transparent",
@@ -148,7 +149,8 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
   {
     id: "secondary-horizontal",
     name: "Secondary Horizontal Logo",
-    description: "Medium horizontal lockup for everyday marketing use.",
+    description:
+      "Full standard horizontal lockup with slightly tighter transparent padding for common marketing placements.",
     recommendedUse: "Website headers, partner pages, and mid-size placements.",
     availableFormats: "PNG · transparent",
     previewSrc: "/media-kit/logos/jobproof-secondary-horizontal.png",
@@ -166,7 +168,8 @@ export const MEDIA_BRAND_ASSETS: MediaAsset[] = [
   {
     id: "compact-horizontal",
     name: "Compact Horizontal Logo",
-    description: "Narrow lockup for constrained layouts.",
+    description:
+      "Full JobProof wordmark with reduced outer padding only—never cropped or abbreviated.",
     recommendedUse: "Email headers, sponsor rows, and compact navigation.",
     availableFormats: "PNG · transparent",
     previewSrc: "/media-kit/logos/jobproof-compact-horizontal.png",
@@ -783,7 +786,7 @@ export function buildMediaCenterFaqs(level: PartnerLevel): MediaFaqItem[] {
     {
       question: "Can I change the JobProof logo or write my own claims?",
       answer:
-        "Partners may create their own honest commentary, but they should not alter the JobProof logo, misrepresent the product, make unsupported claims, or imply an endorsement that JobProof has not approved. Use the approved assets and wording in this Media Center whenever possible.",
+        "Partners may create their own honest commentary, but they should not alter the JobProof logo, misrepresent the product, make unsupported claims, or imply an endorsement that JobProof has not approved. Use the approved assets and wording in this Media Centre whenever possible.",
     },
   ];
 }

@@ -59,7 +59,7 @@ export default async function PartnerMediaCenterPage() {
               Partner Media Kit
             </p>
             <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-950 sm:text-3xl">
-              Partner Media Center
+              Partner Media Centre
             </h1>
             <p className="mt-2 text-base text-zinc-600">
               Production-ready JobProof brand assets, social graphics, email
@@ -73,12 +73,12 @@ export default async function PartnerMediaCenterPage() {
               CAD per qualified referral
             </p>
           </div>
-          <div className="flex w-full shrink-0 items-center justify-center rounded-xl border border-zinc-100 bg-[length:16px_16px] bg-[linear-gradient(45deg,#e4e4e7_25%,transparent_25%,transparent_75%,#e4e4e7_75%,#e4e4e7),linear-gradient(45deg,#e4e4e7_25%,#fafafa_25%,#fafafa_75%,#e4e4e7_75%,#e4e4e7)] bg-[position:0_0,8px_8px] p-5 sm:w-56">
+          <div className="flex w-full shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-100 bg-[length:16px_16px] bg-[linear-gradient(45deg,#e4e4e7_25%,transparent_25%,transparent_75%,#e4e4e7_75%,#e4e4e7),linear-gradient(45deg,#e4e4e7_25%,#fafafa_25%,#fafafa_75%,#e4e4e7_75%,#e4e4e7)] bg-[position:0_0,8px_8px] p-5 sm:w-64">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/media-kit/logos/jobproof-primary-horizontal.png"
               alt="JobProof logo"
-              className="h-auto w-full max-w-[220px] object-contain"
+              className="h-auto max-h-20 w-full object-contain object-center sm:max-h-24"
             />
           </div>
         </div>

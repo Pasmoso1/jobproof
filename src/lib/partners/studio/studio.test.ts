@@ -64,7 +64,7 @@ describe("partner marketing studio copy", () => {
 });
 
 describe("partner marketing studio assets", () => {
-  it("reuses Media Center files and includes QR personalization", () => {
+  it("reuses Media Centre files and includes QR personalization", () => {
     const copy = generateStudioCopy({
       theme: "getting_paid_faster",
       audience: "general_contractors",
@@ -111,7 +111,7 @@ describe("partner marketing studio route wiring", () => {
     assert.match(source, /href: "\/partner\/media"/);
   });
 
-  it("keeps Media Center route intact", async () => {
+  it("keeps Media Centre route intact", async () => {
     const pagePath = join(
       root,
       "src/app/(partner)/partner/(portal)/media/page.tsx"
@@ -121,7 +121,8 @@ describe("partner marketing studio route wiring", () => {
       fs.readFile(pagePath, "utf8")
     );
     assert.match(source, /Brand Assets/);
-    assert.match(source, /Media Center/);
+    assert.match(source, /Partner Media Centre/);
+    assert.doesNotMatch(source, /Partner Media Center/);
   });
 
   it("adds studio pages for landing, create, history, and campaign detail", () => {

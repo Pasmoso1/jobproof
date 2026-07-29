@@ -13,7 +13,7 @@ const NAV = [
   { href: "/partner", label: "Dashboard" },
   { href: "/partner/referrals", label: "Referrals" },
   { href: "/partner/payments", label: "Payments" },
-  { href: "/partner/media", label: "Media Center" },
+  { href: "/partner/media", label: "Media Centre" },
   { href: "/partner/studio", label: "Marketing Studio" },
   { href: "/partner/resources", label: "Resources" },
   { href: "/partner/training", label: "Training" },

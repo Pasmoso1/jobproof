@@ -43,7 +43,7 @@ export default async function PartnerMarketingStudioPage() {
               href="/partner/media"
               className="inline-flex min-h-11 items-center justify-center rounded-lg border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
             >
-              Open Media Center
+              Open Media Centre
             </Link>
           </div>
         </div>
@@ -56,7 +56,7 @@ export default async function PartnerMarketingStudioPage() {
             body: "Every campaign includes your referral URL, code, and QR automatically.",
           },
           {
-            title: "Built on Media Center",
+            title: "Built on Media Centre",
             body: "Reuses approved JobProof logos, social graphics, banners, and print files.",
           },
           {

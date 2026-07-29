@@ -37,13 +37,13 @@ export function StudioAssetCard({
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-      <div className="flex min-h-[140px] items-center justify-center bg-zinc-50 p-4">
+      <div className="flex min-h-[140px] items-center justify-center overflow-hidden bg-zinc-50 p-5 sm:min-h-[168px] sm:p-6">
         {asset.preview_src ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={asset.preview_src}
             alt={`${asset.title} preview`}
-            className="max-h-40 w-auto max-w-full object-contain"
+            className="h-full max-h-40 w-full object-contain object-center"
           />
         ) : (
           <p className="text-sm text-zinc-500">No preview</p>
