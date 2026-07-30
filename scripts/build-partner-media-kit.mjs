@@ -10,6 +10,10 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import {
+  LINKEDIN_SOCIAL_LAYOUT,
+  linkedinHeadlineY,
+} from "./partner-media-linkedin-layout.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const DOWNLOADS = path.join(process.env.USERPROFILE || process.env.HOME || "", "Downloads");
@@ -453,6 +457,12 @@ async function composeSocialGraphic({
   subhead,
   features = [],
   logoWidth,
+  /**
+   * When set, place the headline below the rendered logo by this many pixels.
+   * Used for short landscape templates (LinkedIn) where height*0.28 overlaps the logo.
+   * Leave undefined for other platforms so their layouts stay unchanged.
+   */
+  logoHeadlineGap,
 }) {
   const blue = hexRgb(COLORS.blue);
   const orange = hexRgb(COLORS.orange);
@@ -497,14 +507,31 @@ async function composeSocialGraphic({
     );
   }
 
+  const logoRenderedHeight = logoMeta.height ?? 0;
+  const headlineFontSize = width >= 1200 ? 56 : 48;
+  const headlineLineHeight = 1.15;
+  // Default platforms keep the historical height-fraction layout unchanged.
+  // LinkedIn (logoHeadlineGap set) places the headline below the rendered logo,
+  // accounting for SVG text baseline vs glyph ascent via linkedinHeadlineY.
+  const headlineY =
+    logoHeadlineGap != null
+      ? linkedinHeadlineY(logoRenderedHeight)
+      : Math.round(height * 0.28);
+  const subheadY =
+    logoHeadlineGap != null
+      ? headlineY +
+        headline.length * headlineFontSize * headlineLineHeight +
+        24
+      : Math.round(height * 0.28) + headline.length * 64 + 24;
+
   const headlineSvg = textSvg({
     width,
     height,
     lines: headline,
-    fontSize: width >= 1200 ? 56 : 48,
-    y: Math.round(height * 0.28),
+    fontSize: headlineFontSize,
+    y: headlineY,
     x: 64,
-    lineHeight: 1.15,
+    lineHeight: headlineLineHeight,
   });
 
   const subSvg = textSvg({
@@ -514,7 +541,7 @@ async function composeSocialGraphic({
     fontSize: 26,
     fontWeight: 500,
     fill: "rgba(255,255,255,0.92)",
-    y: Math.round(height * 0.28) + headline.length * 64 + 24,
+    y: subheadY,
     x: 64,
   });
 
@@ -584,13 +611,15 @@ async function buildSocial() {
   });
 
   await composeSocialGraphic({
-    width: 1200,
-    height: 627,
-    fileName: "jobproof-linkedin-1200x627.png",
-    headline: ["The contractor platform", "for growth and protection."],
-    subhead: "Quotes · Contracts · Change Orders · Invoices · Documentation",
+    width: LINKEDIN_SOCIAL_LAYOUT.width,
+    height: LINKEDIN_SOCIAL_LAYOUT.height,
+    fileName: LINKEDIN_SOCIAL_LAYOUT.fileName,
+    headline: [...LINKEDIN_SOCIAL_LAYOUT.headlineLines],
+    subhead: LINKEDIN_SOCIAL_LAYOUT.subhead,
     features: [],
-    logoWidth: 380,
+    logoWidth: LINKEDIN_SOCIAL_LAYOUT.logoWidth,
+    // LinkedIn-only: short landscape canvas — headline must clear the full wordmark.
+    logoHeadlineGap: LINKEDIN_SOCIAL_LAYOUT.logoHeadlineGap,
   });
 
   await composeSocialGraphic({
