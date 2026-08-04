@@ -3,6 +3,7 @@ import {
   PARTNER_RESOURCE_CATEGORY_LABELS,
   type PartnerResource,
 } from "@/lib/partners/content/resources";
+import { OrganizationPartnerCallout } from "@/components/partners/organization-partner-callout";
 
 export default function PartnerResourcesPage() {
   const byCategory = PARTNER_RESOURCES.reduce(
@@ -21,6 +22,7 @@ export default function PartnerResourcesPage() {
           Brand assets and templates for partner promotions. Additional files can be added over
           time without changing the portal structure.
         </p>
+        <OrganizationPartnerCallout className="mt-4" />
       </div>
 
       {Object.entries(byCategory).map(([category, items]) => (

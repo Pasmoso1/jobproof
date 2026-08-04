@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { STUDIO_TAGLINE } from "@/lib/partners/studio/catalog";
 import { listPartnerCampaigns } from "@/lib/partners/studio/actions";
+import { OrganizationPartnerCallout } from "@/components/partners/organization-partner-callout";
 
 export default async function PartnerMarketingStudioPage() {
   const campaigns = await listPartnerCampaigns();
@@ -48,6 +49,8 @@ export default async function PartnerMarketingStudioPage() {
           </div>
         </div>
       </header>
+
+      <OrganizationPartnerCallout />
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[

@@ -35,6 +35,7 @@ import { CopyContentCard } from "@/components/partners/media/copy-content-card";
 import { ComingSoonResourceCard } from "@/components/partners/media/coming-soon-resource-card";
 import { EmailResourceCard } from "@/components/partners/media/email-resource-card";
 import { MediaFaq } from "@/components/partners/media/media-faq";
+import { OrganizationPartnerCallout } from "@/components/partners/organization-partner-callout";
 
 export default async function PartnerMediaCenterPage() {
   const session = await getActivePartnerForCurrentUser();
@@ -83,6 +84,8 @@ export default async function PartnerMediaCenterPage() {
           </div>
         </div>
       </header>
+
+      <OrganizationPartnerCallout />
 
       <section>
         <MediaSectionHeader

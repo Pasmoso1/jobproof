@@ -36,6 +36,12 @@ export default async function PartnersLandingPage() {
             <JobProofLogo />
           </Link>
           <div className="flex items-center gap-4 text-sm">
+            <Link
+              href="/partners/organizations"
+              className="hidden font-medium text-zinc-600 hover:text-zinc-900 sm:inline"
+            >
+              Organizations
+            </Link>
             <Link href="/partners/apply" className="font-medium text-[#2436BB] hover:text-[#1c2a96]">
               Apply
             </Link>
@@ -156,6 +162,16 @@ export default async function PartnersLandingPage() {
                 </li>
               ))}
             </ul>
+            <p className="mt-6 rounded-xl border border-[#2436BB]/20 bg-[#2436BB]/5 px-4 py-3 text-sm leading-relaxed text-zinc-700">
+              Represent an association or organization?{" "}
+              <Link
+                href="/partners/organizations"
+                className="font-semibold text-[#2436BB] hover:text-[#1c2a96] hover:underline"
+              >
+                Learn about our Organization Partner Program
+              </Link>
+              .
+            </p>
           </div>
         </section>
 

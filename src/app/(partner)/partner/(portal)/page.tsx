@@ -10,6 +10,7 @@ import { computePartnerDashboardStats } from "@/lib/partners/dashboard-stats";
 import { CopyButton } from "./copy-button";
 import { redirect } from "next/navigation";
 import { FoundingPartnerBadge } from "@/components/partners/founding-partner-badge";
+import { OrganizationPartnerCallout } from "@/components/partners/organization-partner-callout";
 
 export default async function PartnerDashboardPage() {
   const session = await getActivePartnerForCurrentUser();
@@ -50,6 +51,7 @@ export default async function PartnerDashboardPage() {
           A referral qualifies after 90 consecutive days as a paying subscriber; rewards are
           reviewed and paid manually, with no recurring commissions.
         </p>
+        <OrganizationPartnerCallout className="mt-4" />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
