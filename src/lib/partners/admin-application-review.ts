@@ -8,6 +8,8 @@ export type AdminApplicationDetail = {
   phone: string | null;
   website: string | null;
   partner_type: string;
+  partner_category: string;
+  partner_type_value: string;
   estimated_audience: string | null;
   promotion_plan: string;
   reason: string;

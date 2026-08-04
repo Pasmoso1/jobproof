@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
-import { rewardAmountForLevel, type PartnerLevel } from "@/lib/partners/constants";
+import { rewardAmountForPartner, type PartnerLevel } from "@/lib/partners/constants";
 import { normalizePartnerReferralCode } from "@/lib/partners/referral-code";
 import { sendPartnerReferralLifecycleEmail } from "@/lib/partners/emails";
 
@@ -35,7 +35,7 @@ export async function attributeContractorToPartnerReferral(
 
   const { data: partner } = await admin
     .from("partners")
-    .select("id, contact_name, email, partner_level, status")
+    .select("id, contact_name, email, partner_level, partner_type, status")
     .eq("referral_code", code)
     .eq("status", "active")
     .maybeSingle();
@@ -43,7 +43,10 @@ export async function attributeContractorToPartnerReferral(
   if (!partner) return { attributed: false };
 
   const level = (partner.partner_level === "founding" ? "founding" : "standard") as PartnerLevel;
-  const rewardAmount = rewardAmountForLevel(level);
+  const rewardAmount = rewardAmountForPartner({
+    partner_level: level,
+    partner_type: String(partner.partner_type ?? ""),
+  });
 
   const { data: inserted, error } = await admin
     .from("partner_referrals")

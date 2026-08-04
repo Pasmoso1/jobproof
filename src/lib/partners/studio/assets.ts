@@ -1,10 +1,11 @@
 import type { StudioPlatformId } from "@/lib/partners/studio/catalog";
 import type { GeneratedCopy } from "@/lib/partners/studio/copy";
+import { buildCoBrandDataUrl } from "@/lib/partners/studio/co-brand";
 
 export type CampaignAssetDraft = {
-  /** Wizard platform id, or "qr" for referral QR assets. */
-  platform: StudioPlatformId | "qr";
-  assetKind: "graphic" | "email" | "print" | "qr" | "banner";
+  /** Wizard platform id, or "qr" / "co_brand" for referral / co-brand assets. */
+  platform: StudioPlatformId | "qr" | "co_brand";
+  assetKind: "graphic" | "email" | "print" | "qr" | "banner" | "co_brand";
   title: string;
   previewSrc: string | null;
   downloadHref: string | null;
@@ -119,6 +120,9 @@ export function buildCampaignAssetDrafts(input: {
   platforms: StudioPlatformId[];
   copy: GeneratedCopy;
   referralUrl: string;
+  organizationName?: string;
+  organizationLogoUrl?: string | null;
+  includeCoBrand?: boolean;
 }): CampaignAssetDraft[] {
   const drafts: CampaignAssetDraft[] = [];
   let order = 0;
@@ -180,6 +184,46 @@ export function buildCampaignAssetDrafts(input: {
       printSize: 1024,
     },
   });
+
+  if (input.includeCoBrand && input.organizationName) {
+    const recommendedBy = buildCoBrandDataUrl({
+      organizationName: input.organizationName,
+      referralUrl: input.referralUrl,
+      organizationLogoUrl: input.organizationLogoUrl,
+      layout: "recommended_by",
+      headline: input.copy.headline,
+    });
+    const logoStack = buildCoBrandDataUrl({
+      organizationName: input.organizationName,
+      referralUrl: input.referralUrl,
+      organizationLogoUrl: input.organizationLogoUrl,
+      layout: "logo_stack",
+      headline: input.copy.headline,
+    });
+
+    drafts.push({
+      platform: "co_brand",
+      assetKind: "co_brand",
+      title: "Co-branded Graphic (Recommended by)",
+      previewSrc: recommendedBy,
+      downloadHref: recommendedBy,
+      downloadFileName: "jobproof-cobrand-recommended-by.svg",
+      secondaryDownloadHref: logoStack,
+      secondaryDownloadFileName: "jobproof-cobrand-logo-stack.svg",
+      caption: null,
+      postBody: null,
+      emailHtml: null,
+      emailText: null,
+      emailSubject: null,
+      sortOrder: order++,
+      metadata: {
+        source: "co-brand",
+        organizationName: input.organizationName,
+        hasOrganizationLogo: Boolean(input.organizationLogoUrl),
+        layouts: ["recommended_by", "logo_stack"],
+      },
+    });
+  }
 
   return drafts;
 }

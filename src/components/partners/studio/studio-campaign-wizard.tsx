@@ -17,8 +17,12 @@ import {
   type StudioStyleId,
   type StudioThemeId,
 } from "@/lib/partners/studio/catalog";
+import {
+  ORGANIZATION_CAMPAIGN_PRESETS,
+  type OrganizationCampaignPresetId,
+} from "@/lib/partners/studio/organization-presets";
 
-const STEPS = [
+const BASE_STEPS = [
   "Theme",
   "Audience",
   "Goal",
@@ -38,13 +42,25 @@ export function StudioCampaignWizard({
   organizationName,
   isFounding,
   initialLogoUrl,
+  isOrganizationPartner = false,
 }: {
   organizationName: string;
   isFounding: boolean;
   initialLogoUrl: string | null;
+  isOrganizationPartner?: boolean;
 }) {
   const router = useRouter();
+  const steps = useMemo(
+    () =>
+      isOrganizationPartner
+        ? (["Preset", ...BASE_STEPS] as const)
+        : BASE_STEPS,
+    [isOrganizationPartner]
+  );
   const [step, setStep] = useState(0);
+  const [presetId, setPresetId] = useState<OrganizationCampaignPresetId | null>(
+    null
+  );
   const [theme, setTheme] = useState<StudioThemeId | null>(null);
   const [audience, setAudience] = useState<StudioAudienceId | null>(null);
   const [goal, setGoal] = useState<StudioGoalId | null>(null);
@@ -53,9 +69,12 @@ export function StudioCampaignWizard({
   const [error, setError] = useState<string | null>(null);
   const [progressIndex, setProgressIndex] = useState(0);
   const [pending, startTransition] = useTransition();
+  const wizardOffset = isOrganizationPartner ? 1 : 0;
 
   const canContinue = useMemo(() => {
-    switch (step) {
+    if (isOrganizationPartner && step === 0) return true;
+    const baseStep = step - wizardOffset;
+    switch (baseStep) {
       case 0:
         return Boolean(theme);
       case 1:
@@ -71,13 +90,35 @@ export function StudioCampaignWizard({
       default:
         return false;
     }
-  }, [step, theme, audience, goal, platforms, style]);
+  }, [
+    step,
+    theme,
+    audience,
+    goal,
+    platforms,
+    style,
+    isOrganizationPartner,
+    wizardOffset,
+  ]);
+
+  function applyPreset(id: OrganizationCampaignPresetId) {
+    const preset = ORGANIZATION_CAMPAIGN_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    setPresetId(id);
+    setTheme(preset.theme);
+    setAudience(preset.audience);
+    setGoal(preset.goal);
+    setPlatforms([...preset.platforms]);
+    setStyle(preset.style);
+  }
 
   function togglePlatform(id: StudioPlatformId) {
     setPlatforms((prev) =>
       prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
     );
   }
+
+  const baseStep = step - wizardOffset;
 
   function onGenerate() {
     if (!theme || !audience || !goal || !style || platforms.length === 0) {
@@ -115,7 +156,7 @@ export function StudioCampaignWizard({
     <div className="space-y-6">
       <nav aria-label="Campaign wizard steps" className="overflow-x-auto">
         <ol className="flex min-w-max gap-2">
-          {STEPS.map((label, index) => (
+          {steps.map((label, index) => (
             <li key={label}>
               <button
                 type="button"
@@ -135,7 +176,30 @@ export function StudioCampaignWizard({
         </ol>
       </nav>
 
-      {step === 0 ? (
+      {isOrganizationPartner && step === 0 ? (
+        <section aria-labelledby="preset-heading">
+          <h2 id="preset-heading" className="text-lg font-semibold text-zinc-900">
+            Organization campaign presets
+          </h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            Start from a member-focused template, or skip and build a custom campaign.
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {ORGANIZATION_CAMPAIGN_PRESETS.map((item) => (
+              <StudioSelectCard
+                key={item.id}
+                title={item.label}
+                description={item.description}
+                icon="spark"
+                selected={presetId === item.id}
+                onSelect={() => applyPreset(item.id)}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {baseStep === 0 && !(isOrganizationPartner && step === 0) ? (
         <section aria-labelledby="theme-heading">
           <h2 id="theme-heading" className="text-lg font-semibold text-zinc-900">
             What would you like to promote?
@@ -155,7 +219,7 @@ export function StudioCampaignWizard({
         </section>
       ) : null}
 
-      {step === 1 ? (
+      {baseStep === 1 ? (
         <section aria-labelledby="audience-heading">
           <h2 id="audience-heading" className="text-lg font-semibold text-zinc-900">
             Who is your audience?
@@ -175,7 +239,7 @@ export function StudioCampaignWizard({
         </section>
       ) : null}
 
-      {step === 2 ? (
+      {baseStep === 2 ? (
         <section aria-labelledby="goal-heading">
           <h2 id="goal-heading" className="text-lg font-semibold text-zinc-900">
             Campaign goal
@@ -195,7 +259,7 @@ export function StudioCampaignWizard({
         </section>
       ) : null}
 
-      {step === 3 ? (
+      {baseStep === 3 ? (
         <section aria-labelledby="platforms-heading">
           <h2 id="platforms-heading" className="text-lg font-semibold text-zinc-900">
             Platforms
@@ -217,7 +281,7 @@ export function StudioCampaignWizard({
         </section>
       ) : null}
 
-      {step === 4 ? (
+      {baseStep === 4 ? (
         <section aria-labelledby="style-heading">
           <h2 id="style-heading" className="text-lg font-semibold text-zinc-900">
             Style
@@ -237,16 +301,19 @@ export function StudioCampaignWizard({
         </section>
       ) : null}
 
-      {step === 5 ? (
+      {baseStep === 5 ? (
         <section aria-labelledby="branding-heading" className="space-y-4">
           <div>
             <h2 id="branding-heading" className="text-lg font-semibold text-zinc-900">
-              Partner branding
+              {isOrganizationPartner ? "Organization branding" : "Partner branding"}
             </h2>
             <p className="mt-1 text-sm text-zinc-600">
               Campaigns automatically include your referral link, referral code, QR
               code, and JobProof branding
               {isFounding ? ", plus your Founding Partner badge" : ""}.
+              {isOrganizationPartner
+                ? " Uploaded organization logos are applied to co-branded graphics automatically."
+                : ""}
             </p>
           </div>
           <StudioLogoUploader
@@ -291,14 +358,16 @@ export function StudioCampaignWizard({
         >
           Back
         </button>
-        {step < STEPS.length - 1 ? (
+        {step < steps.length - 1 ? (
           <button
             type="button"
             onClick={() => setStep((s) => s + 1)}
             disabled={!canContinue || pending}
             className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-50"
           >
-            Continue
+            {isOrganizationPartner && step === 0 && !presetId
+              ? "Skip presets"
+              : "Continue"}
           </button>
         ) : (
           <button

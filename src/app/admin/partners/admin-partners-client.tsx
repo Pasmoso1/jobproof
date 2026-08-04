@@ -18,7 +18,7 @@ import {
 import type { PartnerLevel, PartnerRewardStatus } from "@/lib/partners/constants";
 import {
   partnerLevelLabel,
-  rewardAmountForLevel,
+  rewardAmountForPartner,
 } from "@/lib/partners/constants";
 import { FoundingPartnerBadge } from "@/components/partners/founding-partner-badge";
 import {
@@ -39,6 +39,8 @@ type PartnerRow = {
   contact_name: string;
   email: string;
   partner_type: string;
+  partner_category: string;
+  partner_type_value: string;
   partner_level: PartnerLevel;
   status: string;
   referral_code: string;
@@ -180,7 +182,10 @@ export function AdminPartnersClient({
                       <p className="text-xs text-zinc-500">{a.email}</p>
                     </td>
                     <td className="px-3 py-3">{a.contact_name}</td>
-                    <td className="px-3 py-3">{a.partner_type}</td>
+                    <td className="px-3 py-3">
+                      <p className="font-medium text-zinc-900">{a.partner_category}</p>
+                      <p className="text-xs text-zinc-500">{a.partner_type}</p>
+                    </td>
                     <td className="px-3 py-3">
                       {hasValidAgreementAcceptance(a) ? (
                         <>
@@ -336,7 +341,8 @@ export function AdminPartnersClient({
                     <p className="text-xs text-zinc-500">{p.email}</p>
                   </td>
                   <td className="px-3 py-3">
-                    <p>{p.partner_type}</p>
+                    <p className="font-medium text-zinc-900">{p.partner_category}</p>
+                    <p className="text-xs text-zinc-500">{p.partner_type}</p>
                     <div className="mt-1">
                       {p.partner_level === "founding" ? (
                         <FoundingPartnerBadge />
@@ -348,7 +354,11 @@ export function AdminPartnersClient({
                     </div>
                   </td>
                   <td className="px-3 py-3">
-                    ${rewardAmountForLevel(p.partner_level)} CAD
+                    ${rewardAmountForPartner({
+                      partner_level: p.partner_level,
+                      partner_type: p.partner_type_value ?? p.partner_type,
+                    })}{" "}
+                    CAD
                   </td>
                   <td className="px-3 py-3">
                     {p.agreement_version && p.agreement_accepted_at ? (
@@ -609,6 +619,7 @@ function ApplicationDetailPanel({
               )
             }
           />
+          <DetailItem label="Partner category" value={app.partner_category} />
           <DetailItem label="Partner type" value={app.partner_type} />
           <DetailItem
             label="Estimated audience"

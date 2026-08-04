@@ -5,11 +5,14 @@ import {
   getActivePartnerForCurrentUser,
   getPartnerAccountStatusForCurrentUser,
 } from "@/lib/partners/session";
-import { partnerLevelLabel } from "@/lib/partners/constants";
+import {
+  isOrganizationPartnerType,
+  partnerLevelLabel,
+} from "@/lib/partners/constants";
 import { LogoutButton } from "@/app/(app)/logout-button";
 import { FoundingPartnerBadge } from "@/components/partners/founding-partner-badge";
 
-const NAV = [
+const BASE_NAV = [
   { href: "/partner", label: "Dashboard" },
   { href: "/partner/referrals", label: "Referrals" },
   { href: "/partner/payments", label: "Payments" },
@@ -18,7 +21,7 @@ const NAV = [
   { href: "/partner/resources", label: "Resources" },
   { href: "/partner/training", label: "Training" },
   { href: "/partner/faq", label: "FAQ" },
-];
+] as const;
 
 /** Protected Partner Portal chrome — requires active + email-verified partner. */
 export default async function PartnerPortalLayout({
@@ -37,13 +40,35 @@ export default async function PartnerPortalLayout({
   }
 
   const { partner } = session;
+  const isOrg = isOrganizationPartnerType(partner.partner_type);
+  const nav = isOrg
+    ? [
+        { href: "/partner/organization", label: "Organization Dashboard" },
+        { href: "/partner/referrals", label: "Referrals" },
+        { href: "/partner/payments", label: "Payments" },
+        {
+          href: "/partner/media#organization-partner-kit",
+          label: "Organization Partner Kit",
+        },
+        {
+          href: "/partner/studio",
+          label: "Organization Marketing Studio",
+        },
+        { href: "/partner/resources", label: "Resources" },
+        { href: "/partner/training", label: "Training" },
+        { href: "/partner/faq", label: "FAQ" },
+      ]
+    : [...BASE_NAV];
 
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white">
         <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between">
-            <Link href="/partner" className="flex items-center gap-2">
+            <Link
+              href={isOrg ? "/partner/organization" : "/partner"}
+              className="flex items-center gap-2"
+            >
               <JobProofLogo className="h-8 w-auto" />
               <span className="hidden text-sm font-semibold text-zinc-700 sm:inline">
                 Partner Portal
@@ -63,8 +88,11 @@ export default async function PartnerPortalLayout({
               <LogoutButton />
             </div>
           </div>
-          <nav className="flex flex-wrap gap-x-4 gap-y-2">
-            {NAV.map((item) => (
+          <nav
+            className="flex flex-wrap gap-x-4 gap-y-2"
+            aria-label="Partner portal"
+          >
+            {nav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

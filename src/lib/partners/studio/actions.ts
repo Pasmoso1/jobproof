@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
-import { buildPartnerReferralUrl } from "@/lib/partners/constants";
+import { buildPartnerReferralUrl, isOrganizationPartnerType } from "@/lib/partners/constants";
 import { resolveAppUrl } from "@/lib/stripe";
 import { buildCampaignAssetDrafts } from "@/lib/partners/studio/assets";
 import { generateStudioCopy } from "@/lib/partners/studio/copy";
@@ -79,10 +79,16 @@ export async function createStudioCampaign(input: {
     variant: "professional",
   });
 
+  const logo = await getActivePartnerLogo();
+  const isOrg = isOrganizationPartnerType(session.partner.partner_type);
+
   const drafts = buildCampaignAssetDrafts({
     platforms,
     copy,
     referralUrl,
+    organizationName: session.partner.organization_name,
+    organizationLogoUrl: logo?.logoUrl ?? null,
+    includeCoBrand: isOrg,
   });
 
   const supabase = await createClient();

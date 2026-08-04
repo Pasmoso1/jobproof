@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
 import { redirect } from "next/navigation";
+import { isOrganizationPartnerType } from "@/lib/partners/constants";
 import { getActivePartnerLogo } from "@/lib/partners/studio/actions";
 import { StudioCampaignWizard } from "@/components/partners/studio/studio-campaign-wizard";
 
@@ -9,6 +10,9 @@ export default async function PartnerStudioCreatePage() {
   if (!session) redirect("/login?next=/partner/studio/create");
 
   const logo = await getActivePartnerLogo();
+  const isOrganizationPartner = isOrganizationPartnerType(
+    session.partner.partner_type
+  );
 
   return (
     <div className="space-y-6">
@@ -19,9 +23,15 @@ export default async function PartnerStudioCreatePage() {
         >
           ← Marketing Studio
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-zinc-950">Create Campaign</h1>
+        <h1 className="mt-2 text-2xl font-bold text-zinc-950">
+          {isOrganizationPartner
+            ? "Organization Marketing Studio"
+            : "Create Campaign"}
+        </h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Follow the wizard to generate personalized JobProof marketing assets.
+          {isOrganizationPartner
+            ? "Generate member-focused campaigns with your organization logo, referral link, and QR code."
+            : "Follow the wizard to generate personalized JobProof marketing assets."}
         </p>
       </div>
 
@@ -29,6 +39,7 @@ export default async function PartnerStudioCreatePage() {
         organizationName={session.partner.organization_name}
         isFounding={session.partner.partner_level === "founding"}
         initialLogoUrl={logo?.logoUrl ?? null}
+        isOrganizationPartner={isOrganizationPartner}
       />
     </div>
   );

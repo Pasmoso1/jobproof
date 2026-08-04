@@ -158,6 +158,16 @@ export async function createPartnerFromApplication(
     })
     .eq("id", application.id);
 
+  // Link any organization profile created at apply time.
+  await admin
+    .from("organization_partner_profiles")
+    .update({
+      partner_id: partner.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("application_id", application.id)
+    .is("partner_id", null);
+
   return {
     partnerId: String(partner.id),
     referralCode: String(partner.referral_code),

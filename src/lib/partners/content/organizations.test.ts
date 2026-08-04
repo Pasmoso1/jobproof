@@ -27,7 +27,7 @@ describe("association & organization partners page", () => {
     );
     assert.equal(
       ORGANIZATION_PARTNERS_HERO.primaryCta.href,
-      "/partners/apply"
+      "/partners/organizations/apply"
     );
   });
 
@@ -38,6 +38,10 @@ describe("association & organization partners page", () => {
     assert.equal(ORGANIZATION_HOW_STEPS.length, 4);
     assert.ok(ORGANIZATION_FAQS.some((f) => /cost/i.test(f.question)));
     assert.ok(ORGANIZATION_FAQS.some((f) => /webinars/i.test(f.question)));
+    assert.ok(ORGANIZATION_FAQS.some((f) => /earn/i.test(f.question)));
+    assert.ok(
+      ORGANIZATION_FAQS.some((f) => f.answer.includes("$150 CAD"))
+    );
   });
 
   it("registers the public route and portal callouts", async () => {

@@ -29,7 +29,7 @@ export const ORGANIZATION_PARTNERS_HERO = {
     "Protect their business",
     "Grow professionally",
   ],
-  primaryCta: { label: "Become an Organization Partner", href: "/partners/apply" },
+  primaryCta: { label: "Become an Organization Partner", href: "/partners/organizations/apply" },
   secondaryCta: { label: "Schedule a Demo", href: "/support/contact" },
 } as const;
 
@@ -44,7 +44,7 @@ export const ORGANIZATION_WHY_CARDS = [
     id: "revenue",
     icon: "invoice",
     title: "Generate Non-Dues Revenue",
-    body: "Earn referral commissions from qualified member signups.",
+    body: "Earn $150 CAD per qualified member referral after standard qualification requirements are met.",
   },
   {
     id: "grow",
@@ -252,6 +252,11 @@ export const ORGANIZATION_FAQS = [
       "No. There is no cost to become an approved JobProof Organization Partner.",
   },
   {
+    question: "How much do Organization Partners earn?",
+    answer:
+      "Organization Partners earn $150 CAD per qualified referral after the existing Partner Program qualification requirements are met. Payout timing and referral attribution follow the same Partner Program rules.",
+  },
+  {
     question: "How are referrals tracked?",
     answer:
       "Approved organizations receive a unique referral link and code. Signups that use your link are attributed to your partner account so you can monitor referrals and payouts in the Partner Portal.",
@@ -280,7 +285,7 @@ export const ORGANIZATION_FAQS = [
 
 export const ORGANIZATION_FINAL_CTA = {
   headline: "Help your members build stronger businesses.",
-  primaryCta: { label: "Apply Now", href: "/partners/apply" },
+  primaryCta: { label: "Apply Now", href: "/partners/organizations/apply" },
   secondaryCta: { label: "Book a Demo", href: "/support/contact" },
 } as const;
 

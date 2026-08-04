@@ -21,6 +21,8 @@ function sampleApp(
     phone: "4165551234",
     website: "example.com",
     partner_type: "Influencer",
+    partner_category: "Influencer",
+    partner_type_value: "influencer",
     estimated_audience: "500 contractors",
     promotion_plan: "Line one\n\nLine two",
     reason: "Because contractors need better tools.",

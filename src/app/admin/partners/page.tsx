@@ -4,6 +4,7 @@ import { AdminNotAuthorized } from "@/app/admin/NotAuthorized";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   FOUNDING_PARTNER_LIMIT,
+  partnerCategoryLabel,
   partnerTypeLabel,
   rewardStatusLabel,
   type PartnerLevel,
@@ -81,6 +82,8 @@ export default async function AdminPartnersPage() {
         phone: a.phone,
         website: a.website,
         partner_type: partnerTypeLabel(a.partner_type),
+        partner_category: partnerCategoryLabel(a.partner_type),
+        partner_type_value: a.partner_type,
         estimated_audience: a.estimated_audience,
         promotion_plan: a.promotion_plan,
         reason: a.reason,
@@ -143,6 +146,8 @@ export default async function AdminPartnersPage() {
           contact_name: p.contact_name,
           email: p.email,
           partner_type: partnerTypeLabel(p.partner_type),
+          partner_category: partnerCategoryLabel(p.partner_type),
+          partner_type_value: p.partner_type,
           partner_level: p.partner_level as PartnerLevel,
           status: p.status,
           referral_code: p.referral_code,

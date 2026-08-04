@@ -3,7 +3,7 @@ import { resolveAppUrl } from "@/lib/stripe";
 import {
   buildPartnerReferralUrl,
   partnerLevelLabel,
-  rewardAmountForLevel,
+  rewardAmountForPartner,
 } from "@/lib/partners/constants";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
 import { computePartnerDashboardStats } from "@/lib/partners/dashboard-stats";
@@ -29,7 +29,10 @@ export default async function PartnerDashboardPage() {
   const stats = computePartnerDashboardStats(referrals ?? [], payouts ?? []);
   const referralUrl = buildPartnerReferralUrl(resolveAppUrl(), partner.referral_code);
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(referralUrl)}`;
-  const reward = rewardAmountForLevel(partner.partner_level);
+  const reward = rewardAmountForPartner({
+    partner_level: partner.partner_level,
+    partner_type: partner.partner_type,
+  });
 
   const cards = [
     { label: "Total Referrals", value: String(stats.totalReferrals) },

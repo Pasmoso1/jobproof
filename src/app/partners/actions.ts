@@ -16,6 +16,11 @@ import {
 } from "@/lib/partners/submit-application";
 import type { PartnerApplyResult } from "@/lib/partners/submit-application";
 import {
+  insertOrganizationPartnerProfile,
+  prepareOrganizationApplicationFormData,
+} from "@/lib/partners/submit-organization-application";
+import { ORGANIZATION_PARTNER_TYPE } from "@/lib/partners/constants";
+import {
   checkPartnerUsernameAvailability,
   claimPartnerUsername,
   createPartnerAuthUserViaSignUp,
@@ -313,6 +318,56 @@ export async function submitPartnerApplication(
       .from("partner_applications")
       .update({ email_notification_sent_at: new Date().toISOString() })
       .eq("id", applicationId);
+  }
+
+  return result;
+}
+
+/**
+ * Association & Organization Partner application.
+ * Reuses the same Auth + approval pipeline; forces partner_type = organization
+ * and stores extended fields in organization_partner_profiles.
+ */
+export async function submitOrganizationApplication(
+  formData: FormData
+): Promise<PartnerApplyResult> {
+  const prepared = prepareOrganizationApplicationFormData(formData);
+  if (!prepared.ok) {
+    return {
+      success: false,
+      error: prepared.error,
+      fieldErrors: prepared.fieldErrors,
+      code: "validation",
+    };
+  }
+
+  const result = await submitPartnerApplication(prepared.formData);
+  if (!result.success) return result;
+
+  const admin = createServiceRoleClient();
+  if (admin) {
+    const profileResult = await insertOrganizationPartnerProfile(
+      {
+        from: (table) => ({
+          insert: (row) =>
+            admin.from(table).insert(row) as PromiseLike<{
+              error: { message?: string } | null;
+            }>,
+        }),
+      },
+      { applicationId: result.applicationId, profile: prepared.profile }
+    );
+    if (profileResult.error) {
+      console.error(
+        "[partners] organization profile insert failed",
+        profileResult.error
+      );
+    }
+
+    await admin
+      .from("partner_applications")
+      .update({ partner_type: ORGANIZATION_PARTNER_TYPE })
+      .eq("id", result.applicationId);
   }
 
   return result;

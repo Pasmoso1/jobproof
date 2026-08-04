@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
 import {
   buildPartnerReferralUrl,
-  rewardAmountForLevel,
+  isOrganizationPartnerType,
+  rewardAmountForPartner,
   partnerLevelLabel,
 } from "@/lib/partners/constants";
 import { resolveAppUrl } from "@/lib/stripe";
@@ -27,6 +28,10 @@ import {
   buildMediaCenterFaqs,
   personalizePartnerCopy,
 } from "@/lib/partners/media-center-content";
+import {
+  buildOrganizationKitContext,
+  ORGANIZATION_PARTNER_KIT,
+} from "@/lib/partners/organization-partner-kit";
 import { MediaSectionHeader } from "@/components/partners/media/media-section-header";
 import { MediaAssetCard } from "@/components/partners/media/media-asset-card";
 import { BrandColorSwatch } from "@/components/partners/media/brand-color-swatch";
@@ -36,6 +41,7 @@ import { ComingSoonResourceCard } from "@/components/partners/media/coming-soon-
 import { EmailResourceCard } from "@/components/partners/media/email-resource-card";
 import { MediaFaq } from "@/components/partners/media/media-faq";
 import { OrganizationPartnerCallout } from "@/components/partners/organization-partner-callout";
+import { OrganizationKitCard } from "@/components/partners/media/organization-kit-card";
 
 export default async function PartnerMediaCenterPage() {
   const session = await getActivePartnerForCurrentUser();
@@ -47,8 +53,20 @@ export default async function PartnerMediaCenterPage() {
     partner.referral_code
   );
   const faqs = buildMediaCenterFaqs(partner.partner_level);
-  const reward = rewardAmountForLevel(partner.partner_level);
+  const reward = rewardAmountForPartner({
+    partner_level: partner.partner_level,
+    partner_type: partner.partner_type,
+  });
+  const isOrg = isOrganizationPartnerType(partner.partner_type);
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(referralUrl)}`;
+  const orgKitContext = isOrg
+    ? buildOrganizationKitContext({
+        organizationName: partner.organization_name,
+        referralUrl,
+        referralCode: partner.referral_code,
+        origin: resolveAppUrl(),
+      })
+    : null;
 
   return (
     <div className="space-y-14">
@@ -86,6 +104,24 @@ export default async function PartnerMediaCenterPage() {
       </header>
 
       <OrganizationPartnerCallout />
+
+      {orgKitContext ? (
+        <section id="organization-partner-kit" className="scroll-mt-24">
+          <MediaSectionHeader
+            title="Organization Partner Kit"
+            description="Personalized member-facing resources with your organization referral URL, referral code, and QR code."
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {ORGANIZATION_PARTNER_KIT.map((item) => (
+              <OrganizationKitCard
+                key={item.id}
+                item={item}
+                context={orgKitContext}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section>
         <MediaSectionHeader

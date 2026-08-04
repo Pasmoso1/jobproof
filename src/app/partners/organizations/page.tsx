@@ -40,7 +40,7 @@ export default function OrganizationPartnersPage() {
               Partner Program
             </Link>
             <Link
-              href="/partners/apply"
+              href="/partners/organizations/apply"
               className="font-medium text-[#2436BB] hover:text-[#1c2a96]"
             >
               Apply
