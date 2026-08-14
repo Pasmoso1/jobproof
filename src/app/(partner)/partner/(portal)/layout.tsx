@@ -5,20 +5,17 @@ import {
   getActivePartnerForCurrentUser,
   getPartnerAccountStatusForCurrentUser,
 } from "@/lib/partners/session";
-import {
-  isOrganizationPartnerType,
-  partnerLevelLabel,
-} from "@/lib/partners/constants";
+import { partnerLevelLabel, partnerTypeLabel } from "@/lib/partners/constants";
 import { LogoutButton } from "@/app/(app)/logout-button";
 import { FoundingPartnerBadge } from "@/components/partners/founding-partner-badge";
 
-const BASE_NAV = [
+const NAV = [
   { href: "/partner", label: "Dashboard" },
-  { href: "/partner/referrals", label: "Referrals" },
-  { href: "/partner/payments", label: "Payments" },
-  { href: "/partner/media", label: "Media Centre" },
   { href: "/partner/studio", label: "Marketing Studio" },
+  { href: "/partner/media", label: "Media Centre" },
   { href: "/partner/resources", label: "Resources" },
+  { href: "/partner/referrals", label: "Referrals" },
+  { href: "/partner/payments", label: "Earnings" },
   { href: "/partner/training", label: "Training" },
   { href: "/partner/faq", label: "FAQ" },
 ] as const;
@@ -40,35 +37,13 @@ export default async function PartnerPortalLayout({
   }
 
   const { partner } = session;
-  const isOrg = isOrganizationPartnerType(partner.partner_type);
-  const nav = isOrg
-    ? [
-        { href: "/partner/organization", label: "Organization Dashboard" },
-        { href: "/partner/referrals", label: "Referrals" },
-        { href: "/partner/payments", label: "Payments" },
-        {
-          href: "/partner/media#organization-partner-kit",
-          label: "Organization Partner Kit",
-        },
-        {
-          href: "/partner/studio",
-          label: "Organization Marketing Studio",
-        },
-        { href: "/partner/resources", label: "Resources" },
-        { href: "/partner/training", label: "Training" },
-        { href: "/partner/faq", label: "FAQ" },
-      ]
-    : [...BASE_NAV];
 
   return (
     <div className="min-h-screen bg-zinc-50">
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white">
         <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between">
-            <Link
-              href={isOrg ? "/partner/organization" : "/partner"}
-              className="flex items-center gap-2"
-            >
+            <Link href="/partner" className="flex items-center gap-2">
               <JobProofLogo className="h-8 w-auto" />
               <span className="hidden text-sm font-semibold text-zinc-700 sm:inline">
                 Partner Portal
@@ -78,10 +53,13 @@ export default async function PartnerPortalLayout({
               <span className="hidden text-zinc-600 md:inline">
                 {partner.organization_name}
               </span>
+              <span className="hidden text-xs font-medium text-zinc-500 sm:inline">
+                {partnerTypeLabel(partner.partner_type)}
+              </span>
               {partner.partner_level === "founding" ? (
                 <FoundingPartnerBadge className="hidden sm:inline-flex" />
               ) : (
-                <span className="hidden text-zinc-600 sm:inline">
+                <span className="hidden text-zinc-600 lg:inline">
                   {partnerLevelLabel(partner.partner_level)}
                 </span>
               )}
@@ -92,7 +70,7 @@ export default async function PartnerPortalLayout({
             className="flex flex-wrap gap-x-4 gap-y-2"
             aria-label="Partner portal"
           >
-            {nav.map((item) => (
+            {NAV.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

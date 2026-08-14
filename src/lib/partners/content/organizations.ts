@@ -254,7 +254,7 @@ export const ORGANIZATION_FAQS = [
   {
     question: "How much do Organization Partners earn?",
     answer:
-      "Organization Partners earn $150 CAD per qualified referral after the existing Partner Program qualification requirements are met. Payout timing and referral attribution follow the same Partner Program rules.",
+      "Organization Partners use the same Founding Partner and Standard Partner reward levels as the rest of the Partner Program. A referral qualifies after the existing qualification requirements are met. Payout timing and referral attribution follow the same Partner Program rules.",
   },
   {
     question: "How are referrals tracked?",

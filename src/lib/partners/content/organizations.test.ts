@@ -40,7 +40,7 @@ describe("association & organization partners page", () => {
     assert.ok(ORGANIZATION_FAQS.some((f) => /webinars/i.test(f.question)));
     assert.ok(ORGANIZATION_FAQS.some((f) => /earn/i.test(f.question)));
     assert.ok(
-      ORGANIZATION_FAQS.some((f) => f.answer.includes("$150 CAD"))
+      ORGANIZATION_FAQS.some((f) => /Founding Partner/i.test(f.answer))
     );
   });
 

@@ -5,7 +5,6 @@ import { resolveAppUrl } from "@/lib/stripe";
 import {
   buildPartnerReferralUrl,
   isOrganizationPartnerType,
-  ORGANIZATION_REWARD_CAD,
   rewardAmountForPartner,
 } from "@/lib/partners/constants";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
@@ -206,8 +205,7 @@ export default async function OrganizationPartnerDashboardPage() {
             Marketing Studio
           </h2>
           <p className="mt-2 text-sm text-zinc-600">
-            Generate co-branded member campaigns (${ORGANIZATION_REWARD_CAD} CAD
-            org reward messaging).
+            Generate co-branded member campaigns in Marketing Studio.
           </p>
         </Link>
       </section>

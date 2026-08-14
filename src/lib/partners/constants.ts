@@ -3,33 +3,66 @@
 export const FOUNDING_PARTNER_LIMIT = 10;
 export const FOUNDING_REWARD_CAD = 150;
 export const STANDARD_REWARD_CAD = 100;
-/** Organization Partners earn $150 CAD per qualified referral (independent of founding seats). */
-export const ORGANIZATION_REWARD_CAD = 150;
 /** Days of continuous paying subscription required before reward qualifies. */
 export const PARTNER_QUALIFICATION_DAYS = 90;
 export const PARTNER_AGREEMENT_VERSION = "2026-07-01";
 export const PARTNER_AGREEMENT_PATH = "/partners/agreement";
 
-/** Partner type used by the Association & Organization Partners application. */
-export const ORGANIZATION_PARTNER_TYPE = "organization" as const;
+export const PARTNER_TYPE_CREATOR = "creator" as const;
+export const PARTNER_TYPE_MARKETING = "marketing" as const;
+export const PARTNER_TYPE_ORGANIZATION = "organization" as const;
+
+/** @deprecated Use PARTNER_TYPE_ORGANIZATION. */
+export const ORGANIZATION_PARTNER_TYPE = PARTNER_TYPE_ORGANIZATION;
 
 export const PARTNER_TYPES = [
-  { value: "influencer", label: "Influencer" },
-  { value: ORGANIZATION_PARTNER_TYPE, label: "Organization" },
-  { value: "trade_organization", label: "Trade Organization" },
-  { value: "existing_contractor", label: "Existing Contractor" },
-  { value: "business_coach", label: "Business Coach" },
-  { value: "accounting_firm", label: "Accounting Firm" },
-  { value: "financing_company", label: "Financing Company" },
-  { value: "insurance_provider", label: "Insurance Provider" },
-  { value: "strategic_partner", label: "Strategic Partner" },
-  { value: "other", label: "Other" },
+  {
+    value: PARTNER_TYPE_CREATOR,
+    label: "Creator",
+    shortLabel: "Creator Partner",
+    description:
+      "Share JobProof with your audience and earn rewards when contractors you refer become qualified JobProof customers.",
+    applyHint: "For creators, contractors, podcasters and others with an audience.",
+    applyHref: "/partners/apply?type=creator",
+    ctaLabel: "Become a Creator Partner",
+    cardBody:
+      "Introduce JobProof to contractors through your content and audience.",
+    dashboardIntro: "Share JobProof with your audience.",
+  },
+  {
+    value: PARTNER_TYPE_MARKETING,
+    label: "Marketing",
+    shortLabel: "Marketing Partner",
+    description:
+      "Promote JobProof through your audience, content or marketing channels and earn rewards for qualified contractor customers.",
+    applyHint:
+      "For affiliate marketers, publishers, newsletters, media businesses and performance marketers.",
+    applyHref: "/partners/apply?type=marketing",
+    ctaLabel: "Become a Marketing Partner",
+    cardBody:
+      "Promote JobProof through affiliate marketing, publications, newsletters, websites or performance marketing.",
+    dashboardIntro:
+      "Promote JobProof and earn rewards for qualified contractor customers.",
+  },
+  {
+    value: PARTNER_TYPE_ORGANIZATION,
+    label: "Organization",
+    shortLabel: "Organization Partner",
+    description:
+      "Introduce JobProof to your members and earn partner rewards while helping contractors access tools built for their businesses.",
+    applyHint:
+      "For associations, trade organizations, contractor groups and membership organizations.",
+    applyHref: "/partners/organizations/apply",
+    ctaLabel: "Become an Organization Partner",
+    cardBody: "Introduce JobProof to your members and contractor community.",
+    dashboardIntro: "Introduce JobProof to your members.",
+  },
 ] as const;
 
 export type PartnerTypeValue = (typeof PARTNER_TYPES)[number]["value"];
 
-/** High-level category for admin review and portal UX. */
-export type PartnerCategory = "individual" | "influencer" | "organization";
+/** Alias of the three public partner types. */
+export type PartnerCategory = PartnerTypeValue;
 
 export type PartnerLevel = "founding" | "standard";
 export type PartnerStatus = "active" | "suspended" | "declined";
@@ -46,29 +79,76 @@ export type PartnerRewardStatus =
   | "cancelled"
   | "forfeited";
 
-export function isOrganizationPartnerType(partnerType: string | null | undefined): boolean {
-  return partnerType === ORGANIZATION_PARTNER_TYPE;
-}
+const CANONICAL_TYPES = new Set<string>([
+  PARTNER_TYPE_CREATOR,
+  PARTNER_TYPE_MARKETING,
+  PARTNER_TYPE_ORGANIZATION,
+]);
 
-export function partnerCategory(partnerType: string | null | undefined): PartnerCategory {
-  if (isOrganizationPartnerType(partnerType)) return "organization";
-  if (partnerType === "influencer") return "influencer";
-  return "individual";
-}
-
-export function partnerCategoryLabel(partnerType: string | null | undefined): string {
-  switch (partnerCategory(partnerType)) {
-    case "organization":
-      return "Organization";
-    case "influencer":
-      return "Influencer";
-    default:
-      return "Individual Partner";
+/**
+ * Map stored / legacy partner_type values onto the three program types.
+ * Organization stays organization. Marketing stays marketing.
+ * Influencer and all other historical individual types default to creator.
+ */
+export function normalizePartnerType(
+  partnerType: string | null | undefined
+): PartnerTypeValue {
+  const value = String(partnerType ?? "").trim().toLowerCase();
+  if (value === PARTNER_TYPE_ORGANIZATION || value === "trade_organization") {
+    return PARTNER_TYPE_ORGANIZATION;
   }
+  if (value === PARTNER_TYPE_MARKETING) {
+    return PARTNER_TYPE_MARKETING;
+  }
+  return PARTNER_TYPE_CREATOR;
+}
+
+export function isCanonicalPartnerType(
+  value: string | null | undefined
+): value is PartnerTypeValue {
+  return CANONICAL_TYPES.has(String(value ?? ""));
+}
+
+export function isOrganizationPartnerType(
+  partnerType: string | null | undefined
+): boolean {
+  return normalizePartnerType(partnerType) === PARTNER_TYPE_ORGANIZATION;
+}
+
+export function isCreatorPartnerType(
+  partnerType: string | null | undefined
+): boolean {
+  return normalizePartnerType(partnerType) === PARTNER_TYPE_CREATOR;
+}
+
+export function isMarketingPartnerType(
+  partnerType: string | null | undefined
+): boolean {
+  return normalizePartnerType(partnerType) === PARTNER_TYPE_MARKETING;
+}
+
+export function partnerCategory(
+  partnerType: string | null | undefined
+): PartnerCategory {
+  return normalizePartnerType(partnerType);
+}
+
+export function partnerCategoryLabel(
+  partnerType: string | null | undefined
+): string {
+  return partnerTypeLabel(normalizePartnerType(partnerType));
 }
 
 export function partnerTypeLabel(value: string): string {
-  return PARTNER_TYPES.find((t) => t.value === value)?.label ?? value;
+  const canonical = isCanonicalPartnerType(value)
+    ? value
+    : normalizePartnerType(value);
+  return PARTNER_TYPES.find((t) => t.value === canonical)?.label ?? value;
+}
+
+export function partnerTypeMeta(partnerType: string | null | undefined) {
+  const value = normalizePartnerType(partnerType);
+  return PARTNER_TYPES.find((t) => t.value === value) ?? PARTNER_TYPES[0];
 }
 
 export function rewardAmountForLevel(level: PartnerLevel): number {
@@ -76,17 +156,13 @@ export function rewardAmountForLevel(level: PartnerLevel): number {
 }
 
 /**
- * Reward amount for a partner record.
- * Organization Partners always receive ORGANIZATION_REWARD_CAD ($150).
- * Founding / Standard amounts are unchanged for all other partner types.
+ * Reward amount follows Founding / Standard level only.
+ * Partner type is a classification, not a separate commission schedule.
  */
 export function rewardAmountForPartner(input: {
   partner_level: PartnerLevel | string;
   partner_type?: string | null;
 }): number {
-  if (isOrganizationPartnerType(input.partner_type)) {
-    return ORGANIZATION_REWARD_CAD;
-  }
   const level =
     input.partner_level === "founding" ? "founding" : "standard";
   return rewardAmountForLevel(level);
@@ -96,11 +172,8 @@ export function partnerLevelLabel(level: PartnerLevel): string {
   return level === "founding" ? "Founding Partner" : "Standard Partner";
 }
 
-export function partnerRewardSummary(
-  level: PartnerLevel,
-  partnerType?: string | null
-): string {
-  return `$${rewardAmountForPartner({ partner_level: level, partner_type: partnerType })} CAD per qualified referral`;
+export function partnerRewardSummary(level: PartnerLevel): string {
+  return `$${rewardAmountForLevel(level)} CAD per qualified referral`;
 }
 
 export function rewardStatusLabel(status: PartnerRewardStatus): string {
@@ -125,4 +198,15 @@ export function rewardStatusLabel(status: PartnerRewardStatus): string {
 export function buildPartnerReferralUrl(origin: string, referralCode: string): string {
   const base = origin.replace(/\/$/, "");
   return `${base}/signup?ref=${encodeURIComponent(referralCode)}`;
+}
+
+export function filterRecordsByPartnerType<T extends { partner_type?: string | null; partner_type_value?: string | null }>(
+  records: T[],
+  filter: "all" | PartnerTypeValue
+): T[] {
+  if (filter === "all") return records;
+  return records.filter((row) => {
+    const raw = row.partner_type_value ?? row.partner_type ?? "";
+    return normalizePartnerType(raw) === filter;
+  });
 }

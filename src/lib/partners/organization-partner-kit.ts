@@ -3,7 +3,7 @@
  * Organization Partners. Content is generated with referral URL, code, and QR.
  */
 
-import { ORGANIZATION_REWARD_CAD } from "@/lib/partners/constants";
+import { FOUNDING_REWARD_CAD, STANDARD_REWARD_CAD } from "@/lib/partners/constants";
 
 export type OrganizationKitContext = {
   organizationName: string;
@@ -133,7 +133,7 @@ export const ORGANIZATION_PARTNER_KIT: OrganizationKitItem[] = [
         <p class="muted">JobProof helps contractors win more work, stay organized, get paid faster, and protect every job.</p>
         <h2>What members can do with JobProof</h2>
         <ul>${memberBenefitsList()}</ul>
-        <p>Organization Partners earn <span class="accent">$${ORGANIZATION_REWARD_CAD} CAD</span> per qualified referral after standard qualification requirements are met.</p>
+        <p>Organization Partners earn the same Partner Program rewards: <span class="accent">$${FOUNDING_REWARD_CAD} CAD</span> as a Founding Partner or <span class="accent">$${STANDARD_REWARD_CAD} CAD</span> as a Standard Partner per qualified referral.</p>
         ${referralBlock(ctx)}
         <a class="cta" href="${escapeHtml(ctx.referralUrl)}">Start free with JobProof</a>
         <p class="footer">Powered by JobProof · ${escapeHtml(ctx.origin)}</p>`
@@ -361,7 +361,7 @@ Powered by JobProof
         <h1>Partner overview</h1>
         <p>${escapeHtml(ctx.organizationName)} is set up as a JobProof Organization Partner.</p>
         <h2>Reward</h2>
-        <p>Earn <span class="accent">$${ORGANIZATION_REWARD_CAD} CAD</span> per qualified referral after existing qualification requirements are met. Payout timing and attribution follow the standard Partner Program.</p>
+        <p>Rewards follow the Partner Program Founding ($${FOUNDING_REWARD_CAD} CAD) or Standard ($${STANDARD_REWARD_CAD} CAD) level after existing qualification requirements are met. Payout timing and attribution are unchanged.</p>
         <h2>Your tracking assets</h2>
         ${referralBlock(ctx)}
         <h2>Marketing support</h2>

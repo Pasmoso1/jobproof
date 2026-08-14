@@ -7,7 +7,15 @@ import { JobProofLogo } from "@/components/jobproof-logo";
 import {
   PARTNER_AGREEMENT_VERSION,
   PARTNER_TYPES,
+  type PartnerTypeValue,
 } from "@/lib/partners/constants";
+import { PartnerTypeCards } from "@/components/partners/partner-type-cards";
+import { ProvinceSelect } from "@/components/canada/province-select";
+import {
+  CREATOR_AUDIENCE_FOCUS,
+  CREATOR_PLATFORMS,
+  MARKETING_PROMOTION_METHODS,
+} from "@/lib/partners/apply-profiles";
 import {
   PARTNER_PASSWORD_MIN_LENGTH,
   looksLikeEmail,
@@ -62,6 +70,8 @@ export default function PartnerApplyPage() {
     "idle" | "checking" | "available" | "unavailable" | "email"
   >("idle");
   const [usernameHint, setUsernameHint] = useState<string | null>(null);
+  const [partnerType, setPartnerType] = useState<PartnerTypeValue | "">("");
+  const [province, setProvince] = useState("");
   const [, startTransition] = useTransition();
 
   async function refreshAuthState() {
@@ -87,6 +97,18 @@ export default function PartnerApplyPage() {
   useEffect(() => {
     void refreshAuthState();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("type");
+    if (requested === "organization") {
+      router.replace("/partners/organizations/apply");
+      return;
+    }
+    if (requested === "creator" || requested === "marketing") {
+      setPartnerType(requested);
+    }
+  }, [router]);
 
   useEffect(() => {
     const value = loginIdentifier.trim();
@@ -295,8 +317,28 @@ export default function PartnerApplyPage() {
             </div>
 
             <fieldset disabled={formDisabled} className="space-y-5 disabled:opacity-70">
+              <PartnerTypeCards
+                value={partnerType}
+                onChange={(next) => {
+                  if (next === "organization") {
+                    router.push("/partners/organizations/apply");
+                    return;
+                  }
+                  setPartnerType(next);
+                }}
+                error={fieldErrors.partner_type}
+              />
+
+              {partnerType ? (
+                <>
               <Field
-                label="Organization name"
+                label={
+                  partnerType === "marketing"
+                    ? "Individual or business name"
+                    : partnerType === "creator"
+                      ? "Name or channel name"
+                      : "Organization name"
+                }
                 name="organization_name"
                 required
                 error={fieldErrors.organization_name}
@@ -344,51 +386,158 @@ export default function PartnerApplyPage() {
               )}
 
               <Field label="Phone" name="phone" type="tel" error={fieldErrors.phone} />
-              <Field label="Website" name="website" type="url" placeholder="https://" />
 
-              <div>
-                <label
-                  htmlFor="partner_type"
-                  className="block text-sm font-medium text-zinc-700"
-                >
-                  Partner type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  id="partner_type"
-                  name="partner_type"
-                  required
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-                >
-                  <option value="">Select…</option>
-                  {PARTNER_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-                {fieldErrors.partner_type ? (
-                  <p className="mt-1 text-sm text-red-600">{fieldErrors.partner_type}</p>
-                ) : null}
-              </div>
+              {partnerType === "creator" ? (
+                <>
+                  <div>
+                    <label
+                      htmlFor="primary_platform"
+                      className="block text-sm font-medium text-zinc-700"
+                    >
+                      Primary platform <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="primary_platform"
+                      name="primary_platform"
+                      required
+                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                    >
+                      <option value="">Select…</option>
+                      {CREATOR_PLATFORMS.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.primary_platform ? (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.primary_platform}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Field
+                    label="Profile / channel URL"
+                    name="website"
+                    type="url"
+                    required
+                    placeholder="https://"
+                    error={fieldErrors.website}
+                  />
+                  <Field
+                    label="Additional platform links (optional)"
+                    name="additional_links"
+                    placeholder="Other profiles, one per line or comma-separated"
+                  />
+                  <Field
+                    label="Approximate audience size"
+                    name="estimated_audience"
+                    required
+                    placeholder="e.g. 12,000 followers"
+                    error={fieldErrors.estimated_audience}
+                  />
+                  <div>
+                    <label
+                      htmlFor="primary_audience"
+                      className="block text-sm font-medium text-zinc-700"
+                    >
+                      Primary audience
+                    </label>
+                    <select
+                      id="primary_audience"
+                      name="primary_audience"
+                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                    >
+                      <option value="">Select…</option>
+                      {CREATOR_AUDIENCE_FOCUS.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="province"
+                      className="block text-sm font-medium text-zinc-700"
+                    >
+                      Province / territory
+                    </label>
+                    <ProvinceSelect
+                      id="province"
+                      name="province"
+                      value={province}
+                      onChange={setProvince}
+                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                    />
+                    {fieldErrors.province ? (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.province}
+                      </p>
+                    ) : null}
+                  </div>
+                  <TextArea
+                    label="Short description of your content"
+                    name="reason"
+                    required
+                    error={fieldErrors.reason}
+                  />
+                </>
+              ) : null}
 
-              <Field
-                label="Estimated contractor audience size"
-                name="estimated_audience"
-                placeholder="e.g. 500 contractors in Ontario"
-              />
+              {partnerType === "marketing" ? (
+                <>
+                  <Field
+                    label="Website, LinkedIn, or primary business URL"
+                    name="website"
+                    type="url"
+                    placeholder="https://"
+                    error={fieldErrors.website}
+                  />
+                  <div>
+                    <label
+                      htmlFor="promotion_method"
+                      className="block text-sm font-medium text-zinc-700"
+                    >
+                      Primary promotion method{" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="promotion_method"
+                      name="promotion_method"
+                      required
+                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                    >
+                      <option value="">Select…</option>
+                      {MARKETING_PROMOTION_METHODS.map((m) => (
+                        <option key={m.value} value={m.value}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                    {fieldErrors.promotion_method ? (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.promotion_method}
+                      </p>
+                    ) : null}
+                    <p className="mt-1 text-xs text-zinc-500">
+                      You do not need an existing audience. Performance marketing
+                      and paid channels are welcome.
+                    </p>
+                  </div>
+                  <TextArea
+                    label="Tell us briefly how you expect to introduce JobProof to contractors."
+                    name="reason"
+                    required
+                    error={fieldErrors.reason}
+                  />
+                </>
+              ) : null}
 
-              <TextArea
-                label="How do you plan to promote JobProof?"
-                name="promotion_plan"
-                required
-                error={fieldErrors.promotion_plan}
-              />
-              <TextArea
-                label="Why would you like to become a partner?"
-                name="reason"
-                required
-                error={fieldErrors.reason}
-              />
+              {partnerType ? (
+                <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+                  {PARTNER_TYPES.find((t) => t.value === partnerType)?.description}
+                </p>
+              ) : null}
 
               <div className="space-y-4 border-t border-zinc-200 pt-5">
                 <div>
@@ -541,6 +690,13 @@ export default function PartnerApplyPage() {
                     ? "Submitting…"
                     : "Submit application"}
               </button>
+                </>
+              ) : (
+                <p className="text-sm text-zinc-600">
+                  Select Creator or Marketing to continue. Organization Partners
+                  use a dedicated application.
+                </p>
+              )}
             </fieldset>
           </form>
         )}

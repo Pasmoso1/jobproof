@@ -9,6 +9,11 @@ export type PartnerDashboardStats = {
   pendingAmountCad: number;
   qualifiedAmountCad: number;
   approvedAmountCad: number;
+  referredCount: number;
+  qualifiedCount: number;
+  pendingRewardCount: number;
+  approvedRewardCount: number;
+  paidCount: number;
 };
 
 export function computePartnerDashboardStats(
@@ -25,6 +30,11 @@ export function computePartnerDashboardStats(
   let qualifiedAmountCad = 0;
   let approvedAmountCad = 0;
   let activeSubscribers = 0;
+  let referredCount = 0;
+  let qualifiedCount = 0;
+  let pendingRewardCount = 0;
+  let approvedRewardCount = 0;
+  let paidCount = 0;
 
   for (const r of referrals) {
     const amount = Number(r.reward_amount) || 0;
@@ -32,14 +42,27 @@ export function computePartnerDashboardStats(
     if (r.subscription_started_at && !["cancelled", "forfeited"].includes(status)) {
       activeSubscribers += 1;
     }
+    if (!["cancelled", "forfeited"].includes(status)) {
+      referredCount += 1;
+    }
     if (status === "pending" || status === "qualified") {
       pendingRewards += 1;
-      if (status === "pending") pendingAmountCad += amount;
-      if (status === "qualified") qualifiedAmountCad += amount;
+      if (status === "pending") {
+        pendingAmountCad += amount;
+        pendingRewardCount += 1;
+      }
+      if (status === "qualified") {
+        qualifiedAmountCad += amount;
+        qualifiedCount += 1;
+      }
     }
     if (status === "approved") {
       approvedRewards += 1;
       approvedAmountCad += amount;
+      approvedRewardCount += 1;
+    }
+    if (status === "paid") {
+      paidCount += 1;
     }
   }
 
@@ -54,5 +77,10 @@ export function computePartnerDashboardStats(
     pendingAmountCad,
     qualifiedAmountCad,
     approvedAmountCad,
+    referredCount,
+    qualifiedCount,
+    pendingRewardCount,
+    approvedRewardCount,
+    paidCount,
   };
 }

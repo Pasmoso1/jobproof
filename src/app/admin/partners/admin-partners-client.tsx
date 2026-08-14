@@ -6,6 +6,7 @@ import {
   adminApprovePartnerApplication,
   adminApproveReferralReward,
   adminChangePartnerLevel,
+  adminChangePartnerType,
   adminDeclinePartnerApplication,
   adminMarkReferralPaid,
   adminReactivatePartner,
@@ -15,8 +16,14 @@ import {
   adminResendPartnerVerificationEmail,
   adminSendPartnerPasswordResetEmail,
 } from "./actions";
-import type { PartnerLevel, PartnerRewardStatus } from "@/lib/partners/constants";
+import type {
+  PartnerLevel,
+  PartnerRewardStatus,
+  PartnerTypeValue,
+} from "@/lib/partners/constants";
 import {
+  PARTNER_TYPES,
+  filterRecordsByPartnerType,
   partnerLevelLabel,
   rewardAmountForPartner,
 } from "@/lib/partners/constants";
@@ -82,6 +89,7 @@ export function AdminPartnersClient({
   const [pending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | PartnerTypeValue>("all");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -89,6 +97,11 @@ export function AdminPartnersClient({
     setApplications(initialApplications);
   }, [initialApplications]);
 
+  const filteredApplications = filterRecordsByPartnerType(
+    applications,
+    typeFilter
+  );
+  const filteredPartners = filterRecordsByPartnerType(partners, typeFilter);
   const selected = applications.find((a) => a.id === selectedId) ?? null;
 
   useEffect(() => {
@@ -158,6 +171,27 @@ export function AdminPartnersClient({
         </p>
       ) : null}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="admin-partner-type-filter" className="text-sm font-medium text-zinc-700">
+          Partner type
+        </label>
+        <select
+          id="admin-partner-type-filter"
+          value={typeFilter}
+          onChange={(e) =>
+            setTypeFilter(e.target.value as "all" | PartnerTypeValue)
+          }
+          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
+        >
+          <option value="all">All types</option>
+          {PARTNER_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-zinc-900">Applications</h2>
         <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
@@ -173,7 +207,7 @@ export function AdminPartnersClient({
               </tr>
             </thead>
             <tbody>
-              {applications.map((a) => {
+              {filteredApplications.map((a) => {
                 const actions = getApplicationReviewActions(a.status);
                 return (
                   <tr key={a.id} className="border-b border-zinc-100 align-top">
@@ -334,7 +368,7 @@ export function AdminPartnersClient({
               </tr>
             </thead>
             <tbody>
-              {partners.map((p) => (
+              {filteredPartners.map((p) => (
                 <tr key={p.id} className="border-b border-zinc-100" id={`partner-${p.id}`}>
                   <td className="px-3 py-3">
                     <p className="font-medium">{p.organization_name}</p>
@@ -425,6 +459,29 @@ export function AdminPartnersClient({
                       >
                         Set standard
                       </button>
+                      <label className="sr-only" htmlFor={`partner-type-${p.id}`}>
+                        Change partner type
+                      </label>
+                      <select
+                        key={`${p.id}-${p.partner_type_value}`}
+                        id={`partner-type-${p.id}`}
+                        disabled={pending}
+                        defaultValue={p.partner_type_value}
+                        className="rounded border border-zinc-300 bg-white px-2 py-1 text-xs disabled:opacity-60"
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          if (next === p.partner_type_value) return;
+                          run("set_type", () =>
+                            adminChangePartnerType(p.id, next)
+                          );
+                        }}
+                      >
+                        {PARTNER_TYPES.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </td>
                 </tr>

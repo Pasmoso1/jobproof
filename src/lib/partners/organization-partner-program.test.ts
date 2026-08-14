@@ -6,7 +6,6 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   ORGANIZATION_PARTNER_TYPE,
-  ORGANIZATION_REWARD_CAD,
   partnerCategoryLabel,
   rewardAmountForLevel,
   rewardAmountForPartner,
@@ -27,14 +26,13 @@ import { generateStudioCopy } from "@/lib/partners/studio/copy";
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 describe("organization partner rewards", () => {
-  it("pays Organization Partners $150 without changing founding/standard amounts", () => {
-    assert.equal(ORGANIZATION_REWARD_CAD, 150);
+  it("uses Founding/Standard amounts regardless of organization type", () => {
     assert.equal(
       rewardAmountForPartner({
         partner_level: "standard",
         partner_type: ORGANIZATION_PARTNER_TYPE,
       }),
-      150
+      100
     );
     assert.equal(
       rewardAmountForPartner({
@@ -45,16 +43,8 @@ describe("organization partner rewards", () => {
     );
     assert.equal(rewardAmountForLevel("standard"), 100);
     assert.equal(rewardAmountForLevel("founding"), 150);
-    assert.equal(
-      rewardAmountForPartner({
-        partner_level: "standard",
-        partner_type: "influencer",
-      }),
-      100
-    );
     assert.equal(partnerCategoryLabel(ORGANIZATION_PARTNER_TYPE), "Organization");
-    assert.equal(partnerCategoryLabel("influencer"), "Influencer");
-    assert.equal(partnerCategoryLabel("existing_contractor"), "Individual Partner");
+    assert.equal(partnerCategoryLabel("influencer"), "Creator");
   });
 });
 

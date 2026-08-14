@@ -4,6 +4,7 @@ import { JobProofLogo } from "@/components/jobproof-logo";
 import {
   FOUNDING_PARTNER_LIMIT,
   FOUNDING_REWARD_CAD,
+  PARTNER_TYPES,
   STANDARD_REWARD_CAD,
 } from "@/lib/partners/constants";
 import { PARTNER_LANDING_FAQS } from "@/lib/partners/content/faqs";
@@ -138,37 +139,47 @@ export default async function PartnersLandingPage() {
         </FoundingPartnerSectionTracker>
 
         <section className="border-b border-zinc-200 px-6 py-14 sm:px-8">
-          <div className="mx-auto max-w-3xl">
-            <h2 className="text-2xl font-bold text-zinc-950">Who this program is for</h2>
-            <p className="mt-3 text-zinc-600">
-              We are looking for organizations and individuals who already work closely with
-              contractors—not a public affiliate marketplace.
+          <div className="mx-auto max-w-5xl">
+            <h2 className="text-2xl font-bold text-zinc-950">
+              Choose how you partner with JobProof
+            </h2>
+            <p className="mt-3 max-w-3xl text-zinc-600">
+              One Partner Program. Three ways to participate. Creator, Marketing, and
+              Organization Partners share the same portal, referral tracking, and
+              reward qualification rules.
             </p>
-            <ul className="mt-6 grid gap-2 text-zinc-800 sm:grid-cols-2">
-              {[
-                "Contractor influencers",
-                "Trade organizations",
-                "Industry associations",
-                "Business coaches",
-                "Accounting firms serving contractors",
-                "Financing companies",
-                "Insurance providers",
-                "Existing JobProof contractors",
-                "Strategic business partners",
-              ].map((item) => (
-                <li key={item} className="flex gap-2 text-sm">
-                  <span className="text-[#2436BB]">•</span>
-                  <span>{item}</span>
-                </li>
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              {PARTNER_TYPES.map((type) => (
+                <article
+                  key={type.value}
+                  className="flex h-full flex-col rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
+                >
+                  <h3 className="text-lg font-semibold text-zinc-950">
+                    {type.value === "creator"
+                      ? "Creators"
+                      : type.value === "marketing"
+                        ? "Marketing Partners"
+                        : "Organizations"}
+                  </h3>
+                  <p className="mt-2 flex-1 text-sm leading-relaxed text-zinc-600">
+                    {type.cardBody}
+                  </p>
+                  <Link
+                    href={type.applyHref}
+                    className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2436BB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2a96]"
+                  >
+                    {type.ctaLabel}
+                  </Link>
+                </article>
               ))}
-            </ul>
-            <p className="mt-6 rounded-xl border border-[#2436BB]/20 bg-[#2436BB]/5 px-4 py-3 text-sm leading-relaxed text-zinc-700">
-              Represent an association or organization?{" "}
+            </div>
+            <p className="mt-6 text-sm text-zinc-600">
+              Represent a trade association or member organization?{" "}
               <Link
                 href="/partners/organizations"
-                className="font-semibold text-[#2436BB] hover:text-[#1c2a96] hover:underline"
+                className="font-semibold text-[#2436BB] hover:underline"
               >
-                Learn about our Organization Partner Program
+                See Organization Partner details
               </Link>
               .
             </p>

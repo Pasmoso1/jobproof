@@ -18,10 +18,12 @@ function validFormData(overrides?: Record<string, string>): FormData {
   fd.set("email", "jordan@example.com");
   fd.set("phone", "");
   fd.set("website", "");
-  fd.set("partner_type", "influencer");
-  fd.set("estimated_audience", "");
+  fd.set("partner_type", "creator");
+  fd.set("primary_platform", "youtube");
+  fd.set("website", "https://youtube.com/@acme");
+  fd.set("estimated_audience", "5000 subscribers");
   fd.set("promotion_plan", "Share with my contractor network.");
-  fd.set("reason", "I work with many independent contractors.");
+  fd.set("reason", "I make contractor how-to videos.");
   fd.set("agreement_accepted", "on");
   fd.set("username", "jordanlee");
   fd.set("password", "secret12");

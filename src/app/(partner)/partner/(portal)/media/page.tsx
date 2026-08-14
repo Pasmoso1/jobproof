@@ -81,8 +81,9 @@ export default async function PartnerMediaCenterPage() {
               Partner Media Centre
             </h1>
             <p className="mt-2 text-base text-zinc-600">
-              Production-ready JobProof brand assets, social graphics, email
-              templates, and copy—ready to download and use.
+              One Media Centre for every partner type: logos, brand guidelines,
+              social graphics, website banners, email/newsletter assets, print
+              files, and QR/referral tools.
             </p>
             <p className="mt-4 rounded-xl border border-[#2436BB]/20 bg-[#2436BB]/5 px-4 py-3 text-sm leading-relaxed text-zinc-700">
               {MEDIA_CENTER_NOTICE}

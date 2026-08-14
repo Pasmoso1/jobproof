@@ -20,9 +20,9 @@ function sampleApp(
     email: "jordan@example.com",
     phone: "4165551234",
     website: "example.com",
-    partner_type: "Influencer",
-    partner_category: "Influencer",
-    partner_type_value: "influencer",
+    partner_type: "Creator",
+    partner_category: "Creator",
+    partner_type_value: "creator",
     estimated_audience: "500 contractors",
     promotion_plan: "Line one\n\nLine two",
     reason: "Because contractors need better tools.",
@@ -138,7 +138,7 @@ describe("admin application review helpers", () => {
     assert.equal(app.organization_name, "Acme Partners");
     assert.equal(app.contact_name, "Jordan Lee");
     assert.equal(app.email, "jordan@example.com");
-    assert.equal(app.partner_type, "Influencer");
+    assert.equal(app.partner_type, "Creator");
     assert.equal(app.reason, "Need better workflow.");
   });
 });

@@ -76,7 +76,10 @@ export async function attributeContractorToPartnerReferral(
     profileId: input.contractorProfileId,
     eventName: PRODUCT_ANALYTICS_EVENTS.partner_referral_signup,
     source: input.source,
-    metadata: { partner_id: String(partner.id) },
+    metadata: {
+      partner_id: String(partner.id),
+      partner_type: String(partner.partner_type ?? ""),
+    },
   });
 
   void sendPartnerReferralLifecycleEmail({

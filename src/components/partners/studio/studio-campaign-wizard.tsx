@@ -18,9 +18,13 @@ import {
   type StudioThemeId,
 } from "@/lib/partners/studio/catalog";
 import {
-  ORGANIZATION_CAMPAIGN_PRESETS,
-  type OrganizationCampaignPresetId,
-} from "@/lib/partners/studio/organization-presets";
+  getStudioPresetsForPartnerType,
+  type StudioCampaignPreset,
+} from "@/lib/partners/studio/presets";
+import {
+  normalizePartnerType,
+  type PartnerTypeValue,
+} from "@/lib/partners/constants";
 
 const BASE_STEPS = [
   "Theme",
@@ -43,24 +47,27 @@ export function StudioCampaignWizard({
   isFounding,
   initialLogoUrl,
   isOrganizationPartner = false,
+  partnerType = "creator",
 }: {
   organizationName: string;
   isFounding: boolean;
   initialLogoUrl: string | null;
   isOrganizationPartner?: boolean;
+  partnerType?: PartnerTypeValue | string;
 }) {
   const router = useRouter();
+  const type = normalizePartnerType(partnerType);
+  const presets = useMemo(
+    () => getStudioPresetsForPartnerType(type),
+    [type]
+  );
+  const showPresets = presets.length > 0;
   const steps = useMemo(
-    () =>
-      isOrganizationPartner
-        ? (["Preset", ...BASE_STEPS] as const)
-        : BASE_STEPS,
-    [isOrganizationPartner]
+    () => (showPresets ? (["Preset", ...BASE_STEPS] as const) : BASE_STEPS),
+    [showPresets]
   );
   const [step, setStep] = useState(0);
-  const [presetId, setPresetId] = useState<OrganizationCampaignPresetId | null>(
-    null
-  );
+  const [presetId, setPresetId] = useState<string | null>(null);
   const [theme, setTheme] = useState<StudioThemeId | null>(null);
   const [audience, setAudience] = useState<StudioAudienceId | null>(null);
   const [goal, setGoal] = useState<StudioGoalId | null>(null);
@@ -69,10 +76,12 @@ export function StudioCampaignWizard({
   const [error, setError] = useState<string | null>(null);
   const [progressIndex, setProgressIndex] = useState(0);
   const [pending, startTransition] = useTransition();
-  const wizardOffset = isOrganizationPartner ? 1 : 0;
+  const wizardOffset = showPresets ? 1 : 0;
+  const isOrganizationPartnerResolved =
+    isOrganizationPartner || type === "organization";
 
   const canContinue = useMemo(() => {
-    if (isOrganizationPartner && step === 0) return true;
+    if (showPresets && step === 0) return true;
     const baseStep = step - wizardOffset;
     switch (baseStep) {
       case 0:
@@ -97,12 +106,14 @@ export function StudioCampaignWizard({
     goal,
     platforms,
     style,
-    isOrganizationPartner,
+    showPresets,
     wizardOffset,
   ]);
 
-  function applyPreset(id: OrganizationCampaignPresetId) {
-    const preset = ORGANIZATION_CAMPAIGN_PRESETS.find((p) => p.id === id);
+  function applyPreset(id: string) {
+    const preset: StudioCampaignPreset | undefined = presets.find(
+      (p) => p.id === id
+    );
     if (!preset) return;
     setPresetId(id);
     setTheme(preset.theme);
@@ -176,16 +187,16 @@ export function StudioCampaignWizard({
         </ol>
       </nav>
 
-      {isOrganizationPartner && step === 0 ? (
+      {showPresets && step === 0 ? (
         <section aria-labelledby="preset-heading">
           <h2 id="preset-heading" className="text-lg font-semibold text-zinc-900">
-            Organization campaign presets
+            Campaign presets
           </h2>
           <p className="mt-1 text-sm text-zinc-600">
-            Start from a member-focused template, or skip and build a custom campaign.
+            Start from a template for your partner type, or skip and build a custom campaign.
           </p>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {ORGANIZATION_CAMPAIGN_PRESETS.map((item) => (
+            {presets.map((item) => (
               <StudioSelectCard
                 key={item.id}
                 title={item.label}
@@ -199,7 +210,7 @@ export function StudioCampaignWizard({
         </section>
       ) : null}
 
-      {baseStep === 0 && !(isOrganizationPartner && step === 0) ? (
+      {baseStep === 0 && !(showPresets && step === 0) ? (
         <section aria-labelledby="theme-heading">
           <h2 id="theme-heading" className="text-lg font-semibold text-zinc-900">
             What would you like to promote?
@@ -305,13 +316,15 @@ export function StudioCampaignWizard({
         <section aria-labelledby="branding-heading" className="space-y-4">
           <div>
             <h2 id="branding-heading" className="text-lg font-semibold text-zinc-900">
-              {isOrganizationPartner ? "Organization branding" : "Partner branding"}
+              {isOrganizationPartnerResolved
+                ? "Organization branding"
+                : "Partner branding"}
             </h2>
             <p className="mt-1 text-sm text-zinc-600">
               Campaigns automatically include your referral link, referral code, QR
               code, and JobProof branding
               {isFounding ? ", plus your Founding Partner badge" : ""}.
-              {isOrganizationPartner
+              {isOrganizationPartnerResolved
                 ? " Uploaded organization logos are applied to co-branded graphics automatically."
                 : ""}
             </p>
@@ -365,7 +378,7 @@ export function StudioCampaignWizard({
             disabled={!canContinue || pending}
             className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#2436BB] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-50"
           >
-            {isOrganizationPartner && step === 0 && !presetId
+            {showPresets && step === 0 && !presetId
               ? "Skip presets"
               : "Continue"}
           </button>

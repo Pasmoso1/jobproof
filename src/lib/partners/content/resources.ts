@@ -89,3 +89,26 @@ export const PARTNER_RESOURCE_CATEGORY_LABELS: Record<PartnerResource["category"
   web: "Website banners",
   print: "Flyers & print",
 };
+
+export const MARKETING_PARTNER_POLICY = {
+  title: "Marketing Partner guidelines",
+  intro:
+    "Marketing Partners promote JobProof through their own channels and earn referral rewards for qualified contractor customers. JobProof does not hire Marketing Partners as agencies and does not automatically cover advertising costs unless agreed in writing.",
+  mustNot: [
+    "Make false or misleading claims about JobProof",
+    "Pretend to be JobProof",
+    "Create websites or social accounts that impersonate JobProof",
+    "Spam potential customers",
+    "Send unsolicited bulk messages where prohibited",
+    "Bid on JobProof trademarks or brand terms in paid search without written permission",
+    "Offer unauthorized discounts",
+    "Promise features JobProof does not provide",
+    "Manipulate referral attribution",
+    "Refer themselves solely to collect a commission",
+    "Use fraudulent, fake, or duplicate accounts",
+    "Misrepresent pricing",
+    "Use deceptive advertising",
+  ],
+  closing:
+    "JobProof may decline rewards for referrals that appear fraudulent or improperly generated. Rewards become payable only after the existing qualification rules are met.",
+} as const;

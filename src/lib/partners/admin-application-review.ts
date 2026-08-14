@@ -146,6 +146,8 @@ export function adminActionSuccessMessage(action: string): string {
       return "Partner level set to Founding.";
     case "set_standard":
       return "Partner level set to Standard.";
+    case "set_type":
+      return "Partner type updated.";
     case "adjust_amount":
       return "Reward amount updated.";
     case "approve_reward":

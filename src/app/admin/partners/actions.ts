@@ -10,7 +10,9 @@ import {
 import {
   buildPartnerReferralUrl,
   FOUNDING_PARTNER_LIMIT,
+  isCanonicalPartnerType,
   type PartnerLevel,
+  type PartnerTypeValue,
 } from "@/lib/partners/constants";
 import {
   sendPartnerApprovedEmail,
@@ -225,6 +227,23 @@ export async function adminReactivatePartner(partnerId: string) {
   await ctx.admin
     .from("partners")
     .update({ status: "active", updated_at: new Date().toISOString() })
+    .eq("id", partnerId);
+  revalidatePath("/admin/partners");
+  return { ok: true as const };
+}
+
+export async function adminChangePartnerType(
+  partnerId: string,
+  partnerType: PartnerTypeValue | string
+) {
+  const ctx = await requireAdminService();
+  if (!ctx.ok) return ctx;
+  if (!isCanonicalPartnerType(partnerType)) {
+    return { ok: false as const, error: "Select Creator, Marketing, or Organization." };
+  }
+  await ctx.admin
+    .from("partners")
+    .update({ partner_type: partnerType, updated_at: new Date().toISOString() })
     .eq("id", partnerId);
   revalidatePath("/admin/partners");
   return { ok: true as const };

@@ -2,13 +2,16 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveAppUrl } from "@/lib/stripe";
 import {
   buildPartnerReferralUrl,
+  isOrganizationPartnerType,
   partnerLevelLabel,
+  partnerTypeMeta,
   rewardAmountForPartner,
 } from "@/lib/partners/constants";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
 import { computePartnerDashboardStats } from "@/lib/partners/dashboard-stats";
 import { CopyButton } from "./copy-button";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { FoundingPartnerBadge } from "@/components/partners/founding-partner-badge";
 import { OrganizationPartnerCallout } from "@/components/partners/organization-partner-callout";
 
@@ -33,13 +36,15 @@ export default async function PartnerDashboardPage() {
     partner_level: partner.partner_level,
     partner_type: partner.partner_type,
   });
+  const typeMeta = partnerTypeMeta(partner.partner_type);
+  const isOrg = isOrganizationPartnerType(partner.partner_type);
 
   const cards = [
-    { label: "Total Referrals", value: String(stats.totalReferrals) },
-    { label: "Active Subscribers", value: String(stats.activeSubscribers) },
-    { label: "Pending Rewards", value: String(stats.pendingRewards) },
-    { label: "Approved Rewards", value: String(stats.approvedRewards) },
-    { label: "Total Paid", value: `$${stats.totalPaidCad.toFixed(0)} CAD` },
+    { label: "Referred", value: String(stats.referredCount) },
+    { label: "Qualified", value: String(stats.qualifiedCount) },
+    { label: "Pending reward", value: String(stats.pendingRewardCount) },
+    { label: "Approved reward", value: String(stats.approvedRewardCount) },
+    { label: "Paid", value: `$${stats.totalPaidCad.toFixed(0)} CAD` },
   ];
 
   return (
@@ -49,12 +54,16 @@ export default async function PartnerDashboardPage() {
           <h1 className="text-2xl font-bold text-zinc-900">Dashboard</h1>
           {partner.partner_level === "founding" ? <FoundingPartnerBadge /> : null}
         </div>
-        <p className="mt-1 text-sm text-zinc-600">
-          {partnerLevelLabel(partner.partner_level)} · ${reward} CAD per qualified referral.
-          A referral qualifies after 90 consecutive days as a paying subscriber; rewards are
-          reviewed and paid manually, with no recurring commissions.
+        <p className="mt-2 text-base font-medium text-zinc-800">
+          {typeMeta.dashboardIntro}
         </p>
-        <OrganizationPartnerCallout className="mt-4" />
+        <p className="mt-1 text-sm text-zinc-600">
+          {typeMeta.shortLabel} · {partnerLevelLabel(partner.partner_level)} · $
+          {reward} CAD per qualified referral. A referral qualifies after 90
+          consecutive days as a paying subscriber; rewards are reviewed and paid
+          manually, with no recurring commissions.
+        </p>
+        {isOrg ? null : <OrganizationPartnerCallout className="mt-4" />}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -63,7 +72,9 @@ export default async function PartnerDashboardPage() {
             key={c.label}
             className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"
           >
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{c.label}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              {c.label}
+            </p>
             <p className="mt-2 text-2xl font-bold text-zinc-900">{c.value}</p>
           </div>
         ))}
@@ -72,9 +83,10 @@ export default async function PartnerDashboardPage() {
       <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-zinc-900">My referral link</h2>
         <p className="mt-2 text-sm text-zinc-600">
-          Share your referral link with contractors who are a good fit for JobProof. Referral
-          quality matters more than signup volume. Once they remain a paying subscriber for 90
-          consecutive days, the reward becomes eligible for manual review and approval.
+          Share your referral link with contractors who are a good fit for JobProof.
+          Referral quality matters more than signup volume. Once they remain a paying
+          subscriber for 90 consecutive days, the reward becomes eligible for manual
+          review and approval.
         </p>
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
           <div className="min-w-0 flex-1 space-y-3">
@@ -99,10 +111,43 @@ export default async function PartnerDashboardPage() {
           </div>
           <div className="shrink-0 rounded-lg border border-zinc-200 bg-white p-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrSrc} alt="Referral QR code" width={160} height={160} className="h-40 w-40" />
+            <img
+              src={qrSrc}
+              alt="Referral QR code"
+              width={160}
+              height={160}
+              className="h-40 w-40"
+            />
           </div>
         </div>
       </section>
+
+      {isOrg ? (
+        <section className="rounded-xl border border-[#2436BB]/20 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-zinc-900">
+            Organization tools
+          </h2>
+          <p className="mt-2 text-sm text-zinc-600">
+            Co-branded member resources stay in the Media Centre and Marketing
+            Studio. Use the organization hub for kit downloads and upcoming
+            member analytics.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/partner/organization"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2436BB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2a96]"
+            >
+              Organization hub
+            </Link>
+            <Link
+              href="/partner/media#organization-partner-kit"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
+            >
+              Partner Kit
+            </Link>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

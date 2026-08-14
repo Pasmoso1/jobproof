@@ -8,6 +8,12 @@ import {
   validatePartnerLoginIdentifier,
   validatePartnerPassword,
 } from "@/lib/partners/username";
+import {
+  buildPromotionPlanFromProfile,
+  parsePartnerProfileDetails,
+  validateTypeSpecificApplicationFields,
+  type PartnerProfileDetails,
+} from "@/lib/partners/apply-profiles";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -68,6 +74,7 @@ export type ParsedPartnerApplication = {
   confirmPassword: string;
   /** Honeypot — must be empty. */
   companyWebsiteTrap: string;
+  profileDetails: PartnerProfileDetails | null;
 };
 
 export type TrustedPartnerApplySession = {
@@ -79,6 +86,9 @@ export type TrustedPartnerApplySession = {
 export function parsePartnerApplicationFormData(
   formData: FormData
 ): ParsedPartnerApplication {
+  const promotionPlan =
+    String(formData.get("promotion_plan") ?? "").trim() ||
+    buildPromotionPlanFromProfile(formData);
   return {
     organizationName: String(formData.get("organization_name") ?? "").trim(),
     contactName: String(formData.get("contact_name") ?? "").trim(),
@@ -89,13 +99,14 @@ export function parsePartnerApplicationFormData(
     estimatedAudience: blankToNull(
       String(formData.get("estimated_audience") ?? "").trim()
     ),
-    promotionPlan: String(formData.get("promotion_plan") ?? "").trim(),
+    promotionPlan,
     reason: String(formData.get("reason") ?? "").trim(),
     agreementAccepted: formData.get("agreement_accepted") === "on",
     username: String(formData.get("username") ?? "").trim(),
     password: String(formData.get("password") ?? ""),
     confirmPassword: String(formData.get("confirm_password") ?? ""),
     companyWebsiteTrap: String(formData.get("company_website") ?? "").trim(),
+    profileDetails: parsePartnerProfileDetails(formData),
   };
 }
 
@@ -200,6 +211,7 @@ export function buildPartnerApplicationInsertRow(
     normalized_username: options.normalizedUsername,
     auth_user_id: options.authUserId,
     email_confirmed_at: options.emailConfirmedAt ?? null,
+    profile_details: input.profileDetails ?? {},
   };
 }
 
@@ -394,7 +406,10 @@ export async function submitPartnerApplicationCore(input: {
     };
   }
 
-  const fieldErrors = validatePartnerApplication(parsed, { requirePassword });
+  const fieldErrors = {
+    ...validateTypeSpecificApplicationFields(input.formData),
+    ...validatePartnerApplication(parsed, { requirePassword }),
+  };
   if (Object.keys(fieldErrors).length) {
     const missingAgreement = Boolean(fieldErrors.agreement_accepted);
     return {

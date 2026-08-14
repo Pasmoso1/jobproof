@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
 import { redirect } from "next/navigation";
-import { isOrganizationPartnerType } from "@/lib/partners/constants";
+import {
+  isOrganizationPartnerType,
+  normalizePartnerType,
+} from "@/lib/partners/constants";
 import { getActivePartnerLogo } from "@/lib/partners/studio/actions";
 import { StudioCampaignWizard } from "@/components/partners/studio/studio-campaign-wizard";
 
@@ -24,14 +27,12 @@ export default async function PartnerStudioCreatePage() {
           ← Marketing Studio
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-zinc-950">
-          {isOrganizationPartner
-            ? "Organization Marketing Studio"
-            : "Create Campaign"}
+          Create Campaign
         </h1>
         <p className="mt-1 text-sm text-zinc-600">
           {isOrganizationPartner
             ? "Generate member-focused campaigns with your organization logo, referral link, and QR code."
-            : "Follow the wizard to generate personalized JobProof marketing assets."}
+            : "Follow the wizard to generate personalized JobProof marketing assets for your partner type."}
         </p>
       </div>
 
@@ -40,6 +41,7 @@ export default async function PartnerStudioCreatePage() {
         isFounding={session.partner.partner_level === "founding"}
         initialLogoUrl={logo?.logoUrl ?? null}
         isOrganizationPartner={isOrganizationPartner}
+        partnerType={normalizePartnerType(session.partner.partner_type)}
       />
     </div>
   );
