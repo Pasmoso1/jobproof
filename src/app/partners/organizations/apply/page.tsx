@@ -6,9 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
 import {
-  FOUNDING_REWARD_CAD,
   PARTNER_AGREEMENT_PATH,
-  STANDARD_REWARD_CAD,
 } from "@/lib/partners/constants";
 import {
   PARTNER_PASSWORD_MIN_LENGTH,
@@ -194,10 +192,10 @@ export default function OrganizationPartnerApplyPage() {
         </h1>
         <p className="mt-3 text-zinc-600">
           Apply to become an Organization Partner in the JobProof Partner
-          Program. Approved organizations earn the same Founding (${FOUNDING_REWARD_CAD}{" "}
-          CAD) or Standard (${STANDARD_REWARD_CAD} CAD) referral rewards as other
-          partners. This form is for associations, chambers, buying groups, and
-          similar organizations.
+          Program. Approved Organization Partners earn $150 CAD for each
+          qualified contractor referral, subject to the existing qualification
+          requirements. This form is for associations, chambers, buying groups,
+          and similar organizations.
         </p>
         <p className="mt-2 text-sm text-zinc-500">
           Looking for the general Partner Program instead?{" "}

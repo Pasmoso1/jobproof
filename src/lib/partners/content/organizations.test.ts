@@ -29,6 +29,11 @@ describe("association & organization partners page", () => {
       ORGANIZATION_PARTNERS_HERO.primaryCta.href,
       "/partners/organizations/apply"
     );
+    // No Schedule a Demo secondary CTA
+    assert.ok(
+      !("secondaryCta" in ORGANIZATION_PARTNERS_HERO),
+      "hero must not have a secondaryCta"
+    );
   });
 
   it("covers why cards, audience types, how-it-works, and FAQs", () => {
@@ -39,8 +44,13 @@ describe("association & organization partners page", () => {
     assert.ok(ORGANIZATION_FAQS.some((f) => /cost/i.test(f.question)));
     assert.ok(ORGANIZATION_FAQS.some((f) => /webinars/i.test(f.question)));
     assert.ok(ORGANIZATION_FAQS.some((f) => /earn/i.test(f.question)));
+    // FAQ answer should state $150 CAD fixed reward — no Founding/Standard distinction
     assert.ok(
-      ORGANIZATION_FAQS.some((f) => /Founding Partner/i.test(f.answer))
+      ORGANIZATION_FAQS.some((f) => /\$150 CAD/i.test(f.answer))
+    );
+    assert.ok(
+      !ORGANIZATION_FAQS.some((f) => /\$100/i.test(f.answer)),
+      "FAQ must not mention $100 for org partners"
     );
   });
 
@@ -51,7 +61,9 @@ describe("association & organization partners page", () => {
     const page = await readFile(pagePath, "utf8");
     assert.match(page, /ORGANIZATION_PARTNERS_HERO/);
     assert.match(page, /ORGANIZATION_PARTNERS_META/);
-    assert.match(page, /Illustrative examples/);
+    // Success Examples section removed
+    assert.doesNotMatch(page, /Illustrative examples/);
+    assert.doesNotMatch(page, /Schedule a Demo/);
     assert.doesNotMatch(page, /only a documentation/i);
 
     const landing = await readFile(

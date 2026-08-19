@@ -410,6 +410,5 @@ export function getSharedOrganizationLandingContent() {
     faqs: ORGANIZATION_FAQS,
     finalCta: ORGANIZATION_FINAL_CTA,
     primaryCta: ORGANIZATION_PARTNERS_HERO.primaryCta,
-    secondaryCta: ORGANIZATION_PARTNERS_HERO.secondaryCta,
   };
 }

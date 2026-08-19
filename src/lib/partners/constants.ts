@@ -156,13 +156,16 @@ export function rewardAmountForLevel(level: PartnerLevel): number {
 }
 
 /**
- * Reward amount follows Founding / Standard level only.
- * Partner type is a classification, not a separate commission schedule.
+ * Organization Partners always receive $150 CAD regardless of partner_level.
+ * Creator and Marketing Partners follow Founding ($150) / Standard ($100) levels.
  */
 export function rewardAmountForPartner(input: {
   partner_level: PartnerLevel | string;
   partner_type?: string | null;
 }): number {
+  if (isOrganizationPartnerType(input.partner_type)) {
+    return FOUNDING_REWARD_CAD; // fixed $150 for all org partners
+  }
   const level =
     input.partner_level === "founding" ? "founding" : "standard";
   return rewardAmountForLevel(level);

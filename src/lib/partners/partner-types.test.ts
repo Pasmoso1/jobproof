@@ -77,29 +77,37 @@ describe("partner type normalization and rewards", () => {
     assert.equal(partnerCategoryLabel("organization"), "Organization");
   });
 
-  it("does not change Founding/Standard reward amounts by partner type", () => {
+  it("returns correct reward amounts per partner type and level", () => {
     assert.equal(rewardAmountForLevel("standard"), 100);
     assert.equal(rewardAmountForLevel("founding"), 150);
+    // Organization always $150 regardless of level
     assert.equal(
-      rewardAmountForPartner({
-        partner_level: "standard",
-        partner_type: "organization",
-      }),
+      rewardAmountForPartner({ partner_level: "standard", partner_type: "organization" }),
+      150,
+      "org standard must be 150"
+    );
+    assert.equal(
+      rewardAmountForPartner({ partner_level: "founding", partner_type: "organization" }),
+      150,
+      "org founding must be 150"
+    );
+    // Creator follows level
+    assert.equal(
+      rewardAmountForPartner({ partner_level: "standard", partner_type: "creator" }),
       100
     );
     assert.equal(
-      rewardAmountForPartner({
-        partner_level: "founding",
-        partner_type: "marketing",
-      }),
+      rewardAmountForPartner({ partner_level: "founding", partner_type: "creator" }),
       150
     );
+    // Marketing follows level
     assert.equal(
-      rewardAmountForPartner({
-        partner_level: "standard",
-        partner_type: "creator",
-      }),
+      rewardAmountForPartner({ partner_level: "standard", partner_type: "marketing" }),
       100
+    );
+    assert.equal(
+      rewardAmountForPartner({ partner_level: "founding", partner_type: "marketing" }),
+      150
     );
   });
 
@@ -190,6 +198,33 @@ describe("dashboard and studio personalization", () => {
     assert.ok(ORGANIZATION_PARTNER_KIT.length >= 10);
     assert.ok(MARKETING_PARTNER_POLICY.mustNot.length >= 8);
     assert.match(MARKETING_PARTNER_POLICY.intro, /does not automatically cover advertising/i);
+  });
+});
+
+describe("apply page copy and security", () => {
+  it("does not include the removed password security helper sentence", async () => {
+    const apply = await readFile(
+      join(root, "src/app/partners/apply/page.tsx"),
+      "utf8"
+    );
+    assert.doesNotMatch(
+      apply,
+      /Passwords are stored securely by JobProof authentication/,
+      "security helper sentence must be removed from apply page"
+    );
+    // Password field and min-length hint must still be present
+    assert.match(apply, /PasswordField/);
+    assert.match(apply, /PARTNER_PASSWORD_MIN_LENGTH/);
+  });
+
+  it("org apply page contains $150 and not $100", async () => {
+    const orgApply = await readFile(
+      join(root, "src/app/partners/organizations/apply/page.tsx"),
+      "utf8"
+    );
+    assert.match(orgApply, /\$150 CAD/);
+    assert.doesNotMatch(orgApply, /\$100/);
+    assert.doesNotMatch(orgApply, /Founding.*\$150.*Standard.*\$100/);
   });
 });
 

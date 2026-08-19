@@ -24,6 +24,7 @@ import type {
 import {
   PARTNER_TYPES,
   filterRecordsByPartnerType,
+  isOrganizationPartnerType,
   partnerLevelLabel,
   rewardAmountForPartner,
 } from "@/lib/partners/constants";
@@ -377,15 +378,17 @@ export function AdminPartnersClient({
                   <td className="px-3 py-3">
                     <p className="font-medium text-zinc-900">{p.partner_category}</p>
                     <p className="text-xs text-zinc-500">{p.partner_type}</p>
-                    <div className="mt-1">
-                      {p.partner_level === "founding" ? (
-                        <FoundingPartnerBadge />
-                      ) : (
-                        <span className="text-xs text-zinc-600">
-                          {partnerLevelLabel(p.partner_level)}
-                        </span>
-                      )}
-                    </div>
+                    {!isOrganizationPartnerType(p.partner_type_value ?? p.partner_type) && (
+                      <div className="mt-1">
+                        {p.partner_level === "founding" ? (
+                          <FoundingPartnerBadge />
+                        ) : (
+                          <span className="text-xs text-zinc-600">
+                            {partnerLevelLabel(p.partner_level)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-3">
                     ${rewardAmountForPartner({
@@ -435,30 +438,34 @@ export function AdminPartnersClient({
                           Reactivate
                         </button>
                       )}
-                      <button
-                        type="button"
-                        disabled={pending}
-                        className="rounded border px-2 py-1 text-xs disabled:opacity-60"
-                        onClick={() =>
-                          run("set_founding", () =>
-                            adminChangePartnerLevel(p.id, "founding")
-                          )
-                        }
-                      >
-                        Set founding
-                      </button>
-                      <button
-                        type="button"
-                        disabled={pending}
-                        className="rounded border px-2 py-1 text-xs disabled:opacity-60"
-                        onClick={() =>
-                          run("set_standard", () =>
-                            adminChangePartnerLevel(p.id, "standard")
-                          )
-                        }
-                      >
-                        Set standard
-                      </button>
+                      {!isOrganizationPartnerType(p.partner_type_value ?? p.partner_type) && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            className="rounded border px-2 py-1 text-xs disabled:opacity-60"
+                            onClick={() =>
+                              run("set_founding", () =>
+                                adminChangePartnerLevel(p.id, "founding")
+                              )
+                            }
+                          >
+                            Set founding
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            className="rounded border px-2 py-1 text-xs disabled:opacity-60"
+                            onClick={() =>
+                              run("set_standard", () =>
+                                adminChangePartnerLevel(p.id, "standard")
+                              )
+                            }
+                          >
+                            Set standard
+                          </button>
+                        </>
+                      )}
                       <label className="sr-only" htmlFor={`partner-type-${p.id}`}>
                         Change partner type
                       </label>

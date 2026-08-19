@@ -13,7 +13,6 @@ import {
   ORGANIZATION_PARTNERS_HERO,
   ORGANIZATION_PARTNERS_META,
   ORGANIZATION_PROMOTE_WAYS,
-  ORGANIZATION_SUCCESS_EXAMPLES,
   ORGANIZATION_WHY_CARDS,
 } from "@/lib/partners/content/organizations";
 
@@ -87,12 +86,6 @@ export default function OrganizationPartnersPage() {
                 className="inline-flex rounded-xl bg-[#2436BB] px-6 py-3.5 text-base font-semibold text-white hover:bg-[#1c2a96]"
               >
                 {hero.primaryCta.label}
-              </Link>
-              <Link
-                href={hero.secondaryCta.href}
-                className="inline-flex rounded-xl border border-zinc-300 bg-white px-6 py-3.5 text-base font-semibold text-zinc-900 hover:bg-zinc-50"
-              >
-                {hero.secondaryCta.label}
               </Link>
             </div>
           </div>
@@ -297,37 +290,6 @@ export default function OrganizationPartnersPage() {
           </div>
         </section>
 
-        {/* Success examples */}
-        <section className="border-b border-zinc-200 px-6 py-14 sm:px-8">
-          <div className="mx-auto max-w-3xl">
-            <h2 className="text-2xl font-bold text-zinc-950 sm:text-3xl">
-              Success examples
-            </h2>
-            <p className="mt-2 text-sm font-medium uppercase tracking-wide text-zinc-500">
-              Illustrative examples.
-            </p>
-            <p className="mt-2 text-sm text-zinc-600">
-              These scenarios show common ways organizations introduce JobProof.
-              They are not testimonials.
-            </p>
-            <div className="mt-8 space-y-4">
-              {ORGANIZATION_SUCCESS_EXAMPLES.map((example) => (
-                <article
-                  key={example.title}
-                  className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
-                >
-                  <h3 className="text-base font-semibold text-zinc-900">
-                    {example.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-                    {example.body}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* FAQ */}
         <section className="border-b border-zinc-200 bg-zinc-50 px-6 py-14 sm:px-8">
           <div className="mx-auto max-w-3xl">
@@ -359,12 +321,6 @@ export default function OrganizationPartnersPage() {
                 className="inline-flex rounded-xl bg-white px-6 py-3.5 text-base font-semibold text-zinc-950 hover:bg-zinc-100"
               >
                 {ORGANIZATION_FINAL_CTA.primaryCta.label}
-              </Link>
-              <Link
-                href={ORGANIZATION_FINAL_CTA.secondaryCta.href}
-                className="inline-flex rounded-xl border border-zinc-600 px-6 py-3.5 text-base font-semibold text-white hover:bg-zinc-900"
-              >
-                {ORGANIZATION_FINAL_CTA.secondaryCta.label}
               </Link>
             </div>
           </div>

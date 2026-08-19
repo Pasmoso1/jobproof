@@ -627,7 +627,7 @@ export default function PartnerApplyPage() {
                       show={showPassword}
                       onToggleShow={() => setShowPassword((v) => !v)}
                       error={fieldErrors.password ?? passwordHint ?? undefined}
-                      hint={`At least ${PARTNER_PASSWORD_MIN_LENGTH} characters. Passwords are stored securely by JobProof authentication — never in your application record.`}
+                      hint={`At least ${PARTNER_PASSWORD_MIN_LENGTH} characters.`}
                       autoComplete="new-password"
                     />
                     <PasswordField

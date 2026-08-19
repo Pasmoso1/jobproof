@@ -26,21 +26,24 @@ import { generateStudioCopy } from "@/lib/partners/studio/copy";
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 describe("organization partner rewards", () => {
-  it("uses Founding/Standard amounts regardless of organization type", () => {
+  it("always returns $150 for organization partners regardless of level", () => {
     assert.equal(
       rewardAmountForPartner({
         partner_level: "standard",
         partner_type: ORGANIZATION_PARTNER_TYPE,
       }),
-      100
+      150,
+      "org standard should be 150"
     );
     assert.equal(
       rewardAmountForPartner({
         partner_level: "founding",
         partner_type: ORGANIZATION_PARTNER_TYPE,
       }),
-      150
+      150,
+      "org founding should be 150"
     );
+    // Creator/Marketing level amounts remain unchanged
     assert.equal(rewardAmountForLevel("standard"), 100);
     assert.equal(rewardAmountForLevel("founding"), 150);
     assert.equal(partnerCategoryLabel(ORGANIZATION_PARTNER_TYPE), "Organization");

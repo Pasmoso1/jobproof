@@ -52,13 +52,14 @@ export default async function PartnerDashboardPage() {
       <div>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold text-zinc-900">Dashboard</h1>
-          {partner.partner_level === "founding" ? <FoundingPartnerBadge /> : null}
+          {!isOrg && partner.partner_level === "founding" ? <FoundingPartnerBadge /> : null}
         </div>
         <p className="mt-2 text-base font-medium text-zinc-800">
           {typeMeta.dashboardIntro}
         </p>
         <p className="mt-1 text-sm text-zinc-600">
-          {typeMeta.shortLabel} · {partnerLevelLabel(partner.partner_level)} · $
+          {typeMeta.shortLabel}
+          {!isOrg ? ` · ${partnerLevelLabel(partner.partner_level)}` : null} · $
           {reward} CAD per qualified referral. A referral qualifies after 90
           consecutive days as a paying subscriber; rewards are reviewed and paid
           manually, with no recurring commissions.

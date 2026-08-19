@@ -30,7 +30,6 @@ export const ORGANIZATION_PARTNERS_HERO = {
     "Grow professionally",
   ],
   primaryCta: { label: "Become an Organization Partner", href: "/partners/organizations/apply" },
-  secondaryCta: { label: "Schedule a Demo", href: "/support/contact" },
 } as const;
 
 export const ORGANIZATION_WHY_CARDS = [
@@ -225,20 +224,6 @@ export const ORGANIZATION_MARKETING_SUPPORT = [
   },
 ] as const;
 
-export const ORGANIZATION_SUCCESS_EXAMPLES = [
-  {
-    title: "Local Chamber of Commerce",
-    body: "Promoted JobProof in their monthly newsletter and member resource page.",
-  },
-  {
-    title: "Provincial Trade Association",
-    body: "Shared JobProof during contractor education webinars.",
-  },
-  {
-    title: "Buying Group",
-    body: "Included JobProof in new member onboarding.",
-  },
-] as const;
 
 export const ORGANIZATION_FAQS = [
   {
@@ -254,7 +239,7 @@ export const ORGANIZATION_FAQS = [
   {
     question: "How much do Organization Partners earn?",
     answer:
-      "Organization Partners use the same Founding Partner and Standard Partner reward levels as the rest of the Partner Program. A referral qualifies after the existing qualification requirements are met. Payout timing and referral attribution follow the same Partner Program rules.",
+      "Approved Organization Partners earn $150 CAD for each qualified contractor referral. A referral qualifies after the existing qualification requirements are met. Payout timing and referral attribution follow the same Partner Program rules.",
   },
   {
     question: "How are referrals tracked?",
@@ -274,7 +259,7 @@ export const ORGANIZATION_FAQS = [
   {
     question: "Can we host webinars with JobProof?",
     answer:
-      "Yes. Many associations introduce JobProof through educational webinars, lunch-and-learns, and contractor training events. Reach out to schedule a demo or co-hosted session.",
+      "Yes. Many associations introduce JobProof through educational webinars, lunch-and-learns, and contractor training events. Contact JobProof support to discuss a co-hosted session.",
   },
   {
     question: "What support do we receive?",
@@ -286,7 +271,6 @@ export const ORGANIZATION_FAQS = [
 export const ORGANIZATION_FINAL_CTA = {
   headline: "Help your members build stronger businesses.",
   primaryCta: { label: "Apply Now", href: "/partners/organizations/apply" },
-  secondaryCta: { label: "Book a Demo", href: "/support/contact" },
 } as const;
 
 /** Short contextual callout used across Partner Portal surfaces. */

@@ -100,12 +100,6 @@ export default async function OrganizationLandingVariantPage({
               >
                 {shared.primaryCta.label}
               </Link>
-              <Link
-                href={shared.secondaryCta.href}
-                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
-              >
-                {shared.secondaryCta.label}
-              </Link>
             </div>
             <p className="mt-6 text-xs text-zinc-500">{variant.hero.photographyNote}</p>
           </div>
@@ -249,12 +243,6 @@ export default async function OrganizationLandingVariantPage({
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2436BB] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2a96]"
               >
                 {shared.finalCta.primaryCta.label}
-              </Link>
-              <Link
-                href={shared.finalCta.secondaryCta.href}
-                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
-              >
-                {shared.finalCta.secondaryCta.label}
               </Link>
             </div>
             <p className="mt-6 text-xs text-zinc-500">
