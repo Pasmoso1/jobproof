@@ -11,6 +11,10 @@ import {
   type PartnerTypeValue,
 } from "@/lib/partners/constants";
 import { CANADIAN_PROVINCES } from "@/lib/canada/provinces";
+import {
+  normalizeAdditionalProfileLinks,
+  normalizeCreatorProfileLink,
+} from "@/lib/partners/profile-links";
 
 export const CREATOR_PLATFORMS = [
   { value: "youtube", label: "YouTube" },
@@ -64,14 +68,21 @@ export function parsePartnerProfileDetails(
   }
 
   if (rawType === PARTNER_TYPE_CREATOR) {
+    const additionalRaw = blankToNull(
+      String(formData.get("additional_links") ?? "")
+    );
+    const additional = additionalRaw
+      ? normalizeAdditionalProfileLinks(additionalRaw)
+      : null;
     return {
       partnerType: PARTNER_TYPE_CREATOR,
       primaryPlatform: blankToNull(
         String(formData.get("primary_platform") ?? "")
       ) ?? undefined,
-      additionalLinks: blankToNull(
-        String(formData.get("additional_links") ?? "")
-      ) ?? undefined,
+      additionalLinks:
+        additional?.ok && additional.url
+          ? additional.url
+          : additionalRaw ?? undefined,
       primaryAudience: blankToNull(
         String(formData.get("primary_audience") ?? "")
       ) ?? undefined,
@@ -104,7 +115,19 @@ export function validateTypeSpecificApplicationFields(
     }
     const website = String(formData.get("website") ?? "").trim();
     if (!website) {
-      fieldErrors.website = "Add your profile or channel URL.";
+      fieldErrors.website = "Add your profile or channel.";
+    } else {
+      const normalized = normalizeCreatorProfileLink(platform, website);
+      if (!normalized.ok) {
+        fieldErrors.website = normalized.error;
+      }
+    }
+    const additional = String(formData.get("additional_links") ?? "").trim();
+    if (additional) {
+      const extra = normalizeAdditionalProfileLinks(additional);
+      if (!extra.ok) {
+        fieldErrors.additional_links = extra.error;
+      }
     }
     const province = String(formData.get("province") ?? "").trim();
     if (province && !CANADIAN_PROVINCES.includes(province as (typeof CANADIAN_PROVINCES)[number])) {
@@ -144,7 +167,14 @@ export function buildPromotionPlanFromProfile(formData: FormData): string {
     const platform =
       CREATOR_PLATFORMS.find((p) => p.value === platformValue)?.label ??
       platformValue;
-    const extra = String(formData.get("additional_links") ?? "").trim();
+    const extraRaw = String(formData.get("additional_links") ?? "").trim();
+    const extraNormalized = extraRaw
+      ? normalizeAdditionalProfileLinks(extraRaw)
+      : null;
+    const extra =
+      extraNormalized?.ok && extraNormalized.url
+        ? extraNormalized.url.replace(/\n/g, ", ")
+        : extraRaw;
     const audience = String(formData.get("primary_audience") ?? "").trim();
     const audienceLabel =
       CREATOR_AUDIENCE_FOCUS.find((a) => a.value === audience)?.label ?? audience;

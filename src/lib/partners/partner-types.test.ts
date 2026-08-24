@@ -246,6 +246,8 @@ describe("partner type migration and routes", () => {
     assert.match(apply, /PartnerTypeCards/);
     assert.match(apply, /primary_platform/);
     assert.match(apply, /promotion_method/);
+    assert.match(apply, /label="Profile or channel"/);
+    assert.match(apply, /CREATOR_PROFILE_FIELD_HINT/);
 
     const landing = await readFile(join(root, "src/app/partners/page.tsx"), "utf8");
     assert.match(landing, /Choose how you partner with JobProof/);

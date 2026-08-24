@@ -676,7 +676,7 @@ function ApplicationDetailPanel({
                   rel="noopener noreferrer"
                   className="break-all font-medium text-[#2436BB] hover:underline"
                 >
-                  {app.website}
+                  {site}
                 </a>
               ) : (
                 "Not provided."

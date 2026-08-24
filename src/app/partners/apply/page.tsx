@@ -17,6 +17,11 @@ import {
   MARKETING_PROMOTION_METHODS,
 } from "@/lib/partners/apply-profiles";
 import {
+  ADDITIONAL_PROFILE_LINKS_HINT,
+  CREATOR_PROFILE_FIELD_HINT,
+  creatorProfilePlaceholder,
+} from "@/lib/partners/profile-links";
+import {
   PARTNER_PASSWORD_MIN_LENGTH,
   looksLikeEmail,
   partnerPasswordStrengthHint,
@@ -71,6 +76,7 @@ export default function PartnerApplyPage() {
   >("idle");
   const [usernameHint, setUsernameHint] = useState<string | null>(null);
   const [partnerType, setPartnerType] = useState<PartnerTypeValue | "">("");
+  const [primaryPlatform, setPrimaryPlatform] = useState("");
   const [province, setProvince] = useState("");
   const [, startTransition] = useTransition();
 
@@ -400,6 +406,8 @@ export default function PartnerApplyPage() {
                       id="primary_platform"
                       name="primary_platform"
                       required
+                      value={primaryPlatform}
+                      onChange={(e) => setPrimaryPlatform(e.target.value)}
                       className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
                     >
                       <option value="">Select…</option>
@@ -416,17 +424,19 @@ export default function PartnerApplyPage() {
                     ) : null}
                   </div>
                   <Field
-                    label="Profile / channel URL"
+                    label="Profile or channel"
                     name="website"
-                    type="url"
                     required
-                    placeholder="https://"
+                    placeholder={creatorProfilePlaceholder(primaryPlatform)}
+                    hint={CREATOR_PROFILE_FIELD_HINT}
                     error={fieldErrors.website}
                   />
                   <Field
                     label="Additional platform links (optional)"
                     name="additional_links"
-                    placeholder="Other profiles, one per line or comma-separated"
+                    placeholder="instagram.com/example, youtube.com/@example"
+                    hint={ADDITIONAL_PROFILE_LINKS_HINT}
+                    error={fieldErrors.additional_links}
                   />
                   <Field
                     label="Approximate audience size"
@@ -769,6 +779,7 @@ function Field({
   type = "text",
   required,
   error,
+  hint,
   placeholder,
   defaultValue,
 }: {
@@ -777,6 +788,7 @@ function Field({
   type?: string;
   required?: boolean;
   error?: string;
+  hint?: string;
   placeholder?: string;
   defaultValue?: string;
 }) {
@@ -794,6 +806,7 @@ function Field({
         defaultValue={defaultValue}
         className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
       />
+      {hint && !error ? <p className="mt-1 text-xs text-zinc-500">{hint}</p> : null}
       {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
     </div>
   );

@@ -14,6 +14,10 @@ import {
   validateTypeSpecificApplicationFields,
   type PartnerProfileDetails,
 } from "@/lib/partners/apply-profiles";
+import {
+  normalizeCreatorProfileLink,
+  normalizeExternalHttpsUrl,
+} from "@/lib/partners/profile-links";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -94,7 +98,7 @@ export function parsePartnerApplicationFormData(
     contactName: String(formData.get("contact_name") ?? "").trim(),
     email: String(formData.get("email") ?? "").trim().toLowerCase(),
     phone: blankToNull(String(formData.get("phone") ?? "").trim()),
-    website: blankToNull(String(formData.get("website") ?? "").trim()),
+    website: normalizeParsedWebsite(formData),
     partnerType: String(formData.get("partner_type") ?? "").trim(),
     estimatedAudience: blankToNull(
       String(formData.get("estimated_audience") ?? "").trim()
@@ -597,4 +601,17 @@ export async function submitPartnerApplicationCore(input: {
 
 function blankToNull(value: string): string | null {
   return value ? value : null;
+}
+
+function normalizeParsedWebsite(formData: FormData): string | null {
+  const raw = blankToNull(String(formData.get("website") ?? "").trim());
+  if (!raw) return null;
+  const type = String(formData.get("partner_type") ?? "").trim();
+  if (type === "creator") {
+    const platform = String(formData.get("primary_platform") ?? "").trim();
+    const result = normalizeCreatorProfileLink(platform, raw);
+    return result.ok ? result.url : raw;
+  }
+  const generic = normalizeExternalHttpsUrl(raw);
+  return generic.ok ? generic.url : raw;
 }

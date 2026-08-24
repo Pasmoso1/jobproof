@@ -1,4 +1,5 @@
 import type { PartnerApplicationStatus } from "@/lib/partners/constants";
+import { normalizeExternalHttpsUrl } from "@/lib/partners/profile-links";
 
 export type AdminApplicationDetail = {
   id: string;
@@ -48,8 +49,10 @@ export function displayOptionalAdminValue(
 export function websiteHref(website: string | null | undefined): string | null {
   const trimmed = String(website ?? "").trim();
   if (!trimmed) return null;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  return `https://${trimmed}`;
+  const normalized = normalizeExternalHttpsUrl(trimmed);
+  if (normalized.ok) return normalized.url;
+  if (/^https:\/\//i.test(trimmed)) return trimmed;
+  return null;
 }
 
 export function hasValidAgreementAcceptance(app: {
