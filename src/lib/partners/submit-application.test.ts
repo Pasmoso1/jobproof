@@ -319,6 +319,42 @@ describe("submitPartnerApplicationCore", () => {
     assert.equal(auth.deletedUsers.length, 0);
   });
 
+  it("accepts signed-in existing users without a username/password field", async () => {
+    const client = createInsertClient();
+    const auth = authHooks();
+    let provisionCalled = false;
+    auth.hooks.provisionAuthUser = async () => {
+      provisionCalled = true;
+      return {
+        ok: false as const,
+        error: "should not provision",
+        code: "auth_failed" as const,
+      };
+    };
+
+    const result = await submitPartnerApplicationCore({
+      formData: validFormData({
+        username: "",
+        password: "",
+        confirm_password: "",
+      }),
+      insertClient: client,
+      authenticatedUser: {
+        id: "existing-user",
+        email: "jordan@example.com",
+        emailConfirmedAt: "2026-01-01T00:00:00.000Z",
+      },
+      ...auth.hooks,
+    });
+
+    assert.equal(result.success, true);
+    if (!result.success) return;
+    assert.equal(result.flow, "existing_account");
+    assert.equal(provisionCalled, false);
+    assert.equal(client.lastRow?.auth_user_id, "existing-user");
+    assert.equal(client.lastRow?.email, "jordan@example.com");
+  });
+
   it("rejects existing-account submissions that use a different application email", async () => {
     const client = createInsertClient();
     const auth = authHooks();

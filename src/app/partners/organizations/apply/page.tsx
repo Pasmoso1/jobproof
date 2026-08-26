@@ -2,7 +2,7 @@
 
 /* eslint-disable react-hooks/set-state-in-effect -- mirrors /partners/apply session + username availability bootstrap */
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
 import {
@@ -13,6 +13,15 @@ import {
   looksLikeEmail,
   partnerPasswordStrengthHint,
 } from "@/lib/partners/username";
+import {
+  clearPartnerApplicationDraft,
+  collectPartnerApplicationDraftFields,
+  loadPartnerApplicationDraft,
+  markPartnerApplicationDraftRestored,
+  ORGANIZATION_APPLY_LOGIN_NEXT,
+  partnerApplyLoginHref,
+  savePartnerApplicationDraft,
+} from "@/lib/partners/application-draft";
 import {
   checkPartnerUsernameAvailableAction,
   getPartnerApplySessionState,
@@ -43,6 +52,8 @@ type AuthUiState =
     };
 
 export default function OrganizationPartnerApplyPage() {
+  const formRef = useRef<HTMLFormElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +61,7 @@ export default function OrganizationPartnerApplyPage() {
   const [done, setDone] = useState(false);
   const [submittedFlow, setSubmittedFlow] =
     useState<PartnerApplyFlow>("new_account");
+  const [existingAccount, setExistingAccount] = useState(false);
   const [authUi, setAuthUi] = useState<AuthUiState>({ status: "loading" });
   const [loginIdentifier, setLoginIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -59,7 +71,52 @@ export default function OrganizationPartnerApplyPage() {
     "idle" | "checking" | "available" | "unavailable" | "email"
   >("idle");
   const [usernameHint, setUsernameHint] = useState<string | null>(null);
+  const [draftDefaults, setDraftDefaults] = useState<Record<string, string>>({});
+  const [draftReady, setDraftReady] = useState(false);
+  const [showRestoredBanner, setShowRestoredBanner] = useState(false);
+  const [formEpoch, setFormEpoch] = useState(0);
   const [, startTransition] = useTransition();
+
+  function persistDraft(pendingRestore = true) {
+    const form = formRef.current;
+    if (!form) return;
+    const fields = collectPartnerApplicationDraftFields(form, {
+      partner_type: "organization",
+    });
+    savePartnerApplicationDraft({
+      fields,
+      returnPath: ORGANIZATION_APPLY_LOGIN_NEXT,
+      pendingRestore,
+    });
+  }
+
+  function continueToSignIn() {
+    persistDraft(true);
+    window.location.assign(
+      partnerApplyLoginHref(ORGANIZATION_APPLY_LOGIN_NEXT)
+    );
+  }
+
+  function useDifferentEmail() {
+    setExistingAccount(false);
+    setError(null);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.email;
+      delete next.username;
+      delete next.password;
+      return next;
+    });
+    setDraftDefaults((prev) => {
+      const next = { ...prev };
+      delete next.email;
+      return next;
+    });
+    setFormEpoch((n) => n + 1);
+    window.setTimeout(() => {
+      emailInputRef.current?.focus();
+    }, 50);
+  }
 
   async function refreshAuthState() {
     setAuthUi({ status: "loading" });
@@ -85,6 +142,20 @@ export default function OrganizationPartnerApplyPage() {
   }, []);
 
   useEffect(() => {
+    const draft = loadPartnerApplicationDraft();
+    if (draft?.fields.partner_type === "organization") {
+      setDraftDefaults(draft.fields);
+      if (draft.fields.username) setLoginIdentifier(draft.fields.username);
+      if (draft.pendingRestore) {
+        setShowRestoredBanner(true);
+        markPartnerApplicationDraftRestored();
+      }
+    }
+    setDraftReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (authUi.status === "signed_in") return;
     const value = loginIdentifier.trim();
     if (!value) {
       setUsernameStatus("idle");
@@ -110,21 +181,34 @@ export default function OrganizationPartnerApplyPage() {
       });
     }, 400);
     return () => window.clearTimeout(handle);
-  }, [loginIdentifier, startTransition]);
+  }, [loginIdentifier, authUi.status, startTransition]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     setFieldErrors({});
+    setExistingAccount(false);
     const fd = new FormData(e.currentTarget);
+    if (authUi.status === "signed_in") {
+      fd.set("email", authUi.email);
+      fd.set("username", authUi.email);
+      fd.set("password", "");
+      fd.set("confirm_password", "");
+    }
     const result = await submitOrganizationApplication(fd);
     setLoading(false);
     if (!result.success) {
       setError(result.error);
       setFieldErrors(result.fieldErrors ?? {});
+      if (result.code === "existing_account") {
+        setExistingAccount(true);
+        persistDraft(true);
+      }
       return;
     }
+    clearPartnerApplicationDraft();
+    setShowRestoredBanner(false);
     setSubmittedFlow(result.flow);
     setDone(true);
   }
@@ -167,6 +251,14 @@ export default function OrganizationPartnerApplyPage() {
   const isGuest = authUi.status === "signed_out";
   const signedInEmail = authUi.status === "signed_in" ? authUi.email : "";
 
+  if (!draftReady) {
+    return (
+      <div className="min-h-screen bg-white px-6 py-12 text-sm text-zinc-600">
+        Loading application…
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white text-zinc-900">
       <header className="border-b border-zinc-200 px-6 py-4 sm:px-8">
@@ -205,10 +297,25 @@ export default function OrganizationPartnerApplyPage() {
           .
         </p>
 
+        {showRestoredBanner ? (
+          <div
+            className="mt-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900"
+            role="status"
+          >
+            Signed in successfully. Your Partner application has been restored.
+          </div>
+        ) : null}
+
         {authUi.status === "signed_in" ? (
-          <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
-            Signed in as <strong>{authUi.email}</strong>. Your application email is
-            locked to this account.{" "}
+          <div className="mt-6 rounded-xl border border-[#2436BB]/25 bg-[#2436BB]/5 px-4 py-4 text-sm text-zinc-900">
+            <p className="font-semibold text-zinc-950">
+              You are signed in as {authUi.email}.
+            </p>
+            <p className="mt-2 text-zinc-700">
+              Your existing JobProof account will be linked to your Partner
+              application. You’ll use the same sign-in details to access the
+              Partner Portal after approval.
+            </p>
             <button
               type="button"
               disabled={signingOut}
@@ -218,20 +325,55 @@ export default function OrganizationPartnerApplyPage() {
                 setSigningOut(false);
                 await refreshAuthState();
               }}
-              className="font-medium text-[#2436BB] hover:underline"
+              className="mt-3 text-sm font-semibold text-[#2436BB] hover:underline disabled:opacity-60"
             >
-              Sign out to use another email
+              {signingOut
+                ? "Signing out…"
+                : "Not you? Sign out and use another account."}
             </button>
           </div>
         ) : null}
 
-        <form onSubmit={onSubmit} className="mt-8 space-y-8" noValidate>
+        {existingAccount ? (
+          <div className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+            <p className="font-medium text-red-900">
+              You already have a JobProof account. Sign in to continue your
+              Partner application.
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={continueToSignIn}
+                className="inline-flex items-center justify-center rounded-xl bg-[#2436BB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2a96]"
+              >
+                Sign in and continue
+              </button>
+              <button
+                type="button"
+                onClick={useDifferentEmail}
+                className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+              >
+                Use a different email
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <form
+          key={formEpoch}
+          ref={formRef}
+          onSubmit={onSubmit}
+          className="mt-8 space-y-8"
+          noValidate
+        >
+          <input type="hidden" name="partner_type" value="organization" />
           <section className="space-y-4">
             <h2 className="text-lg font-semibold text-zinc-900">Organization</h2>
             <Field
               label="Organization name"
               name="organization_name"
               required
+              defaultValue={draftDefaults.organization_name}
               error={fieldErrors.organization_name}
             />
             <div>
@@ -242,7 +384,7 @@ export default function OrganizationPartnerApplyPage() {
                 name="organization_type"
                 required
                 className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm"
-                defaultValue=""
+                defaultValue={draftDefaults.organization_type ?? ""}
               >
                 <option value="" disabled>
                   Select type…
@@ -257,20 +399,29 @@ export default function OrganizationPartnerApplyPage() {
                 <p className="mt-1 text-sm text-red-600">{fieldErrors.organization_type}</p>
               ) : null}
             </div>
-            <Field label="Website" name="website" type="url" error={fieldErrors.website} />
+            <Field
+              label="Website"
+              name="website"
+              type="url"
+              defaultValue={draftDefaults.website}
+              error={fieldErrors.website}
+            />
             <Field
               label="Approximate number of members"
               name="member_count"
+              defaultValue={draftDefaults.member_count}
               error={fieldErrors.member_count}
             />
             <Field
               label="Primary industries represented"
               name="primary_industries"
+              defaultValue={draftDefaults.primary_industries}
               error={fieldErrors.primary_industries}
             />
             <Field
               label="Geographic coverage"
               name="geographic_coverage"
+              defaultValue={draftDefaults.geographic_coverage}
               error={fieldErrors.geographic_coverage}
             />
           </section>
@@ -281,26 +432,68 @@ export default function OrganizationPartnerApplyPage() {
               label="Primary contact name"
               name="contact_name"
               required
+              defaultValue={draftDefaults.contact_name}
               error={fieldErrors.contact_name}
             />
-            <Field label="Job title" name="job_title" error={fieldErrors.job_title} />
             <Field
-              label="Email"
-              name="email"
-              type="email"
-              required
-              error={fieldErrors.email}
-              defaultValue={signedInEmail}
-              readOnly={Boolean(signedInEmail)}
+              label="Job title"
+              name="job_title"
+              defaultValue={draftDefaults.job_title}
+              error={fieldErrors.job_title}
             />
-            <Field label="Phone" name="phone" error={fieldErrors.phone} />
+            {signedInEmail ? (
+              <Field
+                label="Email"
+                name="email"
+                type="email"
+                required
+                error={fieldErrors.email}
+                defaultValue={signedInEmail}
+                readOnly
+              />
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-zinc-800">
+                  Email <span className="text-red-600">*</span>
+                </label>
+                <input
+                  ref={emailInputRef}
+                  name="email"
+                  type="email"
+                  required
+                  defaultValue={draftDefaults.email}
+                  className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm"
+                />
+                {fieldErrors.email ? (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+                ) : null}
+              </div>
+            )}
+            <Field
+              label="Phone"
+              name="phone"
+              defaultValue={draftDefaults.phone}
+              error={fieldErrors.phone}
+            />
           </section>
 
           <section className="space-y-4">
             <h2 className="text-lg font-semibold text-zinc-900">Audience (optional)</h2>
-            <Field label="Newsletter size" name="newsletter_size" />
-            <Field label="Social media audience" name="social_audience" />
-            <Field label="Website traffic" name="website_traffic" />
+            <Field
+              label="Newsletter size"
+              name="newsletter_size"
+              defaultValue={draftDefaults.newsletter_size}
+            />
+            <Field
+              label="Social media audience"
+              name="social_audience"
+              defaultValue={draftDefaults.social_audience}
+            />
+            <Field
+              label="Website traffic"
+              name="website_traffic"
+              defaultValue={draftDefaults.website_traffic}
+            />
           </section>
 
           <section className="space-y-3">
@@ -316,7 +509,12 @@ export default function OrganizationPartnerApplyPage() {
                   key={c.value}
                   className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 >
-                  <input type="checkbox" name={`channel_${c.value}`} className="rounded" />
+                  <input
+                    type="checkbox"
+                    name={`channel_${c.value}`}
+                    className="rounded"
+                    defaultChecked={draftDefaults[`channel_${c.value}`] === "on"}
+                  />
                   {c.label}
                 </label>
               ))}
@@ -331,7 +529,12 @@ export default function OrganizationPartnerApplyPage() {
                   key={c.value}
                   className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 >
-                  <input type="checkbox" name={`interest_${c.value}`} className="rounded" />
+                  <input
+                    type="checkbox"
+                    name={`interest_${c.value}`}
+                    className="rounded"
+                    defaultChecked={draftDefaults[`interest_${c.value}`] === "on"}
+                  />
                   {c.label}
                 </label>
               ))}
@@ -343,6 +546,7 @@ export default function OrganizationPartnerApplyPage() {
             <textarea
               name="additional_comments"
               rows={4}
+              defaultValue={draftDefaults.additional_comments}
               className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm"
               placeholder="Anything else we should know?"
             />
@@ -423,7 +627,11 @@ export default function OrganizationPartnerApplyPage() {
               </label>
             </section>
           ) : (
-            <input type="hidden" name="username" value={signedInEmail} />
+            <>
+              <input type="hidden" name="username" value={signedInEmail} />
+              <input type="hidden" name="password" value="" />
+              <input type="hidden" name="confirm_password" value="" />
+            </>
           )}
 
           <label className="flex items-start gap-2 text-sm text-zinc-700">
@@ -459,7 +667,7 @@ export default function OrganizationPartnerApplyPage() {
             aria-hidden
           />
 
-          {error ? (
+          {error && !existingAccount ? (
             <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
               {error}
             </p>

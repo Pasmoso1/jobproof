@@ -90,9 +90,15 @@ describe("partner username auth security invariants", () => {
     assert.match(source, /Confirm Password/);
     assert.match(source, /Checking account/);
     assert.match(source, /You are signed in as/);
-    assert.match(source, /Your existing JobProof password will be used/);
-    assert.match(source, /You do not need to create a/);
-    assert.match(source, /Not you\? Sign out and apply with another account/);
+    assert.match(
+      source,
+      /Your existing JobProof account will be linked to your[\s\S]*Partner application/
+    );
+    assert.match(source, /Not you\? Sign out and use another account/);
+    assert.match(source, /Sign in and continue/);
+    assert.match(source, /Use a different email/);
+    assert.match(source, /savePartnerApplicationDraft/);
+    assert.match(source, /type="hidden" name="username"/);
     assert.match(source, /getPartnerApplySessionState/);
     assert.match(source, /signOutFromPartnerApply/);
     assert.match(source, /authUi\.status === "loading"/);

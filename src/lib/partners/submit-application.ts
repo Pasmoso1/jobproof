@@ -379,7 +379,8 @@ export async function submitPartnerApplicationCore(input: {
     logger: input.logger,
   });
 
-  // Existing-account: lock email to the trusted Auth email.
+  // Existing-account: lock email to the trusted Auth email and reuse it as
+  // the login identifier so applicants do not re-enter username/email.
   if (flow === "existing_account" && session) {
     const trustedEmail = session.email.trim().toLowerCase();
     if (parsed.email && parsed.email !== trustedEmail) {
@@ -395,6 +396,9 @@ export async function submitPartnerApplicationCore(input: {
       };
     }
     parsed.email = trustedEmail;
+    if (!parsed.username.trim()) {
+      parsed.username = trustedEmail;
+    }
   }
 
   const requirePassword = flow === "new_account";

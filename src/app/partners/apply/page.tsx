@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { JobProofLogo } from "@/components/jobproof-logo";
@@ -26,6 +26,15 @@ import {
   looksLikeEmail,
   partnerPasswordStrengthHint,
 } from "@/lib/partners/username";
+import {
+  clearPartnerApplicationDraft,
+  collectPartnerApplicationDraftFields,
+  loadPartnerApplicationDraft,
+  markPartnerApplicationDraftRestored,
+  PARTNER_APPLY_LOGIN_NEXT,
+  partnerApplyLoginHref,
+  savePartnerApplicationDraft,
+} from "@/lib/partners/application-draft";
 import {
   checkPartnerUsernameAvailableAction,
   getPartnerApplySessionState,
@@ -57,6 +66,8 @@ type AuthUiState =
 
 export default function PartnerApplyPage() {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +89,56 @@ export default function PartnerApplyPage() {
   const [partnerType, setPartnerType] = useState<PartnerTypeValue | "">("");
   const [primaryPlatform, setPrimaryPlatform] = useState("");
   const [province, setProvince] = useState("");
+  const [draftDefaults, setDraftDefaults] = useState<Record<string, string>>({});
+  const [draftReady, setDraftReady] = useState(false);
+  const [showRestoredBanner, setShowRestoredBanner] = useState(false);
+  const [formEpoch, setFormEpoch] = useState(0);
   const [, startTransition] = useTransition();
+
+  function persistDraft(pendingRestore = true) {
+    const form = formRef.current;
+    if (!form) return;
+    const fields = collectPartnerApplicationDraftFields(form, {
+      partner_type: partnerType || undefined,
+      primary_platform: primaryPlatform || undefined,
+      province: province || undefined,
+    });
+    savePartnerApplicationDraft({
+      fields,
+      returnPath: PARTNER_APPLY_LOGIN_NEXT,
+      pendingRestore,
+    });
+  }
+
+  function continueToSignIn() {
+    persistDraft(true);
+    window.location.assign(partnerApplyLoginHref(PARTNER_APPLY_LOGIN_NEXT));
+  }
+
+  function useDifferentEmail() {
+    setExistingAccount(false);
+    setError(null);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.email;
+      delete next.username;
+      delete next.password;
+      return next;
+    });
+    setDraftDefaults((prev) => {
+      const next = { ...prev };
+      delete next.email;
+      return next;
+    });
+    setFormEpoch((n) => n + 1);
+    window.setTimeout(() => {
+      emailInputRef.current?.focus();
+      emailInputRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 50);
+  }
 
   async function refreshAuthState() {
     setAuthUi({ status: "loading" });
@@ -111,12 +171,48 @@ export default function PartnerApplyPage() {
       router.replace("/partners/organizations/apply");
       return;
     }
-    if (requested === "creator" || requested === "marketing") {
+
+    const draft = loadPartnerApplicationDraft();
+    const draftType = draft?.fields.partner_type;
+    const isCreatorOrMarketing =
+      draftType === "creator" || draftType === "marketing";
+
+    if (draft && isCreatorOrMarketing) {
+      setDraftDefaults(draft.fields);
+      setPartnerType(draftType);
+      if (draft.fields.primary_platform) {
+        setPrimaryPlatform(draft.fields.primary_platform);
+      }
+      if (draft.fields.province) {
+        setProvince(draft.fields.province);
+      }
+      if (draft.fields.username) {
+        setLoginIdentifier(draft.fields.username);
+      }
+      if (draft.pendingRestore) {
+        setShowRestoredBanner(true);
+        markPartnerApplicationDraftRestored();
+      }
+    } else if (requested === "creator" || requested === "marketing") {
       setPartnerType(requested);
     }
+
+    setDraftReady(true);
   }, [router]);
 
   useEffect(() => {
+    if (!showRestoredBanner || !draftReady) return;
+    const handle = window.setTimeout(() => {
+      const incomplete = formRef.current?.querySelector(
+        "input:not([type=hidden]):not([readonly]):invalid, select:invalid, textarea:invalid"
+      ) as HTMLElement | null;
+      incomplete?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+    return () => window.clearTimeout(handle);
+  }, [showRestoredBanner, draftReady, formEpoch]);
+
+  useEffect(() => {
+    if (authUi.status === "signed_in") return;
     const value = loginIdentifier.trim();
     if (!value) {
       setUsernameStatus("idle");
@@ -126,9 +222,7 @@ export default function PartnerApplyPage() {
     if (looksLikeEmail(value)) {
       setUsernameStatus("email");
       setUsernameHint(
-        authUi.status === "signed_in"
-          ? "You’ll use email sign-in with your existing JobProof account to check status."
-          : "You’ll use this email to sign in and check status (must match the application email)."
+        "You’ll use this email to sign in and check status (must match the application email)."
       );
       return;
     }
@@ -166,6 +260,7 @@ export default function PartnerApplyPage() {
       await signOutFromPartnerApply();
       setPassword("");
       setConfirmPassword("");
+      setLoginIdentifier("");
       setAuthUi({ status: "signed_out", flow: "new_account" });
       router.replace("/partners/apply");
       router.refresh();
@@ -189,9 +284,10 @@ export default function PartnerApplyPage() {
     setExistingAccount(false);
     try {
       const fd = new FormData(e.currentTarget);
-      // Existing-account: force trusted email into the payload.
+      // Existing-account: force trusted email + login identifier into the payload.
       if (authUi.status === "signed_in") {
         fd.set("email", authUi.email);
+        fd.set("username", authUi.email);
         fd.set("password", "");
         fd.set("confirm_password", "");
       }
@@ -203,9 +299,14 @@ export default function PartnerApplyPage() {
       if (!result.success) {
         setError(result.error);
         if (result.fieldErrors) setFieldErrors(result.fieldErrors);
-        if (result.code === "existing_account") setExistingAccount(true);
+        if (result.code === "existing_account") {
+          setExistingAccount(true);
+          persistDraft(true);
+        }
         return;
       }
+      clearPartnerApplicationDraft();
+      setShowRestoredBanner(false);
       setSubmittedFlow(result.flow);
       setDone(true);
       // Refresh auth so the status CTA can route signed-in users directly.
@@ -238,7 +339,10 @@ export default function PartnerApplyPage() {
           <Link href="/partners">
             <JobProofLogo />
           </Link>
-          <Link href="/partners" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
+          <Link
+            href="/partners"
+            className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
+          >
             ← Partner program
           </Link>
         </div>
@@ -275,26 +379,56 @@ export default function PartnerApplyPage() {
               </Link>
             </div>
           </div>
+        ) : !draftReady ? (
+          <div className="mt-8 rounded-xl border border-zinc-200 bg-white p-6 text-sm text-zinc-600 shadow-sm">
+            Loading application…
+          </div>
         ) : (
           <form
+            key={formEpoch}
+            ref={formRef}
             onSubmit={onSubmit}
             className="mt-8 space-y-5 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm"
             aria-busy={authLoading}
           >
-            {error ? (
+            {showRestoredBanner ? (
+              <div
+                className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900"
+                role="status"
+              >
+                Signed in successfully. Your Partner application has been
+                restored.
+              </div>
+            ) : null}
+
+            {error || existingAccount ? (
               <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
                 {existingAccount ? (
-                  <p className="mt-2">
-                    <Link
-                      href={`/login?next=${encodeURIComponent("/partners/apply")}`}
-                      className="font-medium underline"
-                    >
-                      Sign in with your existing JobProof account
-                    </Link>{" "}
-                    , then return here to finish your partner application.
-                  </p>
-                ) : null}
+                  <>
+                    <p className="font-medium text-red-900">
+                      You already have a JobProof account. Sign in to continue
+                      your Partner application.
+                    </p>
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      <button
+                        type="button"
+                        onClick={continueToSignIn}
+                        className="inline-flex items-center justify-center rounded-xl bg-[#2436BB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2a96]"
+                      >
+                        Sign in and continue
+                      </button>
+                      <button
+                        type="button"
+                        onClick={useDifferentEmail}
+                        className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+                      >
+                        Use a different email
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p>{error}</p>
+                )}
               </div>
             ) : null}
 
@@ -322,11 +456,15 @@ export default function PartnerApplyPage() {
               />
             </div>
 
-            <fieldset disabled={formDisabled} className="space-y-5 disabled:opacity-70">
+            <fieldset
+              disabled={formDisabled}
+              className="space-y-5 disabled:opacity-70"
+            >
               <PartnerTypeCards
                 value={partnerType}
                 onChange={(next) => {
                   if (next === "organization") {
+                    persistDraft(false);
                     router.push("/partners/organizations/apply");
                     return;
                   }
@@ -337,369 +475,424 @@ export default function PartnerApplyPage() {
 
               {partnerType ? (
                 <>
-              <Field
-                label={
-                  partnerType === "marketing"
-                    ? "Individual or business name"
-                    : partnerType === "creator"
-                      ? "Name or channel name"
-                      : "Organization name"
-                }
-                name="organization_name"
-                required
-                error={fieldErrors.organization_name}
-              />
-              <Field
-                label="Contact name"
-                name="contact_name"
-                required
-                error={fieldErrors.contact_name}
-              />
-
-              {isExistingAccount ? (
-                <div>
-                  <label
-                    htmlFor="email"
-                    className="block text-sm font-medium text-zinc-700"
-                  >
-                    Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    required
-                    readOnly
-                    value={authUi.email}
-                    className="mt-1 block w-full rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-zinc-900"
-                  />
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Locked to your signed-in JobProof account. This application will
-                    be linked to that account.
-                  </p>
-                  {fieldErrors.email ? (
-                    <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
-                  ) : null}
-                </div>
-              ) : (
-                <Field
-                  label="Email"
-                  name="email"
-                  type="email"
-                  required
-                  error={fieldErrors.email}
-                />
-              )}
-
-              <Field label="Phone" name="phone" type="tel" error={fieldErrors.phone} />
-
-              {partnerType === "creator" ? (
-                <>
-                  <div>
-                    <label
-                      htmlFor="primary_platform"
-                      className="block text-sm font-medium text-zinc-700"
-                    >
-                      Primary platform <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="primary_platform"
-                      name="primary_platform"
-                      required
-                      value={primaryPlatform}
-                      onChange={(e) => setPrimaryPlatform(e.target.value)}
-                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-                    >
-                      <option value="">Select…</option>
-                      {CREATOR_PLATFORMS.map((p) => (
-                        <option key={p.value} value={p.value}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.primary_platform ? (
-                      <p className="mt-1 text-sm text-red-600">
-                        {fieldErrors.primary_platform}
-                      </p>
-                    ) : null}
-                  </div>
                   <Field
-                    label="Profile or channel"
-                    name="website"
+                    label={
+                      partnerType === "marketing"
+                        ? "Individual or business name"
+                        : partnerType === "creator"
+                          ? "Name or channel name"
+                          : "Organization name"
+                    }
+                    name="organization_name"
                     required
-                    placeholder={creatorProfilePlaceholder(primaryPlatform)}
-                    hint={CREATOR_PROFILE_FIELD_HINT}
-                    error={fieldErrors.website}
+                    defaultValue={draftDefaults.organization_name}
+                    error={fieldErrors.organization_name}
                   />
                   <Field
-                    label="Additional platform links (optional)"
-                    name="additional_links"
-                    placeholder="instagram.com/example, youtube.com/@example"
-                    hint={ADDITIONAL_PROFILE_LINKS_HINT}
-                    error={fieldErrors.additional_links}
-                  />
-                  <Field
-                    label="Approximate audience size"
-                    name="estimated_audience"
+                    label="Contact name"
+                    name="contact_name"
                     required
-                    placeholder="e.g. 12,000 followers"
-                    error={fieldErrors.estimated_audience}
+                    defaultValue={draftDefaults.contact_name}
+                    error={fieldErrors.contact_name}
                   />
-                  <div>
-                    <label
-                      htmlFor="primary_audience"
-                      className="block text-sm font-medium text-zinc-700"
-                    >
-                      Primary audience
-                    </label>
-                    <select
-                      id="primary_audience"
-                      name="primary_audience"
-                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-                    >
-                      <option value="">Select…</option>
-                      {CREATOR_AUDIENCE_FOCUS.map((p) => (
-                        <option key={p.value} value={p.value}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="province"
-                      className="block text-sm font-medium text-zinc-700"
-                    >
-                      Province / territory
-                    </label>
-                    <ProvinceSelect
-                      id="province"
-                      name="province"
-                      value={province}
-                      onChange={setProvince}
-                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-                    />
-                    {fieldErrors.province ? (
-                      <p className="mt-1 text-sm text-red-600">
-                        {fieldErrors.province}
-                      </p>
-                    ) : null}
-                  </div>
-                  <TextArea
-                    label="Short description of your content"
-                    name="reason"
-                    required
-                    error={fieldErrors.reason}
-                  />
-                </>
-              ) : null}
 
-              {partnerType === "marketing" ? (
-                <>
-                  <Field
-                    label="Website, LinkedIn, or primary business URL"
-                    name="website"
-                    type="url"
-                    placeholder="https://"
-                    error={fieldErrors.website}
-                  />
-                  <div>
-                    <label
-                      htmlFor="promotion_method"
-                      className="block text-sm font-medium text-zinc-700"
-                    >
-                      Primary promotion method{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="promotion_method"
-                      name="promotion_method"
-                      required
-                      className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-                    >
-                      <option value="">Select…</option>
-                      {MARKETING_PROMOTION_METHODS.map((m) => (
-                        <option key={m.value} value={m.value}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.promotion_method ? (
-                      <p className="mt-1 text-sm text-red-600">
-                        {fieldErrors.promotion_method}
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-xs text-zinc-500">
-                      You do not need an existing audience. Performance marketing
-                      and paid channels are welcome.
-                    </p>
-                  </div>
-                  <TextArea
-                    label="Tell us briefly how you expect to introduce JobProof to contractors."
-                    name="reason"
-                    required
-                    error={fieldErrors.reason}
-                  />
-                </>
-              ) : null}
-
-              {partnerType ? (
-                <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-                  {PARTNER_TYPES.find((t) => t.value === partnerType)?.description}
-                </p>
-              ) : null}
-
-              <div className="space-y-4 border-t border-zinc-200 pt-5">
-                <div>
-                  <h2 className="text-base font-semibold text-zinc-900">Account</h2>
                   {isExistingAccount ? (
-                    <div className="mt-3 rounded-xl border border-[#2436BB]/25 bg-[#2436BB]/5 px-4 py-4 text-sm text-zinc-900">
-                      <p className="font-semibold text-zinc-950">
-                        You are signed in as {authUi.email}.
-                      </p>
-                      <p className="mt-2 text-zinc-700">
-                        Your existing JobProof password will be used for Partner
-                        Portal access after approval. You do not need to create a
-                        new password.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={onSignOut}
-                        disabled={signingOut}
-                        className="mt-3 text-sm font-semibold text-[#2436BB] hover:underline disabled:opacity-60"
+                    <div>
+                      <label
+                        htmlFor="email"
+                        className="block text-sm font-medium text-zinc-700"
                       >
-                        {signingOut
-                          ? "Signing out…"
-                          : "Not you? Sign out and apply with another account."}
-                      </button>
+                        Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        required
+                        readOnly
+                        value={authUi.email}
+                        className="mt-1 block w-full rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-zinc-900"
+                      />
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Locked to your signed-in JobProof account. This
+                        application will be linked to that account.
+                      </p>
+                      {fieldErrors.email ? (
+                        <p className="mt-1 text-sm text-red-600">
+                          {fieldErrors.email}
+                        </p>
+                      ) : null}
                     </div>
                   ) : (
-                    <>
-                      <p className="mt-1 text-sm text-zinc-600">
-                        Choose how you&apos;d like to sign in after your application
-                        is approved.
-                      </p>
-                      <p className="mt-2 text-sm text-zinc-600">
-                        You may use your email address or choose a unique username
-                        (4–30 characters using letters, numbers, underscores, or
-                        periods).
-                      </p>
-                      <p className="mt-2 text-sm text-zinc-600">
-                        Create a password that you&apos;ll use to access your Partner
-                        Portal after approval.
-                      </p>
-                    </>
+                    <div>
+                      <label
+                        htmlFor="email"
+                        className="block text-sm font-medium text-zinc-700"
+                      >
+                        Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        ref={emailInputRef}
+                        id="email"
+                        name="email"
+                        type="email"
+                        required
+                        defaultValue={draftDefaults.email}
+                        className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                      />
+                      {fieldErrors.email ? (
+                        <p className="mt-1 text-sm text-red-600">
+                          {fieldErrors.email}
+                        </p>
+                      ) : null}
+                    </div>
                   )}
-                </div>
 
-                <div>
-                  <label
-                    htmlFor="username"
-                    className="block text-sm font-medium text-zinc-700"
-                  >
-                    Username or Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="username"
-                    name="username"
-                    required
-                    autoComplete="username"
-                    value={loginIdentifier}
-                    onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="username or you@example.com"
-                    className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                  <Field
+                    label="Phone"
+                    name="phone"
+                    type="tel"
+                    defaultValue={draftDefaults.phone}
+                    error={fieldErrors.phone}
                   />
-                  {fieldErrors.username ? (
-                    <p className="mt-1 text-sm text-red-600">{fieldErrors.username}</p>
-                  ) : usernameHint ? (
-                    <p
-                      className={`mt-1 text-sm ${
-                        usernameStatus === "available" || usernameStatus === "email"
-                          ? "text-green-700"
-                          : usernameStatus === "unavailable"
-                            ? "text-red-600"
-                            : "text-zinc-500"
-                      }`}
-                    >
-                      {usernameStatus === "checking" ? "Checking…" : usernameHint}
+
+                  {partnerType === "creator" ? (
+                    <>
+                      <div>
+                        <label
+                          htmlFor="primary_platform"
+                          className="block text-sm font-medium text-zinc-700"
+                        >
+                          Primary platform{" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          id="primary_platform"
+                          name="primary_platform"
+                          required
+                          value={primaryPlatform}
+                          onChange={(e) => setPrimaryPlatform(e.target.value)}
+                          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                        >
+                          <option value="">Select…</option>
+                          {CREATOR_PLATFORMS.map((p) => (
+                            <option key={p.value} value={p.value}>
+                              {p.label}
+                            </option>
+                          ))}
+                        </select>
+                        {fieldErrors.primary_platform ? (
+                          <p className="mt-1 text-sm text-red-600">
+                            {fieldErrors.primary_platform}
+                          </p>
+                        ) : null}
+                      </div>
+                      <Field
+                        label="Profile or channel"
+                        name="website"
+                        required
+                        placeholder={creatorProfilePlaceholder(primaryPlatform)}
+                        hint={CREATOR_PROFILE_FIELD_HINT}
+                        defaultValue={draftDefaults.website}
+                        error={fieldErrors.website}
+                      />
+                      <Field
+                        label="Additional platform links (optional)"
+                        name="additional_links"
+                        placeholder="instagram.com/example, youtube.com/@example"
+                        hint={ADDITIONAL_PROFILE_LINKS_HINT}
+                        defaultValue={draftDefaults.additional_links}
+                        error={fieldErrors.additional_links}
+                      />
+                      <Field
+                        label="Approximate audience size"
+                        name="estimated_audience"
+                        required
+                        placeholder="e.g. 12,000 followers"
+                        defaultValue={draftDefaults.estimated_audience}
+                        error={fieldErrors.estimated_audience}
+                      />
+                      <div>
+                        <label
+                          htmlFor="primary_audience"
+                          className="block text-sm font-medium text-zinc-700"
+                        >
+                          Primary audience
+                        </label>
+                        <select
+                          id="primary_audience"
+                          name="primary_audience"
+                          defaultValue={draftDefaults.primary_audience ?? ""}
+                          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                        >
+                          <option value="">Select…</option>
+                          {CREATOR_AUDIENCE_FOCUS.map((p) => (
+                            <option key={p.value} value={p.value}>
+                              {p.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="province"
+                          className="block text-sm font-medium text-zinc-700"
+                        >
+                          Province / territory
+                        </label>
+                        <ProvinceSelect
+                          id="province"
+                          name="province"
+                          value={province}
+                          onChange={setProvince}
+                          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                        />
+                        {fieldErrors.province ? (
+                          <p className="mt-1 text-sm text-red-600">
+                            {fieldErrors.province}
+                          </p>
+                        ) : null}
+                      </div>
+                      <TextArea
+                        label="Short description of your content"
+                        name="reason"
+                        required
+                        defaultValue={draftDefaults.reason}
+                        error={fieldErrors.reason}
+                      />
+                    </>
+                  ) : null}
+
+                  {partnerType === "marketing" ? (
+                    <>
+                      <Field
+                        label="Website, LinkedIn, or primary business URL"
+                        name="website"
+                        type="url"
+                        placeholder="https://"
+                        defaultValue={draftDefaults.website}
+                        error={fieldErrors.website}
+                      />
+                      <div>
+                        <label
+                          htmlFor="promotion_method"
+                          className="block text-sm font-medium text-zinc-700"
+                        >
+                          Primary promotion method{" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          id="promotion_method"
+                          name="promotion_method"
+                          required
+                          defaultValue={draftDefaults.promotion_method ?? ""}
+                          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                        >
+                          <option value="">Select…</option>
+                          {MARKETING_PROMOTION_METHODS.map((m) => (
+                            <option key={m.value} value={m.value}>
+                              {m.label}
+                            </option>
+                          ))}
+                        </select>
+                        {fieldErrors.promotion_method ? (
+                          <p className="mt-1 text-sm text-red-600">
+                            {fieldErrors.promotion_method}
+                          </p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-zinc-500">
+                          You do not need an existing audience. Performance
+                          marketing and paid channels are welcome.
+                        </p>
+                      </div>
+                      <TextArea
+                        label="Tell us briefly how you expect to introduce JobProof to contractors."
+                        name="reason"
+                        required
+                        defaultValue={draftDefaults.reason}
+                        error={fieldErrors.reason}
+                      />
+                    </>
+                  ) : null}
+
+                  {partnerType ? (
+                    <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+                      {
+                        PARTNER_TYPES.find((t) => t.value === partnerType)
+                          ?.description
+                      }
                     </p>
                   ) : null}
-                </div>
 
-                {passwordRequired ? (
-                  <>
-                    <PasswordField
-                      id="password"
-                      name="password"
-                      label="Password"
-                      value={password}
-                      onChange={setPassword}
-                      show={showPassword}
-                      onToggleShow={() => setShowPassword((v) => !v)}
-                      error={fieldErrors.password ?? passwordHint ?? undefined}
-                      hint={`At least ${PARTNER_PASSWORD_MIN_LENGTH} characters.`}
-                      autoComplete="new-password"
-                    />
-                    <PasswordField
-                      id="confirm_password"
-                      name="confirm_password"
-                      label="Confirm Password"
-                      value={confirmPassword}
-                      onChange={setConfirmPassword}
-                      show={showConfirmPassword}
-                      onToggleShow={() => setShowConfirmPassword((v) => !v)}
-                      error={
-                        fieldErrors.confirm_password ?? confirmMismatch ?? undefined
-                      }
-                      autoComplete="new-password"
-                    />
-                  </>
-                ) : isExistingAccount ? (
-                  <>
-                    <input type="hidden" name="password" value="" />
-                    <input type="hidden" name="confirm_password" value="" />
-                  </>
-                ) : null}
-              </div>
+                  <div className="space-y-4 border-t border-zinc-200 pt-5">
+                    <div>
+                      <h2 className="text-base font-semibold text-zinc-900">
+                        Account
+                      </h2>
+                      {isExistingAccount ? (
+                        <div className="mt-3 rounded-xl border border-[#2436BB]/25 bg-[#2436BB]/5 px-4 py-4 text-sm text-zinc-900">
+                          <p className="font-semibold text-zinc-950">
+                            You are signed in as {authUi.email}.
+                          </p>
+                          <p className="mt-2 text-zinc-700">
+                            Your existing JobProof account will be linked to your
+                            Partner application. You’ll use the same sign-in
+                            details to access the Partner Portal after approval.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={onSignOut}
+                            disabled={signingOut}
+                            className="mt-3 text-sm font-semibold text-[#2436BB] hover:underline disabled:opacity-60"
+                          >
+                            {signingOut
+                              ? "Signing out…"
+                              : "Not you? Sign out and use another account."}
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="mt-1 text-sm text-zinc-600">
+                            Choose how you&apos;d like to sign in after your
+                            application is approved.
+                          </p>
+                          <p className="mt-2 text-sm text-zinc-600">
+                            You may use your email address or choose a unique
+                            username (4–30 characters using letters, numbers,
+                            underscores, or periods).
+                          </p>
+                          <p className="mt-2 text-sm text-zinc-600">
+                            Create a password that you&apos;ll use to access your
+                            Partner Portal after approval.
+                          </p>
+                        </>
+                      )}
+                    </div>
 
-              <div>
-                <label className="flex items-start gap-3 text-sm text-zinc-700">
-                  <input
-                    type="checkbox"
-                    name="agreement_accepted"
-                    required
-                    className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-[#2436BB] focus:ring-[#2436BB]"
-                  />
-                  <span>
-                    I have read and agree to the{" "}
-                    <Link
-                      href="/partners/agreement"
-                      target="_blank"
-                      className="font-medium text-[#2436BB] hover:underline"
-                    >
-                      Partner Program Agreement
-                    </Link>{" "}
-                    (version {PARTNER_AGREEMENT_VERSION}).
-                  </span>
-                </label>
-                {fieldErrors.agreement_accepted ? (
-                  <p className="mt-1 text-sm text-red-600">
-                    {fieldErrors.agreement_accepted}
-                  </p>
-                ) : null}
-              </div>
+                    {isExistingAccount ? (
+                      <input type="hidden" name="username" value={authUi.email} />
+                    ) : (
+                      <div>
+                        <label
+                          htmlFor="username"
+                          className="block text-sm font-medium text-zinc-700"
+                        >
+                          Username or Email{" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          id="username"
+                          name="username"
+                          required
+                          autoComplete="username"
+                          value={loginIdentifier}
+                          onChange={(e) => setLoginIdentifier(e.target.value)}
+                          placeholder="username or you@example.com"
+                          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                        />
+                        {fieldErrors.username ? (
+                          <p className="mt-1 text-sm text-red-600">
+                            {fieldErrors.username}
+                          </p>
+                        ) : usernameHint ? (
+                          <p
+                            className={`mt-1 text-sm ${
+                              usernameStatus === "available" ||
+                              usernameStatus === "email"
+                                ? "text-green-700"
+                                : usernameStatus === "unavailable"
+                                  ? "text-red-600"
+                                  : "text-zinc-500"
+                            }`}
+                          >
+                            {usernameStatus === "checking"
+                              ? "Checking…"
+                              : usernameHint}
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
 
-              <button
-                type="submit"
-                disabled={formDisabled}
-                className="w-full rounded-xl bg-[#2436BB] px-6 py-3 text-base font-semibold text-white hover:bg-[#1c2a96] disabled:opacity-60"
-              >
-                {authLoading
-                  ? "Checking account…"
-                  : loading
-                    ? "Submitting…"
-                    : "Submit application"}
-              </button>
+                    {passwordRequired ? (
+                      <>
+                        <PasswordField
+                          id="password"
+                          name="password"
+                          label="Password"
+                          value={password}
+                          onChange={setPassword}
+                          show={showPassword}
+                          onToggleShow={() => setShowPassword((v) => !v)}
+                          error={
+                            fieldErrors.password ?? passwordHint ?? undefined
+                          }
+                          hint={`At least ${PARTNER_PASSWORD_MIN_LENGTH} characters.`}
+                          autoComplete="new-password"
+                        />
+                        <PasswordField
+                          id="confirm_password"
+                          name="confirm_password"
+                          label="Confirm Password"
+                          value={confirmPassword}
+                          onChange={setConfirmPassword}
+                          show={showConfirmPassword}
+                          onToggleShow={() =>
+                            setShowConfirmPassword((v) => !v)
+                          }
+                          error={
+                            fieldErrors.confirm_password ??
+                            confirmMismatch ??
+                            undefined
+                          }
+                          autoComplete="new-password"
+                        />
+                      </>
+                    ) : isExistingAccount ? (
+                      <>
+                        <input type="hidden" name="password" value="" />
+                        <input type="hidden" name="confirm_password" value="" />
+                      </>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label className="flex items-start gap-3 text-sm text-zinc-700">
+                      <input
+                        type="checkbox"
+                        name="agreement_accepted"
+                        required
+                        className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-[#2436BB] focus:ring-[#2436BB]"
+                      />
+                      <span>
+                        I have read and agree to the{" "}
+                        <Link
+                          href="/partners/agreement"
+                          target="_blank"
+                          className="font-medium text-[#2436BB] hover:underline"
+                        >
+                          Partner Program Agreement
+                        </Link>{" "}
+                        (version {PARTNER_AGREEMENT_VERSION}).
+                      </span>
+                    </label>
+                    {fieldErrors.agreement_accepted ? (
+                      <p className="mt-1 text-sm text-red-600">
+                        {fieldErrors.agreement_accepted}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={formDisabled}
+                    className="w-full rounded-xl bg-[#2436BB] px-6 py-3 text-base font-semibold text-white hover:bg-[#1c2a96] disabled:opacity-60"
+                  >
+                    {authLoading
+                      ? "Checking account…"
+                      : loading
+                        ? "Submitting…"
+                        : "Submit application"}
+                  </button>
                 </>
               ) : (
                 <p className="text-sm text-zinc-600">
@@ -767,7 +960,9 @@ function PasswordField({
           {show ? "Hide" : "Show"}
         </button>
       </div>
-      {hint && !error ? <p className="mt-1 text-xs text-zinc-500">{hint}</p> : null}
+      {hint && !error ? (
+        <p className="mt-1 text-xs text-zinc-500">{hint}</p>
+      ) : null}
       {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
     </div>
   );
@@ -806,7 +1001,9 @@ function Field({
         defaultValue={defaultValue}
         className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
       />
-      {hint && !error ? <p className="mt-1 text-xs text-zinc-500">{hint}</p> : null}
+      {hint && !error ? (
+        <p className="mt-1 text-xs text-zinc-500">{hint}</p>
+      ) : null}
       {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
     </div>
   );
@@ -817,11 +1014,13 @@ function TextArea({
   name,
   required,
   error,
+  defaultValue,
 }: {
   label: string;
   name: string;
   required?: boolean;
   error?: string;
+  defaultValue?: string;
 }) {
   return (
     <div>
@@ -833,6 +1032,7 @@ function TextArea({
         name={name}
         required={required}
         rows={4}
+        defaultValue={defaultValue}
         className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
       />
       {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
