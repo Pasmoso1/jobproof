@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
 import { parseAdminEmails } from "@/lib/admin-auth";
+import { ADMIN_LOGIN_PATH } from "@/lib/admin-constants";
 import { AdminSignOutButton } from "@/app/admin/admin-sign-out-button";
 
 export function AdminNotAuthorized({ userEmail }: { userEmail: string }) {
@@ -22,7 +23,11 @@ export function AdminNotAuthorized({ userEmail }: { userEmail: string }) {
         </p>
 
         <div className="mt-6 flex flex-col gap-3">
-          <AdminSignOutButton />
+          <AdminSignOutButton
+            label="Sign out and sign in as admin"
+            redirectTo={ADMIN_LOGIN_PATH}
+            className="inline-flex min-h-[48px] w-full items-center justify-center rounded-lg bg-[#2436BB] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2436BB] focus-visible:ring-offset-2 disabled:opacity-60 sm:w-auto"
+          />
           <Link
             href="/dashboard"
             className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-center text-sm font-medium text-zinc-800 hover:bg-zinc-50"
