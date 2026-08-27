@@ -6,6 +6,10 @@ import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * Update Interac e-Transfer payout email only.
+ * Does not change Supabase Auth email, login credentials, or contractor data.
+ */
 export async function updatePartnerPaymentEmail(
   formData: FormData
 ): Promise<{ success: true } | { success: false; error: string }> {
@@ -25,5 +29,6 @@ export async function updatePartnerPaymentEmail(
 
   if (error) return { success: false, error: error.message };
   revalidatePath("/partner/payments");
+  revalidatePath("/partner");
   return { success: true };
 }

@@ -40,7 +40,7 @@ export default async function AdminPartnersPage() {
     admin
       .from("partner_referrals")
       .select(
-        "id, partner_id, contractor_business_name, signup_date, subscription_started_at, qualification_date, reward_amount, reward_status, reward_paid_at, partners(organization_name, referral_code)"
+        "id, partner_id, contractor_business_name, signup_date, subscription_started_at, qualification_date, reward_amount, reward_status, reward_paid_at, partners(organization_name, referral_code, payment_email)"
       )
       .order("signup_date", { ascending: false })
       .limit(200),
@@ -145,6 +145,7 @@ export default async function AdminPartnersPage() {
           organization_name: p.organization_name,
           contact_name: p.contact_name,
           email: p.email,
+          payment_email: p.payment_email ?? null,
           partner_type: partnerTypeLabel(p.partner_type),
           partner_category: partnerCategoryLabel(p.partner_type),
           partner_type_value: p.partner_type,
@@ -160,14 +161,23 @@ export default async function AdminPartnersPage() {
         }))}
         referrals={(referrals ?? []).map((r) => {
           const partnersEmbed = r.partners as
-            | { organization_name?: string; referral_code?: string }
-            | { organization_name?: string; referral_code?: string }[]
+            | {
+                organization_name?: string;
+                referral_code?: string;
+                payment_email?: string | null;
+              }
+            | {
+                organization_name?: string;
+                referral_code?: string;
+                payment_email?: string | null;
+              }[]
             | null;
           const pe = Array.isArray(partnersEmbed) ? partnersEmbed[0] : partnersEmbed;
           return {
             id: r.id,
             partner_name: pe?.organization_name ?? "—",
             referral_code: pe?.referral_code ?? "—",
+            partner_payment_email: pe?.payment_email ?? null,
             contractor_business_name: r.contractor_business_name,
             signup_date: r.signup_date,
             subscription_started_at: r.subscription_started_at,

@@ -14,6 +14,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FoundingPartnerBadge } from "@/components/partners/founding-partner-badge";
 import { OrganizationPartnerCallout } from "@/components/partners/organization-partner-callout";
+import {
+  PARTNER_MISSING_PAYMENT_EMAIL_PROMPT,
+  hasPartnerPaymentEmail,
+} from "@/lib/partners/payment-details";
 
 export default async function PartnerDashboardPage() {
   const session = await getActivePartnerForCurrentUser();
@@ -61,9 +65,20 @@ export default async function PartnerDashboardPage() {
           {typeMeta.shortLabel}
           {!isOrg ? ` · ${partnerLevelLabel(partner.partner_level)}` : null} · $
           {reward} CAD per qualified referral. A referral qualifies after 90
-          consecutive days as a paying subscriber; rewards are reviewed and paid
-          manually, with no recurring commissions.
+          consecutive days as a paying subscriber; rewards are reviewed and
+          approved by JobProof before payment, with no recurring commissions.
         </p>
+        {!hasPartnerPaymentEmail(partner.payment_email) ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            {PARTNER_MISSING_PAYMENT_EMAIL_PROMPT}{" "}
+            <Link
+              href="/partner/payments"
+              className="font-semibold text-[#2436BB] underline hover:no-underline"
+            >
+              Add payment email
+            </Link>
+          </p>
+        ) : null}
         {isOrg ? null : <OrganizationPartnerCallout className="mt-4" />}
       </div>
 
@@ -86,7 +101,7 @@ export default async function PartnerDashboardPage() {
         <p className="mt-2 text-sm text-zinc-600">
           Share your referral link with contractors who are a good fit for JobProof.
           Referral quality matters more than signup volume. Once they remain a paying
-          subscriber for 90 consecutive days, the reward becomes eligible for manual
+          subscriber for 90 consecutive days, the reward becomes eligible for JobProof
           review and approval.
         </p>
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">

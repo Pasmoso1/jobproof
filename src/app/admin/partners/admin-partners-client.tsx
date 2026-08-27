@@ -28,6 +28,10 @@ import {
   partnerLevelLabel,
   rewardAmountForPartner,
 } from "@/lib/partners/constants";
+import {
+  PARTNER_PAYMENT_METHOD_LABEL,
+  hasPartnerPaymentEmail,
+} from "@/lib/partners/payment-details";
 import { FoundingPartnerBadge } from "@/components/partners/founding-partner-badge";
 import {
   adminActionSuccessMessage,
@@ -46,6 +50,7 @@ type PartnerRow = {
   organization_name: string;
   contact_name: string;
   email: string;
+  payment_email: string | null;
   partner_type: string;
   partner_category: string;
   partner_type_value: string;
@@ -64,6 +69,7 @@ type ReferralRow = {
   id: string;
   partner_name: string;
   referral_code: string;
+  partner_payment_email: string | null;
   contractor_business_name: string | null;
   signup_date: string;
   subscription_started_at: string | null;
@@ -362,6 +368,7 @@ export function AdminPartnersClient({
                 <th className="px-3 py-2">Organization</th>
                 <th className="px-3 py-2">Type / level</th>
                 <th className="px-3 py-2">Reward</th>
+                <th className="px-3 py-2">Payment email</th>
                 <th className="px-3 py-2">Agreement</th>
                 <th className="px-3 py-2">Code</th>
                 <th className="px-3 py-2">Status</th>
@@ -396,6 +403,20 @@ export function AdminPartnersClient({
                       partner_type: p.partner_type_value ?? p.partner_type,
                     })}{" "}
                     CAD
+                  </td>
+                  <td className="px-3 py-3">
+                    {hasPartnerPaymentEmail(p.payment_email) ? (
+                      <div>
+                        <p className="break-all text-xs text-zinc-800">{p.payment_email}</p>
+                        <p className="mt-0.5 text-[11px] text-zinc-500">
+                          {PARTNER_PAYMENT_METHOD_LABEL}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="inline-flex rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">
+                        Missing payment email
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-3">
                     {p.agreement_version && p.agreement_accepted_at ? (
@@ -505,6 +526,7 @@ export function AdminPartnersClient({
             <thead className="border-b bg-zinc-50 text-xs uppercase text-zinc-500">
               <tr>
                 <th className="px-3 py-2">Partner</th>
+                <th className="px-3 py-2">Payment email</th>
                 <th className="px-3 py-2">Contractor</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Amount</th>
@@ -517,6 +539,22 @@ export function AdminPartnersClient({
                   <td className="px-3 py-3">
                     <p className="font-medium">{r.partner_name}</p>
                     <p className="font-mono text-xs text-zinc-500">{r.referral_code}</p>
+                  </td>
+                  <td className="px-3 py-3">
+                    {hasPartnerPaymentEmail(r.partner_payment_email) ? (
+                      <div>
+                        <p className="break-all text-xs text-zinc-800">
+                          {r.partner_payment_email}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-zinc-500">
+                          {PARTNER_PAYMENT_METHOD_LABEL}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="inline-flex rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">
+                        Missing — add before sending e-Transfer
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-3">{r.contractor_business_name || "—"}</td>
                   <td className="px-3 py-3">{r.reward_status_label}</td>
@@ -565,12 +603,19 @@ export function AdminPartnersClient({
                       {r.reward_status !== "paid" && (
                         <button
                           type="button"
-                          disabled={pending}
-                          className="rounded border border-green-300 px-2 py-1 text-xs text-green-800 disabled:opacity-60"
+                          disabled={
+                            pending || !hasPartnerPaymentEmail(r.partner_payment_email)
+                          }
+                          title={
+                            hasPartnerPaymentEmail(r.partner_payment_email)
+                              ? `Confirm ${PARTNER_PAYMENT_METHOD_LABEL} was sent, then mark paid`
+                              : "Partner is missing a payment email"
+                          }
+                          className="rounded border border-green-300 px-2 py-1 text-xs text-green-800 disabled:cursor-not-allowed disabled:opacity-60"
                           onClick={() =>
                             run("mark_paid", () =>
                               adminMarkReferralPaid(r.id, {
-                                paymentMethod: "e-transfer",
+                                paymentMethod: PARTNER_PAYMENT_METHOD_LABEL,
                               })
                             )
                           }

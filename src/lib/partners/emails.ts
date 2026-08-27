@@ -102,7 +102,7 @@ export async function sendPartnerApprovedEmail(input: {
     <p>Hi ${escape(input.contactName)},</p>
     <p>Your application for <strong>${escape(input.organizationName)}</strong> has been approved.</p>
     ${foundingBadge}
-    <p>You are a <strong>${escape(partnerLevelLabel(input.level))}</strong> and earn <strong>$${reward} CAD</strong> for each qualified referral. A referral qualifies after the contractor remains a paying JobProof subscriber for 90 consecutive days. Rewards are reviewed and paid manually, and there are no recurring commissions.</p>
+    <p>You are a <strong>${escape(partnerLevelLabel(input.level))}</strong> and earn <strong>$${reward} CAD</strong> for each qualified referral. A referral qualifies after the contractor remains a paying JobProof subscriber for 90 consecutive days. Rewards are reviewed and approved by JobProof before payment, and there are no recurring commissions.</p>
     <p><strong>Your referral link:</strong><br/><a href="${escape(input.referralUrl)}" style="color:#2436BB;">${escape(input.referralUrl)}</a></p>
     <p><strong>Referral code:</strong> ${escape(input.referralCode)}</p>
     <p><a href="${portalUrl}" style="display:inline-block;margin-top:12px;background:#2436BB;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">Open Partner Portal</a></p>
@@ -110,7 +110,7 @@ export async function sendPartnerApprovedEmail(input: {
     ${signInCopy}
     <p>— The JobProof Team</p>
   `);
-  const text = `Hi ${input.contactName},\n\nYour JobProof Partner application is approved (${partnerLevelLabel(input.level)}, $${reward} CAD per qualified referral). A referral qualifies after 90 consecutive days as a paying JobProof subscriber. Rewards are reviewed and paid manually; there are no recurring commissions.\n\nReferral link: ${input.referralUrl}\nCode: ${input.referralCode}\nPortal: ${portalUrl}\nAgreement: ${agreementUrl}\n\n${signInText}\n\n— The JobProof Team\n`;
+  const text = `Hi ${input.contactName},\n\nYour JobProof Partner application is approved (${partnerLevelLabel(input.level)}, $${reward} CAD per qualified referral). A referral qualifies after 90 consecutive days as a paying JobProof subscriber. Rewards are reviewed and approved by JobProof before payment; there are no recurring commissions.\n\nReferral link: ${input.referralUrl}\nCode: ${input.referralCode}\nPortal: ${portalUrl}\nAgreement: ${agreementUrl}\n\n${signInText}\n\n— The JobProof Team\n`;
   return sendSimpleEmail({ to: input.to, subject, html, text });
 }
 
@@ -164,11 +164,11 @@ export async function sendPartnerReferralLifecycleEmail(input: {
     },
     subscription_started: {
       subject: "Your referral subscribed to JobProof",
-      body: `${biz} became a paying JobProof subscriber. Your reward qualifies after 90 consecutive days as a paying subscriber, followed by manual review and approval.`,
+      body: `${biz} became a paying JobProof subscriber. Your reward qualifies after 90 consecutive days as a paying subscriber, followed by JobProof review and approval.`,
     },
     qualified: {
       subject: "Referral reward qualified",
-      body: `${biz} has met the 90 consecutive-day paying-subscriber requirement. Your $${input.amountCad ?? ""} CAD reward is qualified and awaiting manual review and approval. It has not been paid yet.`,
+      body: `${biz} has met the 90 consecutive-day paying-subscriber requirement. Your $${input.amountCad ?? ""} CAD reward is qualified and awaiting JobProof review and approval. It has not been paid yet.`,
     },
     reward_approved: {
       subject: "Referral reward approved",

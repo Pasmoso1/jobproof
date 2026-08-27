@@ -119,7 +119,7 @@ export async function createPartnerFromApplication(
       partner_level: level,
       status: "active",
       referral_code: referralCode,
-      payment_email: email,
+      payment_email: null,
       agreement_version: application.agreement_version ?? null,
       agreement_accepted_at: application.agreement_accepted_at ?? null,
       username,

@@ -60,10 +60,10 @@ Yes. JobProof is built for Canadian contractors.
 No. Once they sign up with your link, JobProof supports them directly.
 
 **When do I earn a reward?**  
-After the contractor remains a paying JobProof subscriber for 90 consecutive days, the reward becomes eligible for manual review and approval.
+After the contractor remains a paying JobProof subscriber for 90 consecutive days, the reward becomes eligible for JobProof review and approval.
 
 **How much is the reward?**  
-Founding Partners earn $150 CAD and Standard Partners earn $100 CAD for each qualified referral. Rewards are one-time; there are no recurring commissions.`,
+Creator and Marketing Founding Partners earn $150 CAD and Standard Partners earn $100 CAD for each qualified referral. Organization Partners earn a fixed $150 CAD per qualified referral. Rewards are one-time; there are no recurring commissions.`,
   },
   {
     slug: "referral-tips",
@@ -71,11 +71,11 @@ Founding Partners earn $150 CAD and Standard Partners earn $100 CAD for each qua
     summary: "Quality over volume.",
     body: `- Share your link in places where contractors already trust you
 - Prefer warm introductions over cold blasts
-- Explain the 90 consecutive-day paying-subscriber qualification clearly
+- Focus on how JobProof helps contractors win work, create professional quotes, manage contracts and change orders, invoice customers, document jobs, and protect their business
 - Use JobProof marketing resources for consistent branding
 - Follow up once—then let the product speak for itself
 
-Referral quality matters more than signup volume. Rewards are reviewed, approved, and paid manually.`,
+Referral quality matters more than signup volume. Rewards are reviewed and approved by JobProof before payment.`,
   },
 ];
 
