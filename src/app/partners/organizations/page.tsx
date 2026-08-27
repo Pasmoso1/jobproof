@@ -15,6 +15,7 @@ import {
   ORGANIZATION_PROMOTE_WAYS,
   ORGANIZATION_WHY_CARDS,
 } from "@/lib/partners/content/organizations";
+import { PARTNER_PROGRAM_LOGIN_HREF } from "@/lib/partners/login-href";
 
 export const metadata: Metadata = {
   title: ORGANIZATION_PARTNERS_META.title,
@@ -45,7 +46,7 @@ export default function OrganizationPartnersPage() {
               Apply
             </Link>
             <Link
-              href="/login"
+              href={PARTNER_PROGRAM_LOGIN_HREF}
               className="font-medium text-zinc-600 hover:text-zinc-900"
             >
               Partner sign in

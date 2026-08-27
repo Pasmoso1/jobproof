@@ -3,14 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { decodeFirstTouchCookie, FIRST_TOUCH_COOKIE_NAME } from "@/lib/attribution-first-touch";
 import { PARTNER_REF_COOKIE_NAME } from "@/lib/partners/partner-ref-cookie";
-
-/** Allow open redirects only to same-origin relative paths. */
-function isSafeRelativeRedirect(pathWithQuery: string): boolean {
-  const path = pathWithQuery.split("?")[0] ?? "";
-  if (!path.startsWith("/") || path.startsWith("//")) return false;
-  if (path.includes("..")) return false;
-  return true;
-}
+import { isSafeRelativeRedirect } from "@/lib/auth/safe-redirect";
 
 function loginErrorUrl(requestUrl: URL, kind: "auth" | "reset_link"): URL {
   const q = kind === "reset_link" ? "error=reset_link" : "error=auth";

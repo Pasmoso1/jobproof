@@ -10,6 +10,7 @@ import {
   resendSignupConfirmation,
   signInWithUsernameOrEmail,
 } from "@/lib/auth/credential-actions";
+import { resolveSafeLoginRedirect } from "@/lib/auth/safe-redirect";
 
 function readLoginFlashFromLocation(): {
   authError: boolean;
@@ -42,7 +43,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("next") ?? searchParams.get("redirect");
-  const redirectTo = redirectParam ?? "/dashboard";
+  const redirectTo = resolveSafeLoginRedirect(redirectParam, "/dashboard");
   const isAdminLogin = redirectParam === "/admin";
   const [authError, setAuthError] = useState(() => readLoginFlashFromLocation().authError);
   const [resetLinkError, setResetLinkError] = useState(

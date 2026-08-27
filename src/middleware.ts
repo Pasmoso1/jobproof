@@ -6,6 +6,8 @@ import {
 import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
 import { BETA_PLAN_ONBOARDING_PATH, needsPlanSelection } from "@/lib/beta-tester";
 import { isOnboardingCompleteForTrial, needsTrialExpiredIntro } from "@/lib/trial-lifecycle";
+import { resolveAuthenticatedAuthPathRedirect } from "@/lib/auth/safe-redirect";
+import { resolveContractorPostLoginPath } from "@/lib/auth/post-login-path";
 
 const PROTECTED_PATHS = [
   "/dashboard",
@@ -85,19 +87,6 @@ function isBusinessIncomplete(
   });
 }
 
-function postLoginPath(profile: ProfileOnboardingFields, accountEmail: string): string {
-  if (needsPlanSelection(profile)) {
-    return BETA_PLAN_ONBOARDING_PATH;
-  }
-  if (isProfileIncomplete(profile, accountEmail)) {
-    return BUSINESS_ONBOARDING_PATH;
-  }
-  if (needsTrialExpiredIntro(profile)) {
-    return TRIAL_ENDED_PATH;
-  }
-  return "/dashboard";
-}
-
 export async function middleware(request: NextRequest) {
   const { response, user, profile } = await updateSession(request);
 
@@ -118,9 +107,17 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAuthPath(pathname) && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = postLoginPath(profile, user.email ?? "");
-    return Response.redirect(url);
+    const next =
+      request.nextUrl.searchParams.get("next") ??
+      request.nextUrl.searchParams.get("redirect");
+    const destination = resolveAuthenticatedAuthPathRedirect({
+      next,
+      contractorFallbackPath: resolveContractorPostLoginPath(
+        profile,
+        user.email ?? ""
+      ),
+    });
+    return Response.redirect(new URL(destination, request.nextUrl.origin));
   }
 
   if (user && requiresOnboarding(pathname)) {

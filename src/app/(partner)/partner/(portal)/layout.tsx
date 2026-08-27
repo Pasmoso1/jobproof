@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { JobProofLogo } from "@/components/jobproof-logo";
-import {
-  getActivePartnerForCurrentUser,
-  getPartnerAccountStatusForCurrentUser,
-} from "@/lib/partners/session";
+import { getPartnerAccountStatusForCurrentUser } from "@/lib/partners/session";
+import { resolvePartnerEntryPath } from "@/lib/partners/login-href";
 import { partnerLevelLabel, partnerTypeLabel } from "@/lib/partners/constants";
 import { LogoutButton } from "@/app/(app)/logout-button";
 import { FoundingPartnerBadge } from "@/components/partners/founding-partner-badge";
@@ -26,17 +24,17 @@ export default async function PartnerPortalLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getActivePartnerForCurrentUser();
-  if (!session) {
-    redirect("/partner/status");
-  }
-
   const account = await getPartnerAccountStatusForCurrentUser();
   if (account.kind !== "active" || !account.emailVerified) {
-    redirect("/partner/status");
+    redirect(
+      resolvePartnerEntryPath({
+        kind: account.kind,
+        emailVerified: "emailVerified" in account ? account.emailVerified : false,
+      })
+    );
   }
 
-  const { partner } = session;
+  const { partner } = account;
 
   return (
     <div className="min-h-screen bg-zinc-50">

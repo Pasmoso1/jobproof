@@ -126,7 +126,8 @@ describe("partner media center route access conventions", () => {
     assert.match(source, /href: "\/partner\/media"/);
     assert.match(source, /Media Centre/);
     assert.doesNotMatch(source, /Media Center/);
-    assert.match(source, /getActivePartnerForCurrentUser/);
+    assert.match(source, /getPartnerAccountStatusForCurrentUser/);
+    assert.match(source, /resolvePartnerEntryPath/);
   });
 
   it("gates the media page with the active-partner session helper", async () => {

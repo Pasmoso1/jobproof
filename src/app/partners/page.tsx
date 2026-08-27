@@ -12,6 +12,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { countFoundingPartners } from "@/lib/partners/approve";
 import { FoundingPartnerSectionTracker } from "@/components/partners/partner-public-analytics";
 import { FoundingPartnerBadge } from "@/components/partners/founding-partner-badge";
+import { PARTNER_PROGRAM_LOGIN_HREF } from "@/lib/partners/login-href";
 
 export const metadata: Metadata = {
   title: "JobProof Partner Program",
@@ -46,7 +47,10 @@ export default async function PartnersLandingPage() {
             <Link href="/partners/apply" className="font-medium text-[#2436BB] hover:text-[#1c2a96]">
               Apply
             </Link>
-            <Link href="/login" className="font-medium text-zinc-600 hover:text-zinc-900">
+            <Link
+              href={PARTNER_PROGRAM_LOGIN_HREF}
+              className="font-medium text-zinc-600 hover:text-zinc-900"
+            >
               Partner sign in
             </Link>
           </div>

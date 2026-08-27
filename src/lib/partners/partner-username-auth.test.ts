@@ -48,8 +48,8 @@ describe("partner username auth security invariants", () => {
       ),
       "utf8"
     );
-    assert.match(portalLayout, /getActivePartnerForCurrentUser/);
-    assert.match(portalLayout, /\/partner\/status/);
+    assert.match(portalLayout, /getPartnerAccountStatusForCurrentUser/);
+    assert.match(portalLayout, /resolvePartnerEntryPath/);
   });
 
   it("approval email mentions credentials chosen at apply, never includes a password value", () => {

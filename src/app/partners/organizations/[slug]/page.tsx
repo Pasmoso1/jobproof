@@ -10,6 +10,7 @@ import {
   ORGANIZATION_LANDING_SLUGS,
   type OrganizationLandingSlug,
 } from "@/lib/partners/content/organization-landing-pages";
+import { PARTNER_PROGRAM_LOGIN_HREF } from "@/lib/partners/login-href";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -59,7 +60,7 @@ export default async function OrganizationLandingVariantPage({
               Apply
             </Link>
             <Link
-              href="/login"
+              href={PARTNER_PROGRAM_LOGIN_HREF}
               className="font-medium text-zinc-600 hover:text-zinc-900"
             >
               Partner sign in
