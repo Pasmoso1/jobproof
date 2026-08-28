@@ -143,6 +143,7 @@ export async function sendPartnerReferralLifecycleEmail(input: {
   amountCad?: number | null;
   paymentDate?: string | null;
   paymentReference?: string | null;
+  batchReferralCount?: number | null;
 }) {
   const biz = input.businessName?.trim() || "A contractor";
   const paidDate = input.paymentDate
@@ -176,7 +177,10 @@ export async function sendPartnerReferralLifecycleEmail(input: {
     },
     reward_paid: {
       subject: "Referral reward paid",
-      body: `Your $${input.amountCad ?? ""} CAD referral reward for ${biz} was paid on ${paidDate}.${paidReference}`,
+      body:
+        input.batchReferralCount && input.batchReferralCount > 1
+          ? `Your ${input.batchReferralCount} referral rewards totaling $${input.amountCad ?? ""} CAD were paid on ${paidDate} by Interac e-Transfer.${paidReference}`
+          : `Your $${input.amountCad ?? ""} CAD referral reward for ${biz} was paid on ${paidDate}.${paidReference}`,
     },
   };
   const c = copy[input.kind];

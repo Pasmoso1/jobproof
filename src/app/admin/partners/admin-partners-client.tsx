@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   adminApprovePartnerApplication,
-  adminApproveReferralReward,
   adminChangePartnerLevel,
   adminChangePartnerType,
   adminDeclinePartnerApplication,
-  adminMarkReferralPaid,
   adminReactivatePartner,
   adminSetApplicationUnderReview,
   adminSuspendPartner,
@@ -16,6 +15,9 @@ import {
   adminResendPartnerVerificationEmail,
   adminSendPartnerPasswordResetEmail,
 } from "./actions";
+import {
+  adminForceReleaseReferralForPayment,
+} from "./payout-actions";
 import type {
   PartnerLevel,
   PartnerRewardStatus,
@@ -67,6 +69,7 @@ type PartnerRow = {
 
 type ReferralRow = {
   id: string;
+  partner_id: string;
   partner_name: string;
   referral_code: string;
   partner_payment_email: string | null;
@@ -520,7 +523,15 @@ export function AdminPartnersClient({
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-zinc-900">Referrals & rewards</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-zinc-900">Referrals & rewards</h2>
+          <Link
+            href="/admin/partners/payouts"
+            className="rounded bg-[#2436BB] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1e2d99]"
+          >
+            Open payout dashboard
+          </Link>
+        </div>
         <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b bg-zinc-50 text-xs uppercase text-zinc-500">
@@ -586,42 +597,27 @@ export function AdminPartnersClient({
                         Save amount
                       </button>
                       {(r.reward_status === "qualified" ||
-                        r.reward_status === "pending") && (
+                        r.reward_status === "needs_review") && (
                         <button
                           type="button"
                           disabled={pending}
                           className="rounded bg-[#2436BB] px-2 py-1 text-xs text-white disabled:opacity-60"
                           onClick={() =>
-                            run("approve_reward", () =>
-                              adminApproveReferralReward(r.id)
+                            run("release_reward", () =>
+                              adminForceReleaseReferralForPayment(r.id)
                             )
                           }
                         >
-                          Approve reward
+                          Mark ready for payment
                         </button>
                       )}
-                      {r.reward_status !== "paid" && (
-                        <button
-                          type="button"
-                          disabled={
-                            pending || !hasPartnerPaymentEmail(r.partner_payment_email)
-                          }
-                          title={
-                            hasPartnerPaymentEmail(r.partner_payment_email)
-                              ? `Confirm ${PARTNER_PAYMENT_METHOD_LABEL} was sent, then mark paid`
-                              : "Partner is missing a payment email"
-                          }
-                          className="rounded border border-green-300 px-2 py-1 text-xs text-green-800 disabled:cursor-not-allowed disabled:opacity-60"
-                          onClick={() =>
-                            run("mark_paid", () =>
-                              adminMarkReferralPaid(r.id, {
-                                paymentMethod: PARTNER_PAYMENT_METHOD_LABEL,
-                              })
-                            )
-                          }
+                      {r.reward_status === "approved" && (
+                        <Link
+                          href={`/admin/partners/payouts/${r.partner_id}`}
+                          className="rounded border border-green-300 px-2 py-1 text-xs text-green-800"
                         >
-                          Mark paid
-                        </button>
+                          Record grouped payout
+                        </Link>
                       )}
                     </div>
                   </td>

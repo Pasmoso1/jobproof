@@ -9,6 +9,7 @@ import {
   hasPartnerPaymentEmail,
 } from "@/lib/partners/payment-details";
 import {
+  adminRewardStatusLabel,
   partnerFacingRewardStatusLabel,
   rewardAmountForPartner,
   rewardStatusLabel,
@@ -101,15 +102,17 @@ describe("Partner payout copy — no discretionary approval messaging", () => {
 });
 
 describe("Partner-facing reward status labels", () => {
-  it("maps internal approved status to Qualified for partners", () => {
+  it("maps internal approved and needs_review to Qualified for partners", () => {
     assert.equal(partnerFacingRewardStatusLabel("approved"), "Qualified");
+    assert.equal(partnerFacingRewardStatusLabel("needs_review"), "Qualified");
     assert.equal(partnerFacingRewardStatusLabel("qualified"), "Qualified");
     assert.equal(partnerFacingRewardStatusLabel("pending"), "Pending qualification");
     assert.equal(partnerFacingRewardStatusLabel("paid"), "Paid");
   });
 
-  it("keeps internal admin reward status label Approved", () => {
-    assert.equal(rewardStatusLabel("approved"), "Approved");
+  it("uses admin Ready for payment label internally for approved", () => {
+    assert.equal(adminRewardStatusLabel("approved"), "Ready for payment");
+    assert.equal(rewardStatusLabel("approved"), "Ready for payment");
   });
 
   it("referrals page uses partnerFacingRewardStatusLabel", () => {
@@ -130,8 +133,8 @@ describe("Partner payment email field reuse", () => {
       const sql = read(`supabase/migrations/${file}`);
       assert.doesNotMatch(
         sql,
-        /ADD COLUMN(?: IF NOT EXISTS)?\s+payment_email/i,
-        `unexpected payment_email column in ${file}`
+        /ALTER TABLE\s+partners[\s\S]*ADD COLUMN(?: IF NOT EXISTS)?\s+payment_email/i,
+        `unexpected partners.payment_email column in ${file}`
       );
     }
   });
@@ -141,6 +144,7 @@ describe("Partner payment email field reuse", () => {
     assert.equal(hasPartnerPaymentEmail("payout@example.com"), true);
     const action = read("src/app/(partner)/partner/(portal)/actions.ts");
     assert.match(action, /payment_email: paymentEmail/);
+    assert.match(action, /reverifyPartnerReferralsAfterPaymentEmailUpdate/);
     assert.doesNotMatch(action, /auth\.updateUser|auth\.admin/);
     assert.doesNotMatch(action, /\.update\(\{[^}]*\bemail:/);
   });
@@ -150,15 +154,16 @@ describe("Partner payment email field reuse", () => {
     assert.doesNotMatch(cron, /payment_email/);
   });
 
-  it("admin surfaces payment email and internal approve workflow remains", () => {
+  it("admin surfaces payment email and grouped payout workflow", () => {
     const client = read("src/app/admin/partners/admin-partners-client.tsx");
     const adminPage = read("src/app/admin/partners/page.tsx");
-    const actions = read("src/app/admin/partners/actions.ts");
+    const payoutActions = read("src/app/admin/partners/payout-actions.ts");
     assert.match(client, /payment_email/);
-    assert.match(client, /adminApproveReferralReward/);
-    assert.match(client, /adminMarkReferralPaid/);
-    assert.match(adminPage, /rewardStatusLabel/);
-    assert.match(actions, /reward_status: "approved"/);
+    assert.match(client, /Mark ready for payment/);
+    assert.match(client, /Open payout dashboard/);
+    assert.match(adminPage, /adminRewardStatusLabel/);
+    assert.match(adminPage, /\/admin\/partners\/payouts/);
+    assert.match(payoutActions, /record_partner_batch_payout/);
   });
 });
 

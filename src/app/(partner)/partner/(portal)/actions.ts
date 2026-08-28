@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
+import { reverifyPartnerReferralsAfterPaymentEmailUpdate } from "@/lib/partners/payout-verification-runner";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -28,6 +30,15 @@ export async function updatePartnerPaymentEmail(
     .eq("id", session.partner.id);
 
   if (error) return { success: false, error: error.message };
+
+  const serviceAdmin = createServiceRoleClient();
+  if (serviceAdmin) {
+    await reverifyPartnerReferralsAfterPaymentEmailUpdate(
+      serviceAdmin,
+      session.partner.id
+    );
+  }
+
   revalidatePath("/partner/payments");
   revalidatePath("/partner");
   return { success: true };

@@ -2,18 +2,19 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
 import { PARTNER_QUALIFICATION_DAYS } from "@/lib/partners/constants";
 import { sendPartnerReferralLifecycleEmail } from "@/lib/partners/emails";
+import { verifyAndRouteQualifiedReferral } from "@/lib/partners/payout-verification-runner";
 
 const PAID_STATUSES = new Set(["active", "past_due"]);
 
 /**
  * Promote pending referrals to qualified when the contractor has been a paying
  * subscriber for PARTNER_QUALIFICATION_DAYS and still has an active-like status.
- * Does not auto-pay — admin must approve and mark paid.
+ * Runs automated pre-payment verification after qualification.
  */
 export async function qualifyEligiblePartnerReferrals(
   admin: SupabaseClient,
   now: Date = new Date()
-): Promise<{ inspected: number; qualified: number }> {
+): Promise<{ inspected: number; qualified: number; verified: number }> {
   const cutoff = new Date(
     now.getTime() - PARTNER_QUALIFICATION_DAYS * 24 * 60 * 60 * 1000
   ).toISOString();
@@ -40,10 +41,11 @@ export async function qualifyEligiblePartnerReferrals(
 
   if (error) {
     console.error("[partners] qualify query failed", error.message);
-    return { inspected: 0, qualified: 0 };
+    return { inspected: 0, qualified: 0, verified: 0 };
   }
 
   let qualified = 0;
+  let verified = 0;
   for (const row of rows ?? []) {
     const profile = row.profiles as
       | { subscription_status?: string | null; business_name?: string | null }
@@ -92,7 +94,14 @@ export async function qualifyEligiblePartnerReferrals(
         amountCad: Number(row.reward_amount),
       });
     }
+
+    const verifyResult = await verifyAndRouteQualifiedReferral(
+      admin,
+      String(row.id),
+      now
+    );
+    if (verifyResult.ok) verified += 1;
   }
 
-  return { inspected: rows?.length ?? 0, qualified };
+  return { inspected: rows?.length ?? 0, qualified, verified };
 }

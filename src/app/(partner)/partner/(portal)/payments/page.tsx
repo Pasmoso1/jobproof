@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
 import { computePartnerDashboardStats } from "@/lib/partners/dashboard-stats";
+import { computePartnerLifetimeTotals } from "@/lib/partners/payout-batch";
 import { formatBillingDateOrDash } from "@/lib/billing-date-display";
+import { PARTNER_PAYMENT_METHOD_LABEL } from "@/lib/partners/payment-details";
 import { PartnerPaymentEmailForm } from "./payment-email-form";
 
 export default async function PartnerPaymentsPage() {
@@ -17,12 +20,16 @@ export default async function PartnerPaymentsPage() {
       .eq("partner_id", session.partner.id),
     supabase
       .from("partner_payouts")
-      .select("amount, payment_method, payment_reference, notes, paid_at")
+      .select("id, amount, payment_method, payment_reference, notes, paid_at, referral_count")
       .eq("partner_id", session.partner.id)
       .order("paid_at", { ascending: false }),
   ]);
 
   const stats = computePartnerDashboardStats(referrals ?? [], payouts ?? []);
+  const lifetime = computePartnerLifetimeTotals(
+    referrals ?? [],
+    stats.totalPaidCad
+  );
 
   return (
     <div className="space-y-8">
@@ -34,7 +41,7 @@ export default async function PartnerPaymentsPage() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           label="Pending qualification"
           value={`$${stats.pendingAmountCad.toFixed(0)} CAD`}
@@ -43,7 +50,11 @@ export default async function PartnerPaymentsPage() {
           label="Qualified"
           value={`$${(stats.qualifiedAmountCad + stats.approvedAmountCad).toFixed(0)} CAD`}
         />
-        <Stat label="Total earned (paid)" value={`$${stats.totalPaidCad.toFixed(0)} CAD`} />
+        <Stat label="Paid" value={`$${stats.totalPaidCad.toFixed(0)} CAD`} />
+        <Stat
+          label="Lifetime qualified"
+          value={`$${lifetime.lifetimeQualifiedCad.toFixed(0)} CAD`}
+        />
       </div>
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
@@ -62,27 +73,42 @@ export default async function PartnerPaymentsPage() {
           <p className="mt-3 text-sm text-zinc-500">No payouts recorded yet.</p>
         ) : (
           <ul className="mt-4 divide-y divide-zinc-100">
-            {(payouts ?? []).map((p, i) => (
-              <li
-                key={i}
-                className="flex flex-wrap items-baseline justify-between gap-2 py-3 text-sm"
-              >
-                <div>
-                  <p className="font-medium text-zinc-900">
-                    ${Number(p.amount).toFixed(2)} CAD
-                  </p>
-                  <p className="text-zinc-500">
-                    {formatBillingDateOrDash(p.paid_at)}
-                    {p.payment_method ? ` · ${p.payment_method}` : ""}
-                    {p.payment_reference ? ` · Ref ${p.payment_reference}` : ""}
-                  </p>
-                  {p.notes ? <p className="text-zinc-500">{p.notes}</p> : null}
-                </div>
-                <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                  Paid
-                </span>
-              </li>
-            ))}
+            {(payouts ?? []).map((p) => {
+              const count = Number(p.referral_count ?? 1);
+              return (
+                <li key={p.id} className="py-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                    <div>
+                      <p className="font-medium text-zinc-900">
+                        ${Number(p.amount).toFixed(2)} CAD
+                        {count > 1 ? (
+                          <span className="ml-2 font-normal text-zinc-500">
+                            · {count} rewards
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-zinc-500">
+                        {formatBillingDateOrDash(p.paid_at)}
+                        {` · ${p.payment_method || PARTNER_PAYMENT_METHOD_LABEL}`}
+                        {p.payment_reference ? ` · Ref ${p.payment_reference}` : ""}
+                      </p>
+                      {p.notes ? <p className="text-zinc-500">{p.notes}</p> : null}
+                    </div>
+                    <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                      Paid
+                    </span>
+                  </div>
+                  {count > 1 ? (
+                    <Link
+                      href={`/partner/payments/${p.id}`}
+                      className="mt-2 inline-block text-xs font-medium text-[#2436BB] hover:underline"
+                    >
+                      View included referrals
+                    </Link>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

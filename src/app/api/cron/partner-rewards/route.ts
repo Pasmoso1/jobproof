@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { qualifyEligiblePartnerReferrals } from "@/lib/partners/qualification";
+import { verifyQualifiedPartnerReferrals } from "@/lib/partners/payout-verification-runner";
 
 /**
  * Qualify partner referral rewards after 90 days of paid subscription.
@@ -19,6 +20,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Service role unavailable" }, { status: 500 });
   }
 
-  const result = await qualifyEligiblePartnerReferrals(admin);
-  return NextResponse.json({ ok: true, ...result });
+  const qualifyResult = await qualifyEligiblePartnerReferrals(admin);
+  const verifyResult = await verifyQualifiedPartnerReferrals(admin);
+  return NextResponse.json({
+    ok: true,
+    ...qualifyResult,
+    verification: verifyResult,
+  });
 }

@@ -45,21 +45,20 @@ export function computePartnerDashboardStats(
     if (!["cancelled", "forfeited"].includes(status)) {
       referredCount += 1;
     }
-    if (status === "pending" || status === "qualified") {
+    if (status === "pending") {
       pendingRewards += 1;
-      if (status === "pending") {
-        pendingAmountCad += amount;
-        pendingRewardCount += 1;
-      }
-      if (status === "qualified") {
-        qualifiedAmountCad += amount;
-        qualifiedCount += 1;
-      }
+      pendingAmountCad += amount;
+      pendingRewardCount += 1;
     }
-    if (status === "approved") {
-      approvedRewards += 1;
-      approvedAmountCad += amount;
-      approvedRewardCount += 1;
+    if (status === "qualified" || status === "needs_review" || status === "approved") {
+      pendingRewards += 1;
+      qualifiedAmountCad += amount;
+      qualifiedCount += 1;
+      if (status === "approved") {
+        approvedRewards += 1;
+        approvedAmountCad += amount;
+        approvedRewardCount += 1;
+      }
     }
     if (status === "paid") {
       paidCount += 1;

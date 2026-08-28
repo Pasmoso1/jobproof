@@ -3,10 +3,10 @@ import { requireAdminUserOrRedirectLogin } from "@/lib/admin-auth";
 import { AdminNotAuthorized } from "@/app/admin/NotAuthorized";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
+  adminRewardStatusLabel,
   FOUNDING_PARTNER_LIMIT,
   partnerCategoryLabel,
   partnerTypeLabel,
-  rewardStatusLabel,
   type PartnerLevel,
   type PartnerRewardStatus,
 } from "@/lib/partners/constants";
@@ -108,8 +108,8 @@ export default async function AdminPartnersPage() {
   const pendingApps = applicationRows.filter((a) =>
     ["submitted", "under_review"].includes(a.status)
   );
-  const qualified = (referrals ?? []).filter((r) => r.reward_status === "qualified");
-  const approvedRewards = (referrals ?? []).filter((r) => r.reward_status === "approved");
+  const readyForPayment = (referrals ?? []).filter((r) => r.reward_status === "approved");
+  const needsReview = (referrals ?? []).filter((r) => r.reward_status === "needs_review");
   const paidRewards = (referrals ?? []).filter((r) => r.reward_status === "paid");
   const foundingSlotsAvailable = (foundingCount ?? 0) < FOUNDING_PARTNER_LIMIT;
 
@@ -122,20 +122,26 @@ export default async function AdminPartnersPage() {
           </Link>
           <h1 className="mt-2 text-2xl font-bold text-zinc-900">Partner Program</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Applications, partners, referrals, and manual payouts. Founding slots used:{" "}
+            Applications, partners, referrals, and grouped payouts. Founding slots used:{" "}
             {foundingCount ?? 0} of {FOUNDING_PARTNER_LIMIT}.{" "}
             {foundingSlotsAvailable
               ? "Founding positions remain available."
               : "Founding positions are filled."}
           </p>
         </div>
+        <Link
+          href="/admin/partners/payouts"
+          className="rounded bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1e2d99]"
+        >
+          Payouts
+        </Link>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Card label="Pending applications" value={String(pendingApps.length)} />
         <Card label="Active partners" value={String((partners ?? []).filter((p) => p.status === "active").length)} />
-        <Card label="Qualified rewards" value={String(qualified.length)} />
-        <Card label="Approved / paid" value={`${approvedRewards.length} / ${paidRewards.length}`} />
+        <Card label="Ready for payment" value={String(readyForPayment.length)} />
+        <Card label="Needs review / paid" value={`${needsReview.length} / ${paidRewards.length}`} />
       </div>
 
       <AdminPartnersClient
@@ -175,6 +181,7 @@ export default async function AdminPartnersPage() {
           const pe = Array.isArray(partnersEmbed) ? partnersEmbed[0] : partnersEmbed;
           return {
             id: r.id,
+            partner_id: String(r.partner_id),
             partner_name: pe?.organization_name ?? "—",
             referral_code: pe?.referral_code ?? "—",
             partner_payment_email: pe?.payment_email ?? null,
@@ -185,7 +192,7 @@ export default async function AdminPartnersPage() {
             reward_amount: Number(r.reward_amount),
             reward_status: r.reward_status as PartnerRewardStatus,
             reward_paid_at: r.reward_paid_at,
-            reward_status_label: rewardStatusLabel(r.reward_status as PartnerRewardStatus),
+            reward_status_label: adminRewardStatusLabel(r.reward_status as PartnerRewardStatus),
             level_label: "",
           };
         })}

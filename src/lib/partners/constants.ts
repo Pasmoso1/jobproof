@@ -74,6 +74,7 @@ export type PartnerApplicationStatus =
 export type PartnerRewardStatus =
   | "pending"
   | "qualified"
+  | "needs_review"
   | "approved"
   | "paid"
   | "cancelled"
@@ -179,15 +180,17 @@ export function partnerRewardSummary(level: PartnerLevel): string {
   return `$${rewardAmountForLevel(level)} CAD per qualified referral`;
 }
 
-/** Admin / internal reward status labels. */
-export function rewardStatusLabel(status: PartnerRewardStatus): string {
+/** Admin payout workflow labels. */
+export function adminRewardStatusLabel(status: PartnerRewardStatus): string {
   switch (status) {
     case "pending":
-      return "Pending";
+      return "Pending qualification";
     case "qualified":
       return "Qualified";
+    case "needs_review":
+      return "Needs review";
     case "approved":
-      return "Approved";
+      return "Ready for payment";
     case "paid":
       return "Paid";
     case "cancelled":
@@ -199,12 +202,18 @@ export function rewardStatusLabel(status: PartnerRewardStatus): string {
   }
 }
 
-/** Partner Portal labels — hides internal post-qualification approval workflow. */
+/** @deprecated Prefer adminRewardStatusLabel for admin UI. */
+export function rewardStatusLabel(status: PartnerRewardStatus): string {
+  return adminRewardStatusLabel(status);
+}
+
+/** Partner Portal labels — hides internal verification/review workflow. */
 export function partnerFacingRewardStatusLabel(status: PartnerRewardStatus): string {
   switch (status) {
     case "pending":
       return "Pending qualification";
     case "qualified":
+    case "needs_review":
     case "approved":
       return "Qualified";
     case "paid":
