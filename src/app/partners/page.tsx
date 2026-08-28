@@ -129,8 +129,8 @@ export default async function PartnersLandingPage() {
               )}
               <p className="mt-5 text-sm leading-relaxed text-zinc-600">
                 A referral qualifies after the contractor has remained a paying JobProof
-                subscriber for 90 consecutive days. Rewards are reviewed and approved by
-                JobProof before payment, and there are no recurring commissions.
+                subscriber for 90 consecutive days. Qualified rewards are paid by Interac
+                e-Transfer, and there are no recurring commissions.
               </p>
               <Link
                 href="/partners/apply"
@@ -270,7 +270,7 @@ export default async function PartnersLandingPage() {
                 "Contractor starts a free trial",
                 "Contractor subscribes",
                 "Contractor remains a paying subscriber for 90 consecutive days",
-                "Reward is reviewed and approved by JobProof before payment",
+                "Reward is sent by Interac e-Transfer after qualification",
               ].map((step, i) => (
                 <li key={step} className="flex gap-4 text-zinc-800">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2436BB] text-sm font-semibold text-white">

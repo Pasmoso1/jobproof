@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
-import { rewardStatusLabel, type PartnerRewardStatus } from "@/lib/partners/constants";
+import { partnerFacingRewardStatusLabel, type PartnerRewardStatus } from "@/lib/partners/constants";
 import { formatBillingDateOrDash } from "@/lib/billing-date-display";
 
 export default async function PartnerReferralsPage() {
@@ -70,7 +70,7 @@ export default async function PartnerReferralsPage() {
                       : "—"}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
-                    {rewardStatusLabel(r.reward_status as PartnerRewardStatus)}
+                    {partnerFacingRewardStatusLabel(r.reward_status as PartnerRewardStatus)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
                     ${Number(r.reward_amount).toFixed(0)} CAD

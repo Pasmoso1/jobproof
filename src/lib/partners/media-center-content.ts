@@ -777,7 +777,7 @@ export function buildMediaCenterFaqs(level: PartnerLevel): MediaFaqItem[] {
     },
     {
       question: "How do partner referrals work?",
-      answer: `Each approved partner receives a referral code or link. A referral is permanently attributed according to JobProof referral rules. Rewards become eligible only after the referred contractor remains a paying subscriber for ${PARTNER_QUALIFICATION_DAYS} consecutive days, and payouts are reviewed manually.`,
+      answer: `Each approved partner receives a referral code or link. A referral is permanently attributed according to JobProof referral rules. Rewards qualify after the referred contractor remains a paying subscriber for ${PARTNER_QUALIFICATION_DAYS} consecutive days and are paid by Interac e-Transfer.`,
     },
     {
       question: "How much do partners earn?",

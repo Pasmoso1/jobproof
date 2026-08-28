@@ -8,7 +8,11 @@ import {
   PARTNER_PAYMENT_METHOD_LABEL,
   hasPartnerPaymentEmail,
 } from "@/lib/partners/payment-details";
-import { rewardAmountForPartner } from "@/lib/partners/constants";
+import {
+  partnerFacingRewardStatusLabel,
+  rewardAmountForPartner,
+  rewardStatusLabel,
+} from "@/lib/partners/constants";
 
 const root = process.cwd();
 
@@ -16,37 +20,102 @@ function read(rel: string): string {
   return readFileSync(join(root, rel), "utf8");
 }
 
-describe("Partner payout UX content", () => {
-  it("Training no longer tells partners to explain the 90-day requirement", () => {
-    const tips = PARTNER_TRAINING_ARTICLES.find((a) => a.slug === "referral-tips");
-    assert.ok(tips);
-    assert.doesNotMatch(tips!.body, /Explain the 90 consecutive-day/i);
-    assert.match(
-      tips!.body,
-      /Focus on how JobProof helps contractors win work/i
-    );
+const PARTNER_FACING_COPY_FILES = [
+  "src/lib/partners/content/training.ts",
+  "src/lib/partners/content/faqs.ts",
+  "src/lib/partners/emails.ts",
+  "src/lib/partners/media-center-content.ts",
+  "src/app/partners/page.tsx",
+  "src/app/(partner)/partner/(portal)/page.tsx",
+  "src/app/(partner)/partner/(portal)/payments/page.tsx",
+  "src/app/(partner)/partner/(portal)/referrals/page.tsx",
+];
+
+const PAYOUT_REVIEW_PHRASES = [
+  /reviewed and approved by JobProof before payment/i,
+  /rewards are reviewed and approved/i,
+  /JobProof review and approval/i,
+  /awaiting JobProof review/i,
+  /once the referral qualifies and is approved/i,
+  /paid manually/i,
+  /payouts are reviewed manually/i,
+  /Approved \(awaiting payout\)/i,
+  /Approved reward/i,
+];
+
+describe("Partner payout copy — no discretionary approval messaging", () => {
+  it("partner-facing sources omit reward review/approval payout wording", () => {
+    for (const rel of PARTNER_FACING_COPY_FILES) {
+      const source = read(rel);
+      for (const pattern of PAYOUT_REVIEW_PHRASES) {
+        assert.doesNotMatch(
+          source,
+          pattern,
+          `${rel} should not match ${pattern}`
+        );
+      }
+    }
   });
 
-  it('removes "paid manually" from partner-facing Training and FAQ content', () => {
-    for (const article of PARTNER_TRAINING_ARTICLES) {
-      assert.doesNotMatch(article.body, /paid manually/i);
-    }
-    for (const faq of [...PARTNER_PORTAL_FAQS, ...PARTNER_LANDING_FAQS]) {
-      assert.doesNotMatch(faq.answer, /paid manually/i);
-    }
-    assert.match(
-      PARTNER_TRAINING_ARTICLES.find((a) => a.slug === "referral-tips")!.body,
-      /reviewed and approved by JobProof before payment/i
-    );
-  });
-
-  it("FAQ identifies Interac e-Transfer for payouts", () => {
+  it("FAQ does not say once the referral qualifies and is approved", () => {
     const whenPaid = PARTNER_PORTAL_FAQS.find((f) => f.question === "When do I get paid?");
     assert.ok(whenPaid);
-    assert.match(whenPaid!.answer, /Interac e-Transfer/);
+    assert.doesNotMatch(whenPaid!.answer, /once the referral qualifies and is approved/i);
+    assert.match(whenPaid!.answer, /Once the referral qualifies, your reward will be sent by Interac e-Transfer/i);
     assert.match(whenPaid!.answer, /90 consecutive days/);
-    assert.match(whenPaid!.answer, /payment email listed in your Partner account/);
-    assert.equal(PARTNER_PAYMENT_METHOD_LABEL, "Interac e-Transfer");
+  });
+
+  it("landing FAQ uses qualification + Interac wording without reward approval step", () => {
+    const whenPaid = PARTNER_LANDING_FAQS.find((f) => f.question === "When do I get paid?");
+    assert.ok(whenPaid);
+    assert.doesNotMatch(whenPaid!.answer, /and is approved/i);
+    assert.match(whenPaid!.answer, /Interac e-Transfer/);
+  });
+
+  it("Training does not tell partners rewards are reviewed or approved", () => {
+    for (const article of PARTNER_TRAINING_ARTICLES) {
+      assert.doesNotMatch(article.body, /reviewed and approved/i);
+      assert.doesNotMatch(article.body, /JobProof review and approval/i);
+    }
+    const tips = PARTNER_TRAINING_ARTICLES.find((a) => a.slug === "referral-tips");
+    assert.ok(tips);
+    assert.doesNotMatch(tips!.body, /before payment/i);
+  });
+
+  it("portal dashboard uses Interac e-Transfer payout wording from screenshot spec", () => {
+    const dashboard = read("src/app/(partner)/partner/(portal)/page.tsx");
+    assert.match(
+      dashboard,
+      /Rewards are paid by Interac\s*\n?\s*e-Transfer/
+    );
+    assert.doesNotMatch(dashboard, /reviewed and approved/i);
+  });
+
+  it("referral lifecycle emails avoid post-qualification approval language", () => {
+    const emails = read("src/lib/partners/emails.ts");
+    assert.doesNotMatch(emails, /awaiting JobProof review/i);
+    assert.doesNotMatch(emails, /Referral reward approved/i);
+    assert.match(emails, /Interac e-Transfer/);
+    assert.match(emails, /application is approved/i);
+  });
+});
+
+describe("Partner-facing reward status labels", () => {
+  it("maps internal approved status to Qualified for partners", () => {
+    assert.equal(partnerFacingRewardStatusLabel("approved"), "Qualified");
+    assert.equal(partnerFacingRewardStatusLabel("qualified"), "Qualified");
+    assert.equal(partnerFacingRewardStatusLabel("pending"), "Pending qualification");
+    assert.equal(partnerFacingRewardStatusLabel("paid"), "Paid");
+  });
+
+  it("keeps internal admin reward status label Approved", () => {
+    assert.equal(rewardStatusLabel("approved"), "Approved");
+  });
+
+  it("referrals page uses partnerFacingRewardStatusLabel", () => {
+    const source = read("src/app/(partner)/partner/(portal)/referrals/page.tsx");
+    assert.match(source, /partnerFacingRewardStatusLabel/);
+    assert.doesNotMatch(source, /rewardStatusLabel\(/);
   });
 });
 
@@ -74,33 +143,22 @@ describe("Partner payment email field reuse", () => {
     assert.match(action, /payment_email: paymentEmail/);
     assert.doesNotMatch(action, /auth\.updateUser|auth\.admin/);
     assert.doesNotMatch(action, /\.update\(\{[^}]*\bemail:/);
-    const form = read(
-      "src/app/(partner)/partner/(portal)/payments/payment-email-form.tsx"
-    );
-    assert.match(form, /different from your JobProof login email/);
-    assert.match(form, /PARTNER_PAYMENT_METHOD_LABEL/);
   });
 
   it("missing payment email does not appear in qualification cron/logic", () => {
     const cron = read("src/app/api/cron/partner-rewards/route.ts");
     assert.doesNotMatch(cron, /payment_email/);
-    const paymentsPage = read(
-      "src/app/(partner)/partner/(portal)/payments/page.tsx"
-    );
-    assert.match(paymentsPage, /Payment details/);
   });
 
-  it("new partner approvals leave payment_email unset for partner to provide", () => {
-    const approve = read("src/lib/partners/approve.ts");
-    assert.match(approve, /payment_email:\s*null/);
-  });
-
-  it("admin surfaces payment email and warns when missing before mark paid", () => {
+  it("admin surfaces payment email and internal approve workflow remains", () => {
     const client = read("src/app/admin/partners/admin-partners-client.tsx");
+    const adminPage = read("src/app/admin/partners/page.tsx");
+    const actions = read("src/app/admin/partners/actions.ts");
     assert.match(client, /payment_email/);
-    assert.match(client, /Missing payment email/);
-    assert.match(client, /hasPartnerPaymentEmail\(r\.partner_payment_email\)/);
-    assert.match(client, /PARTNER_PAYMENT_METHOD_LABEL/);
+    assert.match(client, /adminApproveReferralReward/);
+    assert.match(client, /adminMarkReferralPaid/);
+    assert.match(adminPage, /rewardStatusLabel/);
+    assert.match(actions, /reward_status: "approved"/);
   });
 });
 
@@ -136,10 +194,27 @@ describe("Reward amounts unchanged", () => {
     );
     assert.equal(
       rewardAmountForPartner({
+        partner_level: "founding",
+        partner_type: "marketing",
+      }),
+      150
+    );
+    assert.equal(
+      rewardAmountForPartner({
         partner_level: "standard",
         partner_type: "marketing",
       }),
       100
     );
+    assert.equal(PARTNER_PAYMENT_METHOD_LABEL, "Interac e-Transfer");
+  });
+});
+
+describe("Partner application approval language preserved", () => {
+  it("application approval copy remains in apply success and status views", () => {
+    const applySuccess = read("src/lib/partners/apply-success-copy.ts");
+    assert.match(applySuccess, /application has been approved/i);
+    const statusView = read("src/lib/partners/partner-status-view.ts");
+    assert.match(statusView, /application is approved/i);
   });
 });

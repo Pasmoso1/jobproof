@@ -45,9 +45,14 @@ export default async function PartnerDashboardPage() {
 
   const cards = [
     { label: "Referred", value: String(stats.referredCount) },
-    { label: "Qualified", value: String(stats.qualifiedCount) },
-    { label: "Pending reward", value: String(stats.pendingRewardCount) },
-    { label: "Approved reward", value: String(stats.approvedRewardCount) },
+    {
+      label: "Pending qualification",
+      value: String(stats.pendingRewardCount),
+    },
+    {
+      label: "Qualified",
+      value: String(stats.qualifiedCount + stats.approvedRewardCount),
+    },
     { label: "Paid", value: `$${stats.totalPaidCad.toFixed(0)} CAD` },
   ];
 
@@ -65,8 +70,8 @@ export default async function PartnerDashboardPage() {
           {typeMeta.shortLabel}
           {!isOrg ? ` · ${partnerLevelLabel(partner.partner_level)}` : null} · $
           {reward} CAD per qualified referral. A referral qualifies after 90
-          consecutive days as a paying subscriber; rewards are reviewed and
-          approved by JobProof before payment, with no recurring commissions.
+          consecutive days as a paying subscriber. Rewards are paid by Interac
+          e-Transfer, with no recurring commissions.
         </p>
         {!hasPartnerPaymentEmail(partner.payment_email) ? (
           <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -82,7 +87,7 @@ export default async function PartnerDashboardPage() {
         {isOrg ? null : <OrganizationPartnerCallout className="mt-4" />}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => (
           <div
             key={c.label}
@@ -101,8 +106,7 @@ export default async function PartnerDashboardPage() {
         <p className="mt-2 text-sm text-zinc-600">
           Share your referral link with contractors who are a good fit for JobProof.
           Referral quality matters more than signup volume. Once they remain a paying
-          subscriber for 90 consecutive days, the reward becomes eligible for JobProof
-          review and approval.
+          subscriber for 90 consecutive days, the referral qualifies for your reward.
         </p>
         <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
           <div className="min-w-0 flex-1 space-y-3">

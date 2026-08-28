@@ -4,7 +4,6 @@ import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
 import { computePartnerDashboardStats } from "@/lib/partners/dashboard-stats";
 import { formatBillingDateOrDash } from "@/lib/billing-date-display";
 import { PartnerPaymentEmailForm } from "./payment-email-form";
-import { PARTNER_PAYMENT_METHOD_LABEL } from "@/lib/partners/payment-details";
 
 export default async function PartnerPaymentsPage() {
   const session = await getActivePartnerForCurrentUser();
@@ -30,19 +29,19 @@ export default async function PartnerPaymentsPage() {
       <div>
         <h1 className="text-2xl font-bold text-zinc-900">Earnings</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Rewards move from Pending → Qualified → Approved → Paid after JobProof review.
-          Payouts are sent by {PARTNER_PAYMENT_METHOD_LABEL}.
+          Track rewards from referral through qualification to Interac e-Transfer
+          payout. Statuses show as Pending qualification, Qualified, or Paid.
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat
-          label="Pending / qualified"
-          value={`$${(stats.pendingAmountCad + stats.qualifiedAmountCad).toFixed(0)} CAD`}
+          label="Pending qualification"
+          value={`$${stats.pendingAmountCad.toFixed(0)} CAD`}
         />
         <Stat
-          label="Approved (awaiting payout)"
-          value={`$${stats.approvedAmountCad.toFixed(0)} CAD`}
+          label="Qualified"
+          value={`$${(stats.qualifiedAmountCad + stats.approvedAmountCad).toFixed(0)} CAD`}
         />
         <Stat label="Total earned (paid)" value={`$${stats.totalPaidCad.toFixed(0)} CAD`} />
       </div>
