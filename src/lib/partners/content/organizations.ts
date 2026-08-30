@@ -13,21 +13,21 @@ export const ORGANIZATION_PARTNERS_HERO = {
   eyebrow: "Association & Organization Partners",
   title: "Association & Organization Partners",
   subtitle:
-    "Help your members win more work, operate more professionally, and protect their businesses while creating a new revenue opportunity for your organization.",
+    "Help your members win more work, grow stronger businesses, get paid, and protect the revenue they've earned — while creating a new revenue opportunity for your organization.",
   headline: "A stronger member benefit for today's contractors.",
   supporting:
-    "JobProof helps contractors do far more than document their work. Organizations can provide members with a modern business tool while earning referral revenue.",
+    "JobProof is more than documentation. Organizations can provide members with a modern business platform for winning work, managing jobs, getting paid, and protecting earned revenue — while earning referral rewards.",
   memberBenefits: [
     "Win more jobs",
+    "Make it easier for customers to request a quote",
     "Create professional quotes",
-    "Manage contracts",
-    "Handle change orders",
-    "Send invoices",
-    "Organize job documentation",
-    "Build customer confidence",
-    "Reduce disputes",
-    "Protect their business",
-    "Grow professionally",
+    "Convert work into signed agreements",
+    "Manage change orders",
+    "Send invoices and get paid",
+    "Document jobs",
+    "Protect payment and revenue",
+    "Operate more professionally",
+    "Grow their business",
   ],
   primaryCta: { label: "Become an Organization Partner", href: "/partners/organizations/apply" },
 } as const;
@@ -49,7 +49,7 @@ export const ORGANIZATION_WHY_CARDS = [
     id: "grow",
     icon: "bolt",
     title: "Help Members Grow",
-    body: "Support contractors beyond advocacy by helping them win and manage more work.",
+    body: "Support contractors beyond advocacy by helping them win more work, get paid, and protect earned revenue.",
   },
   {
     id: "promote",
@@ -74,39 +74,39 @@ export const ORGANIZATION_WHY_CARDS = [
 export const ORGANIZATION_AUDIENCE_CARDS = [
   {
     title: "Chamber of Commerce",
-    body: "Give local contractors a shared platform for quotes, contracts, invoices, and professional growth.",
+    body: "Give local contractors tools to win more work, quote professionally, get paid, and grow stronger businesses.",
   },
   {
     title: "Construction Association",
-    body: "Help members look more professional on every bid while staying organized from quote to payment.",
+    body: "Help members turn opportunities into paying jobs and manage the path from quote to payment.",
   },
   {
     title: "Home Builders Association",
-    body: "Support builders and renovators with clearer approvals, change orders, and job documentation.",
+    body: "Support builders and renovators with quoting, contracts, change orders, invoicing, and job records.",
   },
   {
     title: "Electrical Association",
-    body: "Equip electricians to win more work with polished quotes and stronger project records.",
+    body: "Equip electricians to win more work with polished quotes and clearer payment workflows.",
   },
   {
     title: "HVAC Association",
-    body: "Help HVAC members manage jobs, invoices, and customer communication in one place.",
+    body: "Help HVAC members manage opportunities, jobs, invoices, and customer follow-up in one place.",
   },
   {
     title: "Landscape Association",
-    body: "Give landscapers tools to quote faster, document sites, and protect every project.",
+    body: "Give landscapers tools to quote faster, win more work, get paid, and protect every project.",
   },
   {
     title: "Plumbing Association",
-    body: "Support plumbers with professional proposals, contracts, and organized job history.",
+    body: "Support plumbers with professional proposals, contracts, invoicing, and organized job history.",
   },
   {
     title: "Roofing Association",
-    body: "Help roofers create clearer estimates, manage change orders, and reduce disputes.",
+    body: "Help roofers win more estimates, manage change orders, get paid, and protect earned revenue.",
   },
   {
     title: "Renovation Association",
-    body: "Give renovators a complete workflow from first quote through final invoice.",
+    body: "Give renovators a complete workflow from first quote request through final invoice.",
   },
   {
     title: "Business Network",
@@ -114,7 +114,7 @@ export const ORGANIZATION_AUDIENCE_CARDS = [
   },
   {
     title: "Franchise System",
-    body: "Give franchise locations consistent quoting, contracting, and documentation tools.",
+    body: "Give franchise locations consistent tools for quoting, contracting, invoicing, and growth.",
   },
   {
     title: "Buying Group",
@@ -161,21 +161,21 @@ export const ORGANIZATION_PROMOTE_WAYS = [
 
 export const ORGANIZATION_COMPARISON = {
   without: [
-    "Paper quotes",
-    "Manual documentation",
-    "Lost photos",
-    "Unorganized jobs",
-    "Higher dispute risk",
+    "Missed quote opportunities",
+    "Paper quotes and slow follow-up",
+    "Unclear change approvals",
+    "Payment delays",
+    "Weak job records when disputes arise",
   ],
   with: [
+    "Easier quote requests",
     "Professional quotes",
-    "Contracts",
-    "Change Orders",
-    "Invoices",
-    "Organized job records",
-    "Secure documentation",
-    "Better customer confidence",
-    "Business growth tools",
+    "Signed contracts",
+    "Approved change orders",
+    "Clear invoices",
+    "Path from inquiry to payment",
+    "Records that help protect revenue",
+    "Tools to grow the business",
   ],
 } as const;
 
@@ -269,7 +269,7 @@ export const ORGANIZATION_FAQS = [
 ] as const;
 
 export const ORGANIZATION_FINAL_CTA = {
-  headline: "Help your members build stronger businesses.",
+  headline: "Help your members win more work and build stronger businesses.",
   primaryCta: { label: "Apply Now", href: "/partners/organizations/apply" },
 } as const;
 

@@ -31,121 +31,119 @@ const THEME_CORE: Record<
   { headline: string; bullets: string[]; focus: string }
 > = {
   getting_more_jobs: {
-    headline: "Win more work with professional quotes and fast follow-up.",
+    headline: "Win more work. Grow your contracting business.",
     bullets: [
-      "Respond to quote requests quickly",
-      "Present professional estimates",
-      "Convert more leads into paying customers",
+      "Make it easier for customers to request a quote",
+      "Respond quickly and professionally",
+      "Help turn more opportunities into paying jobs",
     ],
     focus:
-      "JobProof helps contractors convert more leads into paying customers with clearer quoting and follow-up.",
+      "JobProof is designed to help contractors turn more opportunities into paying jobs — from the first inquiry through follow-up.",
   },
   professional_quotes: {
-    headline: "Create professional quotes in minutes.",
+    headline: "Help turn quote requests into paying jobs.",
     bullets: [
-      "Customers approve online",
-      "No paperwork scramble",
+      "Present clear, professional quotes",
+      "Customers can review and approve online",
       "Less confusion on scope and price",
     ],
     focus:
-      "Create professional quotes customers can review and approve without the usual back-and-forth.",
+      "A professional quoting process helps contractors move from interest to agreement with less back-and-forth.",
   },
   customer_quote_requests: {
-    headline: "Capture customer quote requests in one place.",
+    headline: "Make it easier for customers to hire you.",
     bullets: [
-      "Inbound requests stay organized",
-      "Respond faster with clearer details",
-      "Start every job on the right foot",
+      "Give customers a simple way to request a quote",
+      "Respond to opportunities quickly",
+      "Keep inbound requests in one place",
     ],
     focus:
-      "JobProof helps contractors receive and manage customer quote requests without losing details in texts and emails.",
+      "JobProof gives customers an easier way to request a quote — and gives contractors a clearer path to respond.",
   },
   contracts: {
-    headline: "Professional contracts. Clear approvals.",
+    headline: "Turn interest into a clear signed agreement.",
     bullets: [
-      "Put agreements in writing",
+      "Put the agreement in writing",
       "Collect customer approvals",
-      "Reduce misunderstandings before work starts",
+      "Start work with clearer expectations",
     ],
     focus:
-      "JobProof helps contractors create professional contracts and secure clear customer approvals.",
+      "Once a customer is ready to move forward, JobProof helps turn the agreement into a clear signed contract.",
   },
   change_orders: {
-    headline: "Track every change before it becomes a dispute.",
+    headline: "Get paid for the extra work you do.",
     bullets: [
       "Document scope changes",
-      "Get customer approval",
-      "Keep the job financially clear",
+      "Get customer approval before billing",
+      "Protect revenue when the job expands",
     ],
     focus:
-      "Change orders in JobProof help contractors stay aligned when the work changes.",
+      "When the scope changes, JobProof helps contractors document and approve additional work so they have a better chance of getting paid for it.",
   },
   invoicing: {
-    headline: "Invoice professionally. Get paid with confidence.",
+    headline: "Invoice for completed work with clarity.",
     bullets: [
       "Accurate invoices tied to the job",
       "Clearer customer payment experience",
       "Less chasing and confusion",
     ],
     focus:
-      "JobProof helps contractors create professional invoices connected to the work they completed.",
+      "JobProof helps contractors create professional invoices connected to the work they completed — so they can get paid.",
   },
   getting_paid_faster: {
-    headline: "Track every change. Invoice professionally. Reduce payment delays.",
+    headline: "Get paid for the work you do.",
     bullets: [
       "Clear approvals before billing",
-      "Organized job records",
-      "Faster, cleaner payment follow-up",
+      "Invoices connected to the job",
+      "A cleaner path from work done to payment",
     ],
     focus:
-      "Stay organized and reduce payment delays with quotes, approvals, change orders, and invoices in one place.",
+      "From approved changes to professional invoices, JobProof helps contractors manage the path from completed work to payment.",
   },
   project_documentation: {
-    headline: "Document the work with photos, files, and clear records.",
+    headline: "Protect the revenue you've earned.",
     bullets: [
-      "Upload photos and files",
-      "Keep project details connected",
-      "Protect every job with better records",
+      "Keep photos and files with the job",
+      "Preserve proof of work completed",
+      "Support payment if disagreements arise",
     ],
     focus:
-      "Project documentation in JobProof helps contractors preserve the proof of work alongside the rest of the job.",
+      "Clear job records help contractors protect the revenue they've earned when questions or disputes come up.",
   },
   job_organization: {
-    headline: "Customers, jobs, files, and follow-up—organized.",
+    headline: "Grow your business with better tools.",
     bullets: [
-      "Manage customers and jobs",
-      "Keep documents together",
-      "Spend less time searching for details",
+      "Manage customers and jobs in one place",
+      "Keep the path from inquiry to payment together",
+      "Spend less time hunting for details",
     ],
     focus:
-      "JobProof helps contractors stay organized from the first inquiry through final payment.",
+      "JobProof gives contractors tools to help grow their business — from quote request through payment — in one platform.",
   },
   protect_every_job: {
-    headline: "Protect every job with approvals and clear records.",
+    headline: "Protect every job. Get paid. Stay protected.",
     bullets: [
       "Quotes, contracts, and change orders",
       "Photos and documentation",
       "Records that support the work you completed",
     ],
     focus:
-      "JobProof helps contractors protect every job with organized approvals, documentation, and project records.",
+      "JobProof helps contractors protect the work and revenue they've earned with clear approvals and project records.",
   },
   everything_jobproof: {
-    headline: STUDIO_TAGLINE,
+    headline: "From quote request to payment.",
     bullets: [
-      "Get more jobs",
-      "Create quotes",
-      "Manage customers",
-      "Track projects",
-      "Collect approvals",
-      "Create contracts",
+      "Win more work",
+      "Capture quote requests",
+      "Create professional quotes",
+      "Sign agreements",
       "Manage change orders",
       "Invoice customers",
-      "Document work",
-      "Protect every job",
+      "Get paid",
+      "Protect the revenue you've earned",
     ],
     focus:
-      "From the first customer inquiry to the final payment, JobProof helps contractors run a more professional business.",
+      "JobProof is a business tool designed to help contractors win more work, make more money, get paid, and protect the work they've earned.",
   },
 };
 
@@ -174,9 +172,9 @@ function applyVariant(base: string, variant: StudioCopyVariantId): string {
         "contractors like you"
       );
     case "educational":
-      return `${base}\n\nWhy it matters: clearer systems help contractors win more work, stay organized, get paid, and protect every job.`;
+      return `${base}\n\nWhy it matters: better tools and workflows can help contractors win more work, get paid, and protect the revenue they've earned.`;
     case "detailed":
-      return `${base}\n\n${STUDIO_TAGLINE}\n\nUse one platform for quote requests, professional quotes, customers, jobs, contracts, change orders, documentation, invoices, and payment follow-up.`;
+      return `${base}\n\n${STUDIO_TAGLINE}\n\nUse one platform for quote requests, professional quotes, contracts, change orders, invoices, documentation, and payment follow-up — designed to help contractors grow their business.`;
     case "professional":
     default:
       return base;

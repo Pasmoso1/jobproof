@@ -26,7 +26,7 @@ export const PARTNER_TYPES = [
     applyHref: "/partners/apply?type=creator",
     ctaLabel: "Become a Creator Partner",
     cardBody:
-      "Introduce JobProof to contractors through your content and audience.",
+      "Introduce JobProof so contractors can win more work and run stronger businesses.",
     dashboardIntro: "Share JobProof with your audience.",
   },
   {
@@ -49,7 +49,7 @@ export const PARTNER_TYPES = [
     label: "Organization",
     shortLabel: "Organization Partner",
     description:
-      "Introduce JobProof to your members and earn partner rewards while helping contractors access tools built for their businesses.",
+      "Introduce JobProof to your members and earn partner rewards while helping contractors access tools to win more work and grow their businesses.",
     applyHint:
       "For associations, trade organizations, contractor groups and membership organizations.",
     applyHref: "/partners/organizations/apply",

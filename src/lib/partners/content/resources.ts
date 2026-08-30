@@ -1,4 +1,4 @@
-/** Marketing resource library placeholders — add real assets later. */
+/** Marketing resource library + partner sales copy helpers. */
 
 export type PartnerResource = {
   id: string;
@@ -90,12 +90,47 @@ export const PARTNER_RESOURCE_CATEGORY_LABELS: Record<PartnerResource["category"
   print: "Flyers & print",
 };
 
+/** Ready-to-use partner intro language (no guaranteed-income claims). */
+export const PARTNER_SALES_COPY = {
+  introduction:
+    "JobProof gives contractors tools to help turn opportunities into paying jobs — from quote requests and professional quotes to contracts, change orders, invoices and job documentation.",
+  socialShort:
+    "More jobs. Better processes. Better protection. JobProof helps contractors manage the journey from quote request to payment.",
+  mainMessage:
+    "JobProof isn't just about paperwork. It's a business tool designed to help contractors win more work, make more money, and protect the work they've earned.",
+  supporting:
+    "Saving time, looking professional, staying organized and reducing disputes are important benefits — but they support the bigger goal of running a more successful contracting business.",
+  conversationSteps: [
+    {
+      title: "Find the pain",
+      body: "Ask how the contractor currently gets leads, handles quote requests, follows up, manages contracts and gets paid.",
+    },
+    {
+      title: "Connect the opportunity",
+      body: "Explain how JobProof can help turn more of that activity into organized, paying work.",
+    },
+    {
+      title: "Show the workflow",
+      body: "Quote request → Quote → Signed agreement → Job → Changes → Invoice → Documentation",
+    },
+    {
+      title: "Lead with the outcome",
+      body: "More opportunities converted into work, better control over payment, and less revenue lost through poor processes or disputes.",
+    },
+    {
+      title: "Share your referral link",
+      body: "Let the contractor explore JobProof and start their trial.",
+    },
+  ],
+} as const;
+
 export const MARKETING_PARTNER_POLICY = {
   title: "Marketing Partner guidelines",
   intro:
     "Marketing Partners promote JobProof through their own channels and earn referral rewards for qualified contractor customers. JobProof does not hire Marketing Partners as agencies and does not automatically cover advertising costs unless agreed in writing.",
   mustNot: [
     "Make false or misleading claims about JobProof",
+    "Promise that JobProof will increase a contractor's income or job volume",
     "Pretend to be JobProof",
     "Create websites or social accounts that impersonate JobProof",
     "Spam potential customers",

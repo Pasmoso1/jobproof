@@ -68,7 +68,8 @@ export default async function PartnersLandingPage() {
             </h1>
             <p className="mt-4 text-lg leading-relaxed text-zinc-600">
               JobProof partners with trusted people and organizations who regularly support
-              independent contractors. Share a referral link. Earn a one-time reward when they
+              independent contractors. Share a product that helps contractors win more work,
+              get paid, and protect earned revenue — and earn a one-time reward when they
               become lasting customers.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -195,8 +196,9 @@ export default async function PartnersLandingPage() {
             <h2 className="text-2xl font-bold text-zinc-950">Who should you refer?</h2>
             <p className="mt-3 leading-relaxed text-zinc-600">
               JobProof is best suited to independent contractors and small contracting
-              businesses that prepare quotes, visit job sites, send proposals, document
-              work, or manage customer approvals.
+              businesses that want better tools to win work, respond to quote requests,
+              create professional quotes, convert agreements, manage changes, invoice
+              customers, and protect the revenue they&apos;ve earned.
             </p>
             <ul className="mt-6 grid gap-2 text-sm text-zinc-800 sm:grid-cols-3">
               {[
@@ -224,15 +226,29 @@ export default async function PartnersLandingPage() {
               These are examples, not limits—contractors in other trades are welcome.
             </p>
             <div className="mt-7 rounded-xl border border-zinc-200 bg-white p-5">
+              <h3 className="font-semibold text-zinc-950">What partners promote</h3>
+              <p className="mt-2 text-sm text-zinc-600">
+                JobProof is a business platform — not just a documentation app. Partners
+                introduce contractors to tools that help them:
+              </p>
+              <ul className="mt-3 space-y-2 text-sm text-zinc-700">
+                <li>• Attract and capture opportunities</li>
+                <li>• Respond to quote requests quickly</li>
+                <li>• Create professional quotes</li>
+                <li>• Convert work into signed agreements</li>
+                <li>• Manage change orders</li>
+                <li>• Invoice customers and get paid</li>
+                <li>• Document jobs and protect earned revenue</li>
+                <li>• Operate more professionally</li>
+              </ul>
+            </div>
+            <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-5">
               <h3 className="font-semibold text-zinc-950">The ideal referral</h3>
               <ul className="mt-3 space-y-2 text-sm text-zinc-700">
                 <li>• Is an independent contractor or small company</li>
-                <li>• Regularly prepares quotes</li>
-                <li>• Wants to look more professional</li>
-                <li>
-                  • Needs a better way to organize customer details, photos, notes,
-                  approvals, and proposals
-                </li>
+                <li>• Wants to win more work and grow the business</li>
+                <li>• Regularly handles quote requests and proposals</li>
+                <li>• Needs a clearer path from inquiry to payment</li>
                 <li>• Is willing to use a digital tool to improve the business</li>
               </ul>
             </div>
@@ -244,7 +260,7 @@ export default async function PartnersLandingPage() {
             <h2 className="text-2xl font-bold text-zinc-950">Why become a JobProof Partner</h2>
             <ul className="mt-6 space-y-3 text-zinc-700">
               {[
-                "Help contractors grow their business with better tools",
+                "Help contractors win more work and grow their business",
                 "Recommend software you believe in",
                 "Earn straightforward referral rewards",
                 "No ongoing account management required",

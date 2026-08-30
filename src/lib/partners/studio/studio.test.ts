@@ -43,10 +43,13 @@ describe("partner marketing studio copy", () => {
     assert.match(copy.caption, /https:\/\/jobproof\.ca\/signup\?ref=ABC123/);
     assert.match(copy.caption, /ABC Roofing/);
     assert.match(copy.caption, /Founding Partner/);
-    assert.match(copy.postBody, /Create quotes/i);
+    assert.match(copy.postBody, /Create professional quotes/i);
     assert.match(copy.postBody, /Manage change orders/i);
-    assert.match(copy.emailSubject, /JobProof/);
+    assert.match(copy.caption, /From quote request to payment/i);
+    assert.match(copy.emailHtml, /JobProof/);
     assert.match(copy.emailHtml, /Explore JobProof/);
+    assert.doesNotMatch(copy.caption, /guarantees? more (jobs|money|income)/i);
+    assert.doesNotMatch(copy.caption, /will make you more money/i);
   });
 
   it("supports short copy variants without dropping the referral link", () => {

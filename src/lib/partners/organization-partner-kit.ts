@@ -74,17 +74,14 @@ function shellHtml(title: string, body: string): string {
 
 function memberBenefitsList(): string {
   return [
-    "Get more jobs",
-    "Receive customer quote requests",
+    "Win more work",
+    "Make it easier for customers to request a quote",
     "Create professional quotes",
-    "Manage customers",
-    "Manage projects",
-    "Create contracts",
-    "Handle change orders",
-    "Create invoices",
-    "Stay organized",
-    "Get paid faster",
-    "Protect every job",
+    "Turn agreements into signed contracts",
+    "Document and approve change orders",
+    "Invoice customers and get paid",
+    "Protect the revenue they've earned",
+    "Operate more professionally",
   ]
     .map((b) => `<li>${b}</li>`)
     .join("\n");
@@ -130,7 +127,7 @@ export const ORGANIZATION_PARTNER_KIT: OrganizationKitItem[] = [
         "JobProof Member Benefit One-Pager",
         `<p class="eyebrow">Recommended by ${escapeHtml(ctx.organizationName)}</p>
         <h1>A stronger business tool for contractors</h1>
-        <p class="muted">JobProof helps contractors win more work, stay organized, get paid faster, and protect every job.</p>
+        <p class="muted">JobProof is designed to help contractors win more work, make more money, get paid, and protect the work they've earned.</p>
         <h2>What members can do with JobProof</h2>
         <ul>${memberBenefitsList()}</ul>
         <p>Approved Organization Partners earn <span class="accent">$${FOUNDING_REWARD_CAD} CAD</span> for each qualified contractor referral, subject to existing qualification requirements.</p>
@@ -151,15 +148,14 @@ export const ORGANIZATION_PARTNER_KIT: OrganizationKitItem[] = [
     build: (ctx) =>
       `Recommended Member Tool: JobProof
 
-${ctx.organizationName} is proud to recommend JobProof — an all-in-one platform that helps contractors:
+${ctx.organizationName} is proud to recommend JobProof — a business platform designed to help contractors:
 
-• Get more jobs
-• Receive customer quote requests
-• Create professional quotes
-• Manage customers and projects
-• Create contracts and change orders
-• Create invoices and get paid faster
-• Stay organized and protect every job
+• Win more work
+• Make it easier for customers to request a quote
+• Create professional quotes and signed agreements
+• Manage change orders and get paid for extra work
+• Invoice customers clearly
+• Protect the revenue they've earned
 
 Members can get started here:
 ${ctx.referralUrl}
@@ -205,7 +201,7 @@ Questions? Reply to this newsletter or visit JobProof for a quick demo.
         "JobProof for Members",
         `<p class="eyebrow">${escapeHtml(ctx.organizationName)}</p>
         <h1>A recommended tool for growing contractor businesses</h1>
-        <p>We recommend JobProof to help members get more jobs, create professional quotes, manage projects, handle contracts and change orders, invoice with confidence, and get paid faster — while protecting every job.</p>
+        <p>We recommend JobProof to help members win more work, turn opportunities into paying jobs, manage contracts and change orders, invoice with clarity, get paid, and protect the revenue they've earned.</p>
         <ul>${memberBenefitsList()}</ul>
         ${referralBlock(ctx)}
         <a class="cta" href="${escapeHtml(ctx.referralUrl)}">Explore JobProof</a>
@@ -226,11 +222,10 @@ Questions? Reply to this newsletter or visit JobProof for a quick demo.
 Hi,
 
 ${ctx.organizationName} recommends JobProof for contractors who want to:
-- Get more jobs and receive quote requests
+- Win more work and respond to quote requests quickly
 - Create professional quotes, contracts, and invoices
-- Manage customers and projects in one place
-- Handle change orders clearly
-- Stay organized, get paid faster, and protect every job
+- Manage change orders so extra work is easier to bill
+- Get paid and protect the revenue they've earned
 
 Get started: ${ctx.referralUrl}
 Referral code: ${ctx.referralCode}
@@ -422,7 +417,7 @@ function buildPrintSvg(
   <text x="48" y="90" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="700" fill="#2436BB">RECOMMENDED BY</text>
   <text x="48" y="140" font-family="Segoe UI, Arial, sans-serif" font-size="36" font-weight="700" fill="#18181b">${escapeXml(truncate(ctx.organizationName, 32))}</text>
   <text x="48" y="210" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="700" fill="#2436BB">JobProof</text>
-  <text x="48" y="260" font-family="Segoe UI, Arial, sans-serif" font-size="22" fill="#52525b">Win more work. Stay organized. Get paid. Protect every job.</text>
+  <text x="48" y="260" font-family="Segoe UI, Arial, sans-serif" font-size="22" fill="#52525b">Win more work. Make more money. Get paid. Protect what you've earned.</text>
   <text x="48" y="330" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600" fill="#18181b">Members can:</text>
   <text x="48" y="370" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#3f3f46">• Get more jobs &amp; quote requests</text>
   <text x="48" y="400" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#3f3f46">• Create quotes, contracts &amp; invoices</text>

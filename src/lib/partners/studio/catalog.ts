@@ -1,7 +1,7 @@
 /** Marketing Studio catalog — themes, audiences, goals, platforms, styles. */
 
 export const STUDIO_TAGLINE =
-  "Win more work. Stay organized. Get paid. Protect every job.";
+  "Win more work. Make more money. Get paid. Protect what you've earned.";
 
 export type StudioThemeId =
   | "getting_more_jobs"
@@ -80,67 +80,67 @@ export type StudioOption<T extends string> = {
 export const STUDIO_THEMES: StudioOption<StudioThemeId>[] = [
   {
     id: "getting_more_jobs",
-    label: "Getting More Jobs",
-    description: "Win more work with professional follow-up and conversions.",
+    label: "Win More Work",
+    description: "Help turn more opportunities into paying jobs.",
     icon: "briefcase",
   },
   {
     id: "professional_quotes",
-    label: "Professional Quotes",
-    description: "Create clear quotes customers can approve online.",
+    label: "Turn Quotes Into Jobs",
+    description: "Help convert quote requests with a professional quoting process.",
     icon: "document",
   },
   {
     id: "customer_quote_requests",
-    label: "Customer Quote Requests",
-    description: "Capture inbound requests and respond faster.",
+    label: "Make It Easier to Hire You",
+    description: "Give customers an easier way to request a quote.",
     icon: "inbox",
   },
   {
     id: "contracts",
-    label: "Contracts",
-    description: "Professional contracts and clear approvals.",
+    label: "Signed Agreements",
+    description: "Help turn interest into clear signed contracts.",
     icon: "contract",
   },
   {
     id: "change_orders",
-    label: "Change Orders",
-    description: "Track scope changes before they become disputes.",
+    label: "Get Paid for Changes",
+    description: "Document and approve extra work so it is easier to bill.",
     icon: "refresh",
   },
   {
     id: "invoicing",
-    label: "Invoicing",
-    description: "Invoice accurately and look more professional.",
+    label: "Invoice With Clarity",
+    description: "Help contractors bill clearly for completed work.",
     icon: "invoice",
   },
   {
     id: "getting_paid_faster",
-    label: "Getting Paid Faster",
-    description: "Reduce payment delays with clearer systems.",
+    label: "Get Paid for the Work You Do",
+    description: "Clearer path from completed work to payment.",
     icon: "bolt",
   },
   {
     id: "project_documentation",
-    label: "Project Documentation",
-    description: "Photos, files, and records that protect the job.",
+    label: "Protect the Revenue You Earn",
+    description: "Records that help protect income if disagreements arise.",
     icon: "camera",
   },
   {
     id: "job_organization",
-    label: "Job Organization",
-    description: "Keep customers, jobs, and files in one place.",
+    label: "Grow With Better Systems",
+    description: "Keep the path from inquiry to payment in one place.",
     icon: "folder",
   },
   {
     id: "protect_every_job",
     label: "Protect Every Job",
-    description: "Approvals and records that support every project.",
+    description: "Approvals and records that support payment and protection.",
     icon: "shield",
   },
   {
     id: "everything_jobproof",
-    label: "Everything JobProof",
+    label: "From Quote Request to Payment",
     description: "The full platform—from first inquiry to final payment.",
     icon: "grid",
   },

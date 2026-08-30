@@ -57,10 +57,10 @@ export const MEDIA_CENTER_NOTICE =
   "Please use only the approved assets and wording provided here. Do not alter the JobProof logo, make unsupported product claims, or imply that JobProof endorses your business.";
 
 export const MEDIA_CENTER_MISSION =
-  "Help contractors win more jobs, get paid faster, and protect every project.";
+  "Help contractors win more work, make more money, get paid, and protect the revenue they've earned.";
 
 export const MEDIA_CENTER_POSITIONING =
-  "JobProof is an all-in-one contractor business platform that helps contractors manage the customer journey from the initial quote request through approvals, project records, invoicing, payment, and ongoing business protection.";
+  "JobProof is a contractor business platform designed to help turn more opportunities into paying jobs — from the initial quote request through quotes, contracts, change orders, invoicing, payment, and job records that help protect earned revenue.";
 
 export const MEDIA_CENTER_PERSONALITY = [
   "Professional",
@@ -600,15 +600,15 @@ export const MEDIA_EMAIL_RESOURCES: EmailResource[] = [
     description: "HTML and plain-text introduction partners can send to contractors.",
     htmlHref: "/media-kit/email/introduction-email.html",
     htmlFileName: "introduction-email.html",
-    textBody: `Help contractors win more jobs and get paid faster
+    textBody: `Win more work. Run a better business.
 
-JobProof is an all-in-one contractor platform for quotes, contracts, change orders, invoices, documentation, and dispute protection—so contractors can present a professional image and protect every project.
+JobProof gives contractors tools to help turn opportunities into paying jobs — from quote requests and professional quotes to contracts, change orders, invoices and job documentation.
 
 Share JobProof: ${PARTNER_LINK_TOKEN}`,
     subjects: [
-      "A simpler way for contractors to quote, contract, and get paid",
-      "Help your network look more professional on every job",
-      "Quotes, contracts, change orders, and invoices—in one place",
+      "Tools to help turn opportunities into paying jobs",
+      "From quote request to payment — in one place",
+      "Help contractors win more work and get paid",
     ],
   },
   {
@@ -619,7 +619,7 @@ Share JobProof: ${PARTNER_LINK_TOKEN}`,
     htmlFileName: "referral-email.html",
     textBody: `Hi,
 
-I wanted to share JobProof with you. It’s built for contractors who need professional quotes, contracts, change orders, invoices, documentation, and clearer payment workflows—with records that support dispute protection.
+I wanted to share JobProof with you. It’s designed to help contractors turn more opportunities into paying jobs — from quote requests through quotes, contracts, changes, invoicing, and documentation that helps protect the work they’ve earned.
 
 Learn more: ${PARTNER_LINK_TOKEN}
 
@@ -633,20 +633,20 @@ Happy to answer questions if helpful.`,
     htmlFileName: "reminder-email.html",
     textBody: `Hi,
 
-Quick reminder about JobProof—the contractor platform for quotes, contracts, change orders, invoices, and job documentation that helps teams look professional and get paid with more confidence.
+Quick reminder about JobProof — a business platform designed to help contractors win more work, manage jobs professionally, get paid, and protect the revenue they’ve earned.
 
 Here’s the link again: ${PARTNER_LINK_TOKEN}`,
   },
 ];
 
 export const EMAIL_SUBJECT_SUGGESTIONS = [
-  "A simpler way for contractors to quote, contract, and get paid",
-  "Help your network look more professional on every job",
-  "Quotes, contracts, change orders, and invoices—in one place",
-  "Protect every project with clearer documentation",
-  "Share JobProof with contractors who want faster payments",
-  "From first quote to final invoice—without the paperwork scramble",
-  "A Canadian platform built for growing trade businesses",
+  "Tools to help turn opportunities into paying jobs",
+  "From quote request to payment — in one place",
+  "Help contractors win more work and get paid",
+  "Make it easier for customers to hire you",
+  "Win the job. Manage the work. Get paid.",
+  "Grow your contracting business with better tools",
+  "More than job documentation — a business platform",
 ] as const;
 
 export const PARTNER_COPY_LIBRARY: CopyBlock[] = [
@@ -654,27 +654,29 @@ export const PARTNER_COPY_LIBRARY: CopyBlock[] = [
     id: "tagline",
     title: "Tagline",
     intendedUse: "Headlines and short brand lines.",
-    body: "Win more jobs. Get paid faster. Protect every project.",
+    body: "Win more work. Make more money. Get paid. Protect what you've earned.",
   },
   {
     id: "one-sentence",
     title: "One sentence",
     intendedUse: "Bios, directories, and short intros.",
-    body: "JobProof helps contractors manage quotes, contracts, change orders, invoices, and documentation in one professional platform.",
+    body: "JobProof gives contractors tools to help turn opportunities into paying jobs — from quote requests and professional quotes to contracts, change orders, invoices and job documentation.",
   },
   {
     id: "short-description",
     title: "Short description",
     intendedUse: "Website snippets and partner directories.",
-    body: "JobProof is an all-in-one contractor platform for quotes, contracts, change orders, invoices, documentation, and dispute protection—helping teams look professional and get paid with more confidence.",
+    body: "JobProof is a contractor business platform designed to help win more work, manage the path from inquiry to payment, and protect the revenue contractors have earned — with quotes, contracts, change orders, invoices, and job records in one place.",
   },
   {
     id: "long-description",
     title: "Long description",
     intendedUse: "About pages, newsletters, and press-style blurbs.",
-    body: `JobProof is a Canadian contractor business platform designed to help independent contractors and growing trade businesses operate more professionally and confidently.
+    body: `JobProof is a Canadian contractor business platform designed to help independent contractors and growing trade businesses win more work and run stronger businesses.
 
-Instead of juggling disconnected tools for quoting, approvals, change orders, job records, invoicing, and payment follow-up, JobProof brings the customer journey together in one place. Contractors can present a stronger professional image, keep clearer documentation, and protect every project with organized records.
+Instead of juggling disconnected tools for quoting, approvals, change orders, job records, invoicing, and payment follow-up, JobProof brings the customer journey together in one place. Contractors get tools to help turn opportunities into paying jobs, invoice clearly, and protect the revenue they've earned with organized records.
+
+Saving time, looking professional, staying organized, and reducing disputes remain important benefits — they support the bigger goal of growing a successful contracting business.
 
 JobProof is intended for renovators, landscapers, roofers, painters, plumbers, electricians, HVAC professionals, and other service-based contractors.`,
   },
@@ -682,43 +684,49 @@ JobProof is intended for renovators, landscapers, roofers, painters, plumbers, e
     id: "facebook-copy",
     title: "Facebook",
     intendedUse: "Facebook posts and captions.",
-    body: `Contractors deserve systems that match the quality of their work. JobProof helps with quotes, contracts, change orders, invoices, and documentation—so you can look professional, get paid faster, and protect every project. Learn more: ${PARTNER_LINK_TOKEN}`,
+    body: `More jobs. Better processes. Better protection. JobProof helps contractors manage the journey from quote request to payment — so they can win more work, get paid, and protect the revenue they've earned. Learn more: ${PARTNER_LINK_TOKEN}`,
   },
   {
     id: "instagram-copy",
     title: "Instagram",
     intendedUse: "Instagram captions.",
-    body: `From first quote to final invoice—keep the job organized. JobProof supports contracts, change orders, documentation, and faster payments for contractors who want a more professional image. ${PARTNER_LINK_TOKEN}`,
+    body: `Win the job. Manage the work. Get paid. JobProof gives contractors tools to help turn opportunities into paying jobs — from quote requests to invoices and job records. ${PARTNER_LINK_TOKEN}`,
   },
   {
     id: "linkedin-copy",
     title: "LinkedIn",
     intendedUse: "LinkedIn posts.",
-    body: `Growing contracting businesses need clear systems for quoting, contracting, change management, invoicing, and documentation. JobProof is built to support that journey in one professional platform—helping contractors win more work, get paid faster, and protect every project. ${PARTNER_LINK_TOKEN}`,
+    body: `Growing contracting businesses need clear systems for capturing opportunities, quoting, contracting, change management, invoicing, and documentation. JobProof is built to support that journey — helping contractors win more work, get paid, and protect the revenue they've earned. ${PARTNER_LINK_TOKEN}`,
   },
   {
     id: "website-copy",
     title: "Website",
     intendedUse: "Partner website sections.",
-    body: `JobProof is the contractor platform for quotes, contracts, change orders, invoices, documentation, and dispute-ready records. Share it with contractors who want a more professional customer experience and stronger payment confidence.`,
+    body: `JobProof is designed to help contractors turn more opportunities into paying jobs — from quote requests and professional quotes to contracts, change orders, invoices, and documentation that helps protect earned revenue.`,
   },
   {
     id: "email-copy",
     title: "Email",
     intendedUse: "Email body snippets.",
-    body: `I recommend JobProof for contractors who want professional quotes and contracts, clearer change orders, organized documentation, and smoother invoicing. You can explore it here: ${PARTNER_LINK_TOKEN}`,
+    body: `I recommend JobProof for contractors who want better tools to win work, respond to quote requests, create professional quotes and contracts, manage changes, invoice customers, and protect the revenue they've earned. You can explore it here: ${PARTNER_LINK_TOKEN}`,
   },
   {
     id: "sms-copy",
     title: "SMS",
     intendedUse: "Short text messages.",
-    body: `JobProof helps contractors with quotes, contracts, invoices & documentation. Check it out: ${PARTNER_LINK_TOKEN}`,
+    body: `JobProof helps contractors win more work & get paid — from quote request to invoice. Check it out: ${PARTNER_LINK_TOKEN}`,
   },
   {
     id: "referral-cta",
     title: "Referral CTA",
     intendedUse: "Buttons, banners, and closing lines.",
-    body: `Ready to run jobs more professionally? Start with JobProof: ${PARTNER_LINK_TOKEN}`,
+    body: `Ready to grow your contracting business with better tools? Start with JobProof: ${PARTNER_LINK_TOKEN}`,
+  },
+  {
+    id: "social-short",
+    title: "Short social",
+    intendedUse: "Captions and bios.",
+    body: `More jobs. Better processes. Better protection. JobProof helps contractors manage the journey from quote request to payment.`,
   },
 ];
 
@@ -759,7 +767,7 @@ export function buildMediaCenterFaqs(level: PartnerLevel): MediaFaqItem[] {
     {
       question: "What is JobProof?",
       answer:
-        "JobProof is an all-in-one contractor business platform designed to help contractors manage the customer journey, operate professionally, get paid with greater confidence, and maintain stronger project records.",
+        "JobProof is a contractor business platform designed to help contractors win more work, manage the path from quote request to payment, get paid, and protect the revenue they've earned.",
     },
     {
       question: "Who is JobProof for?",
@@ -769,7 +777,7 @@ export function buildMediaCenterFaqs(level: PartnerLevel): MediaFaqItem[] {
     {
       question: "Is JobProof only a job-documentation app?",
       answer:
-        "No. Project documentation is one important part of JobProof, but the broader platform is focused on helping contractors manage the customer journey, win work, handle approvals and changes, invoice customers, get paid, and protect their projects.",
+        "No. Project documentation is one important part of JobProof, but the platform is designed to help contractors turn opportunities into paying jobs, handle approvals and changes, invoice customers, get paid, and protect earned revenue.",
     },
     {
       question: "What subscription plans are available?",
@@ -810,13 +818,13 @@ export const QUICK_PITCH_BLOCKS: CopyBlock[] = [
     id: "one-line",
     title: "One-line pitch",
     intendedUse: "Headlines, captions, and short intros.",
-    body: "Win more jobs. Get paid faster. Protect every project.",
+    body: "Win more work. Make more money. Get paid. Protect what you've earned.",
   },
   {
     id: "15-second",
     title: "15-second pitch",
     intendedUse: "Quick verbal introductions.",
-    body: "JobProof is an all-in-one business platform built for contractors. It helps organize quotes, contracts, change orders, invoices, documentation, and payment protection in one place.",
+    body: "JobProof is a business platform built for contractors. It gives tools to help turn opportunities into paying jobs — from quote requests and quotes to contracts, change orders, invoices, and documentation that helps protect earned revenue.",
   },
 ];
 

@@ -41,7 +41,7 @@ export function buildCoBrandSvg(input: {
     input.jobproofLogoUrl ?? "/media-kit/logos/jobproof-primary-horizontal.png";
   const orgName = truncate(input.organizationName, 42);
   const headline =
-    input.headline ?? "Win more work. Stay organized. Get paid. Protect every job.";
+    input.headline ?? "Win more work. Make more money. Get paid. Protect what you've earned.";
 
   const orgLogoBlock = input.organizationLogoUrl
     ? `<image href="${escapeXml(input.organizationLogoUrl)}" x="64" y="72" width="220" height="72" preserveAspectRatio="xMidYMid meet"/>`

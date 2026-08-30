@@ -56,9 +56,9 @@ export const ORGANIZATION_LANDING_VARIANTS: Record<
       eyebrow: "Chamber of Commerce Partners",
       headline: "A practical growth benefit for local contractors.",
       subtitle:
-        "Help chamber members win more work, look more professional, and run stronger businesses — while creating non-dues revenue for your organization.",
+        "Help chamber members win more work, get paid, and run stronger businesses — while creating non-dues revenue for your organization.",
       supporting:
-        "JobProof gives members tools for quotes, customers, projects, contracts, invoices, and job protection in one place.",
+        "JobProof gives members tools to turn opportunities into paying jobs — quotes, contracts, invoices, and records that help protect earned revenue.",
       photographyNote:
         "Suggested imagery: downtown business district, local contractor storefronts, chamber networking events.",
     },
@@ -93,21 +93,21 @@ export const ORGANIZATION_LANDING_VARIANTS: Record<
     slug: "home-builders",
     metaTitle: "Home Builders Association Partners | JobProof",
     metaDescription:
-      "Give builders and renovators professional quoting, change orders, and documentation tools through JobProof.",
+      "Give builders and renovators tools to win more work, manage change orders, invoice clearly, and protect earned revenue through JobProof.",
     hero: {
       eyebrow: "Home Builders Association Partners",
-      headline: "Help builders and renovators run clearer jobs.",
+      headline: "Help builders and renovators win more work.",
       subtitle:
-        "Support members with professional quotes, contracts, change orders, and organized project records from first lead to final invoice.",
+        "Support members with professional quotes, contracts, change orders, and a clearer path from first lead to final invoice.",
       supporting:
-        "JobProof helps association members look more professional with customers while staying organized on every project.",
+        "JobProof helps association members turn opportunities into paying jobs while staying organized on every project.",
       photographyNote:
         "Suggested imagery: residential construction sites, renovation walkthroughs, association conference floors.",
     },
     industryExamples: [
       {
         title: "Custom home builders",
-        body: "Document scope, approvals, and changes before they become disputes.",
+        body: "Win more work with clearer quotes, signed agreements, and approved change orders.",
       },
       {
         title: "Renovation contractors",
@@ -138,11 +138,11 @@ export const ORGANIZATION_LANDING_VARIANTS: Record<
       "Equip electricians with professional quotes, job organization, and faster invoicing through JobProof.",
     hero: {
       eyebrow: "Electrical Association Partners",
-      headline: "Help electricians win work and stay organized.",
+      headline: "Help electricians win more work.",
       subtitle:
-        "Give members a modern way to receive quote requests, present professional estimates, manage jobs, and get paid faster.",
+        "Give members a modern way to receive quote requests, present professional estimates, manage jobs, and get paid.",
       supporting:
-        "Protection remains part of the story — alongside quoting, contracts, invoices, and day-to-day organization.",
+        "JobProof helps electricians turn opportunities into paying jobs — with quoting, contracts, invoices, and records that support payment protection.",
       photographyNote:
         "Suggested imagery: electrical panel work, van branding, jobsite tablets, association training nights.",
     },
@@ -345,14 +345,14 @@ export const ORGANIZATION_LANDING_VARIANTS: Record<
     slug: "roofing",
     metaTitle: "Roofing Association Partners | JobProof",
     metaDescription:
-      "Help roofers create clearer estimates, manage change orders, and reduce disputes with JobProof.",
+      "Help roofers win more estimates, manage change orders, get paid, and protect earned revenue with JobProof.",
     hero: {
       eyebrow: "Roofing Association Partners",
-      headline: "Help roofers protect every job — and win more of them.",
+      headline: "Help roofers win more work — and get paid for it.",
       subtitle:
-        "Professional quotes, documented change orders, organized photos, and clearer invoices help members look more trustworthy.",
+        "Professional quotes, approved change orders, clearer invoices, and job records help members grow and protect revenue.",
       supporting:
-        "Protection is one benefit; winning work and getting paid remain front and center.",
+        "Winning work and getting paid lead; documentation and dispute protection support those outcomes.",
       photographyNote:
         "Suggested imagery: roof inspections, before/after documentation, association expo booths.",
     },
