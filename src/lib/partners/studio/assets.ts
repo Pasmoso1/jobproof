@@ -1,6 +1,7 @@
 import type { StudioPlatformId } from "@/lib/partners/studio/catalog";
 import type { GeneratedCopy } from "@/lib/partners/studio/copy";
 import { buildCoBrandDataUrl } from "@/lib/partners/studio/co-brand";
+import { SOCIAL_CAMPAIGN_STUDIO_DEFAULTS } from "@/lib/partners/social-campaigns";
 
 export type CampaignAssetDraft = {
   /** Wizard platform id, or "qr" / "co_brand" for referral / co-brand assets. */
@@ -21,7 +22,7 @@ export type CampaignAssetDraft = {
   metadata: Record<string, unknown>;
 };
 
-/** Map platforms to existing Media Centre assets — do not duplicate files. */
+/** Map platforms to Media Kit v2 campaign graphics — do not duplicate files. */
 const PLATFORM_MEDIA: Record<
   StudioPlatformId,
   {
@@ -37,37 +38,37 @@ const PLATFORM_MEDIA: Record<
   facebook: {
     kind: "graphic",
     title: "Facebook",
-    previewSrc: "/media-kit/social/jobproof-facebook-post-1080.png",
-    downloadHref: "/media-kit/social/jobproof-facebook-post-1080.png",
-    downloadFileName: "jobproof-facebook-post-1080.png",
+    previewSrc: SOCIAL_CAMPAIGN_STUDIO_DEFAULTS.square,
+    downloadHref: SOCIAL_CAMPAIGN_STUDIO_DEFAULTS.square,
+    downloadFileName: "jobproof-win-more-work-square.png",
   },
   instagram_post: {
     kind: "graphic",
     title: "Instagram Post",
-    previewSrc: "/media-kit/social/jobproof-instagram-post-1080.png",
-    downloadHref: "/media-kit/social/jobproof-instagram-post-1080.png",
-    downloadFileName: "jobproof-instagram-post-1080.png",
+    previewSrc: SOCIAL_CAMPAIGN_STUDIO_DEFAULTS.square,
+    downloadHref: SOCIAL_CAMPAIGN_STUDIO_DEFAULTS.square,
+    downloadFileName: "jobproof-win-more-work-square.png",
   },
   instagram_story: {
     kind: "graphic",
     title: "Instagram Story",
-    previewSrc: "/media-kit/social/jobproof-instagram-story-1080x1920.png",
-    downloadHref: "/media-kit/social/jobproof-instagram-story-1080x1920.png",
-    downloadFileName: "jobproof-instagram-story-1080x1920.png",
+    previewSrc: SOCIAL_CAMPAIGN_STUDIO_DEFAULTS.story,
+    downloadHref: SOCIAL_CAMPAIGN_STUDIO_DEFAULTS.story,
+    downloadFileName: "jobproof-win-more-work-story.png",
   },
   linkedin: {
     kind: "graphic",
     title: "LinkedIn",
-    previewSrc: "/media-kit/social/jobproof-linkedin-1200x627.png",
-    downloadHref: "/media-kit/social/jobproof-linkedin-1200x627.png",
-    downloadFileName: "jobproof-linkedin-1200x627.png",
+    previewSrc: SOCIAL_CAMPAIGN_STUDIO_DEFAULTS.linkedin,
+    downloadHref: SOCIAL_CAMPAIGN_STUDIO_DEFAULTS.linkedin,
+    downloadFileName: "jobproof-win-more-work-linkedin.png",
   },
   x: {
     kind: "graphic",
     title: "X",
-    previewSrc: "/media-kit/social/jobproof-twitter-1600x900.png",
-    downloadHref: "/media-kit/social/jobproof-twitter-1600x900.png",
-    downloadFileName: "jobproof-twitter-1600x900.png",
+    previewSrc: SOCIAL_CAMPAIGN_STUDIO_DEFAULTS.x,
+    downloadHref: SOCIAL_CAMPAIGN_STUDIO_DEFAULTS.x,
+    downloadFileName: "jobproof-win-more-work-x.png",
   },
   email: {
     kind: "email",

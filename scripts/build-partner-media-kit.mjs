@@ -10,10 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import {
-  LINKEDIN_SOCIAL_LAYOUT,
-  linkedinHeadlineY,
-} from "./partner-media-linkedin-layout.mjs";
+import { buildAllSocialCampaigns } from "./partner-media-social-campaigns.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const DOWNLOADS = path.join(process.env.USERPROFILE || process.env.HOME || "", "Downloads");
@@ -45,25 +42,61 @@ const OUT = {
   source: path.join(ROOT, "public/media-kit/source"),
 };
 
-const MASTERS = {
-  /** Uploaded transparent PNG logo package — canonical source only. */
-  sheetTransparent: path.join(DOWNLOADS, "Png.LogosTransparent", "1.png"),
-  /** Dedicated full horizontal lockup from the same package (preferred). */
-  primaryHorizontal: path.join(
-    DOWNLOADS,
-    "Png.LogosTransparent",
-    "jobproof-logo.png.png"
+/** First existing path wins — prefer vendored true-transparent masters. */
+function resolveMaster(...candidates) {
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+const VENDORED = {
+  horizontalTransparent: path.join(
+    ROOT,
+    "public/media-kit/source/jobproof-logo-horizontal-transparent.png"
   ),
-  shieldSheet: path.join(DOWNLOADS, "Png.LogosTransparent", "2.png"),
+  sheetTransparent: path.join(
+    ROOT,
+    "public/media-kit/source/jobproof-logos-sheet-transparent.png"
+  ),
+  shieldTransparent: path.join(
+    ROOT,
+    "public/media-kit/source/jobproof-shield-transparent.png"
+  ),
+};
+
+const MASTERS = {
+  /**
+   * True-transparent horizontal lockup (no white plate). Prefer vendored copy,
+   * then Downloads/trans12565, then legacy opaque plate master (stripped at build).
+   */
+  get primaryHorizontal() {
+    return resolveMaster(
+      VENDORED.horizontalTransparent,
+      path.join(DOWNLOADS, "trans12565", "3.png"),
+      path.join(DOWNLOADS, "Png.LogosTransparent", "jobproof-logo.png.png")
+    );
+  },
+  get sheetTransparent() {
+    return resolveMaster(
+      VENDORED.sheetTransparent,
+      path.join(DOWNLOADS, "trans12565", "1.png"),
+      path.join(DOWNLOADS, "Png.LogosTransparent", "1.png")
+    );
+  },
+  get shieldSheet() {
+    return resolveMaster(
+      VENDORED.shieldTransparent,
+      path.join(DOWNLOADS, "trans12565", "2.png"),
+      path.join(DOWNLOADS, "JobProof_13_Separate_Media_Assets_FINAL", "10_shield_transparent_1024x1024.png"),
+      path.join(DOWNLOADS, "Png.LogosTransparent", "2.png")
+    );
+  },
   faviconDir: path.join(DOWNLOADS, "favicon"),
 };
 
 function ensureDirs() {
   for (const dir of Object.values(OUT)) fs.mkdirSync(dir, { recursive: true });
-}
-
-function mustExist(file) {
-  if (!fs.existsSync(file)) throw new Error(`Missing required master: ${file}`);
 }
 
 async function writePng(pipeline, dest) {
@@ -72,54 +105,74 @@ async function writePng(pipeline, dest) {
   console.log("wrote", path.relative(ROOT, dest), `${meta.width}x${meta.height}`);
 }
 
-/** Remove sheet background while preserving white logo strokes (checkmark, Job). */
-async function extractLogoKeepWhites(
-  input,
-  { threshold = 245, sampleStep = 2, pad = 20 } = {}
-) {
-  const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({
-    resolveWithObject: true,
-  });
+/** True when the PNG already has meaningful alpha (not an opaque white plate). */
+async function hasSubstantialTransparency(input, minRatio = 0.12) {
+  const { data, info } = await sharp(input)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let transparent = 0;
+  const total = info.width * info.height;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] < 10) transparent++;
+  }
+  return transparent / total >= minRatio;
+}
+
+/**
+ * Remove exterior opaque white plate via edge flood-fill.
+ * Preserves interior white strokes that are not connected to the image border
+ * (e.g. "Job" lettering). Prefer true-transparent masters when available —
+ * checkmark tips that touch the plate may be cleared on opaque masters.
+ */
+async function stripExteriorWhitePlate(input, { threshold = 245 } = {}) {
+  const { data, info } = await sharp(input)
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   const w = info.width;
   const h = info.height;
   const out = Buffer.from(data);
-  const isWhite = (i) =>
+  const isPlate = (i) =>
     out[i] >= threshold &&
     out[i + 1] >= threshold &&
     out[i + 2] >= threshold &&
     out[i + 3] > 0;
 
-  const colored = [];
-  for (let y = 0; y < h; y += sampleStep) {
-    for (let x = 0; x < w; x += sampleStep) {
-      const i = (y * w + x) * 4;
-      if (out[i + 3] < 10) continue;
-      if (!isWhite(i)) colored.push([x, y]);
-    }
-  }
+  const seen = new Uint8Array(w * h);
+  const qx = new Int32Array(w * h);
+  const qy = new Int32Array(w * h);
+  let qs = 0;
+  let qe = 0;
+  const push = (x, y) => {
+    const k = y * w + x;
+    if (seen[k]) return;
+    seen[k] = 1;
+    qx[qe] = x;
+    qy[qe] = y;
+    qe++;
+  };
 
-  const hull = convexHull(colored);
-  let cx = 0;
-  let cy = 0;
-  for (const p of hull) {
-    cx += p[0];
-    cy += p[1];
+  for (let x = 0; x < w; x++) {
+    push(x, 0);
+    push(x, h - 1);
   }
-  cx /= hull.length;
-  cy /= hull.length;
-  const expanded = hull.map(([x, y]) => {
-    const dx = x - cx;
-    const dy = y - cy;
-    const len = Math.hypot(dx, dy) || 1;
-    return [Math.round(x + (dx / len) * pad), Math.round(y + (dy / len) * pad)];
-  });
-
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      if (!isWhite(i)) continue;
-      if (!pointInHull(x + 0.5, y + 0.5, expanded)) out[i + 3] = 0;
-    }
+    push(0, y);
+    push(w - 1, y);
+  }
+
+  while (qs < qe) {
+    const x = qx[qs];
+    const y = qy[qs];
+    qs++;
+    const i = (y * w + x) * 4;
+    if (!isPlate(i)) continue;
+    out[i + 3] = 0;
+    if (x > 0) push(x - 1, y);
+    if (x < w - 1) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y < h - 1) push(x, y + 1);
   }
 
   return sharp(out, { raw: { width: w, height: h, channels: 4 } })
@@ -128,51 +181,13 @@ async function extractLogoKeepWhites(
     .toBuffer();
 }
 
-function cross(o, a, b) {
-  return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-}
-
-function convexHull(points) {
-  const sorted = points.slice().sort((p, q) => p[0] - q[0] || p[1] - q[1]);
-  if (sorted.length <= 1) return sorted;
-  const lower = [];
-  for (const p of sorted) {
-    while (
-      lower.length >= 2 &&
-      cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0
-    ) {
-      lower.pop();
-    }
-    lower.push(p);
+/** Normalize a logo master: keep true transparency; strip opaque white plates. */
+async function prepareTransparentLogo(input) {
+  const buf = await sharp(input).ensureAlpha().png().toBuffer();
+  if (await hasSubstantialTransparency(buf)) {
+    return sharp(buf).trim({ threshold: 1 }).png().toBuffer();
   }
-  const upper = [];
-  for (let i = sorted.length - 1; i >= 0; i--) {
-    const p = sorted[i];
-    while (
-      upper.length >= 2 &&
-      cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0
-    ) {
-      upper.pop();
-    }
-    upper.push(p);
-  }
-  upper.pop();
-  lower.pop();
-  return lower.concat(upper);
-}
-
-function pointInHull(x, y, hull) {
-  let inside = false;
-  for (let i = 0, j = hull.length - 1; i < hull.length; j = i++) {
-    const xi = hull[i][0];
-    const yi = hull[i][1];
-    const xj = hull[j][0];
-    const yj = hull[j][1];
-    const intersect =
-      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi || 1e-9) + xi;
-    if (intersect) inside = !inside;
-  }
-  return inside;
+  return stripExteriorWhitePlate(buf);
 }
 
 async function resizeContain(input, width, height, background = { r: 0, g: 0, b: 0, alpha: 0 }) {
@@ -220,79 +235,34 @@ async function ensureSafePadding(input, padding = 24) {
     .toBuffer();
 }
 
-/** Find non-white content bounds on a white sheet (left horizontal lockup). */
-async function findNonWhiteBounds(inputPath, { xMaxRatio = 0.7, whiteThreshold = 245 } = {}) {
-  const { data, info } = await sharp(inputPath).ensureAlpha().raw().toBuffer({
-    resolveWithObject: true,
-  });
-  const w = info.width;
-  const h = info.height;
-  const xLimit = Math.floor(w * xMaxRatio);
-  let minX = w;
-  let maxX = 0;
-  let minY = h;
-  let maxY = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < xLimit; x++) {
-      const i = (y * w + x) * 4;
-      if (data[i + 3] < 20) continue;
-      if (
-        data[i] >= whiteThreshold &&
-        data[i + 1] >= whiteThreshold &&
-        data[i + 2] >= whiteThreshold
-      ) {
-        continue;
-      }
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
-    }
-  }
-  if (maxX < minX) throw new Error(`No logo content found in ${inputPath}`);
-  const margin = 30;
-  const left = Math.max(0, minX - margin);
-  const top = Math.max(0, minY - margin);
-  const width = Math.min(w - left, maxX - minX + 1 + margin * 2);
-  const height = Math.min(h - top, maxY - minY + 1 + margin * 2);
-  return { left, top, width, height, contentWidth: maxX - minX + 1 };
-}
-
 async function prepareLogos() {
-  mustExist(MASTERS.sheetTransparent);
-  mustExist(MASTERS.shieldSheet);
+  const sheetPath = MASTERS.sheetTransparent;
+  const shieldPath = MASTERS.shieldSheet;
+  const primaryPath = MASTERS.primaryHorizontal;
+  if (!sheetPath) throw new Error("Missing required master: sheetTransparent");
+  if (!shieldPath) throw new Error("Missing required master: shieldSheet");
+  if (!primaryPath) throw new Error("Missing required master: primaryHorizontal");
 
   fs.copyFileSync(
-    MASTERS.sheetTransparent,
+    sheetPath,
     path.join(OUT.source, "png-logos-transparent-1.png")
   );
-  fs.copyFileSync(MASTERS.shieldSheet, path.join(OUT.source, "jobproof-shield-source.png"));
+  fs.copyFileSync(shieldPath, path.join(OUT.source, "jobproof-shield-source.png"));
 
-  // Primary horizontal — prefer dedicated full lockup; fall back to auto-bounds on sheet.
-  // Dedicated master is already transparent with the full wordmark — do not run
-  // extractLogoKeepWhites on it (that path is for white sheet crops only).
-  let primaryClean;
-  if (fs.existsSync(MASTERS.primaryHorizontal)) {
-    fs.copyFileSync(
-      MASTERS.primaryHorizontal,
-      path.join(OUT.source, "jobproof-logo-horizontal-source.png")
-    );
-    primaryClean = await sharp(MASTERS.primaryHorizontal).png().toBuffer();
-    console.log("using dedicated horizontal master:", path.basename(MASTERS.primaryHorizontal));
-  } else {
-    const bounds = await findNonWhiteBounds(MASTERS.sheetTransparent);
-    console.log("auto horizontal crop bounds", bounds);
-    const cropped = await sharp(MASTERS.sheetTransparent)
-      .extract({
-        left: bounds.left,
-        top: bounds.top,
-        width: bounds.width,
-        height: bounds.height,
-      })
-      .png()
-      .toBuffer();
-    primaryClean = await extractLogoKeepWhites(cropped, { pad: 18 });
-  }
+  // Primary horizontal — prefer true-transparent master (no white plate).
+  // Opaque plate masters are edge-flood-stripped; never hull-pad white into a sticker.
+  fs.copyFileSync(
+    primaryPath,
+    path.join(OUT.source, "jobproof-logo-horizontal-source.png")
+  );
+  const primaryClean = await prepareTransparentLogo(primaryPath);
+  console.log(
+    "using horizontal master:",
+    path.relative(ROOT, primaryPath),
+    (await hasSubstantialTransparency(await sharp(primaryPath).png().toBuffer()))
+      ? "(already transparent)"
+      : "(white plate stripped)"
+  );
 
   const primaryBuf = await ensureSafePadding(primaryClean, 32);
   await writePng(sharp(primaryBuf), path.join(OUT.logos, "jobproof-primary-horizontal.png"));
@@ -314,14 +284,9 @@ async function prepareLogos() {
   const compactBuf = await ensureSafePadding(compactResized, 8);
   await writePng(sharp(compactBuf), path.join(OUT.logos, "jobproof-compact-horizontal.png"));
 
-  // Shield — from uploaded transparent package
-  const shieldBuf = await ensureSafePadding(
-    await extractLogoKeepWhites(
-      await sharp(MASTERS.shieldSheet).png().toBuffer(),
-      { pad: 28 }
-    ),
-    24
-  );
+  // Shield — prefer true-transparent master
+  const shieldClean = await prepareTransparentLogo(shieldPath);
+  const shieldBuf = await ensureSafePadding(shieldClean, 24);
   const shieldMaster = path.join(OUT.icons, "jobproof-shield-1024.png");
   await writePng(
     sharp(shieldBuf).resize(1024, 1024, {
@@ -403,234 +368,28 @@ function hexRgb(hex) {
   };
 }
 
-function textSvg({
-  width,
-  height,
-  lines,
-  fontSize = 48,
-  fill = COLORS.white,
-  fontWeight = 700,
-  y = 80,
-  x = 64,
-  lineHeight = 1.2,
-  maxWidth,
-  textAnchor = "start",
-}) {
-  const escaped = lines
-    .map((line, i) => {
-      const yy = y + i * fontSize * lineHeight;
-      const safe = String(line)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-      return `<text x="${x}" y="${yy}" fill="${fill}" font-size="${fontSize}" font-weight="${fontWeight}" font-family="Arial, Helvetica, sans-serif" text-anchor="${textAnchor}"${maxWidth ? ` textLength="${maxWidth}" lengthAdjust="spacingAndGlyphs"` : ""}>${safe}</text>`;
-    })
-    .join("");
-  return Buffer.from(
-    `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${escaped}</svg>`
-  );
-}
-
-function featurePillsSvg(width, height, features, startY) {
-  const pillH = 44;
-  const gap = 14;
-  const pills = features
-    .map((label, i) => {
-      const y = startY + i * (pillH + gap);
-      const safe = label.replace(/&/g, "&amp;");
-      return `
-        <rect x="64" y="${y}" width="420" height="${pillH}" rx="10" fill="rgba(255,255,255,0.14)"/>
-        <text x="84" y="${y + 29}" fill="#FFFFFF" font-size="20" font-weight="600" font-family="Arial, Helvetica, sans-serif">${safe}</text>
-      `;
-    })
-    .join("");
-  return Buffer.from(
-    `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${pills}</svg>`
-  );
-}
-
-async function composeSocialGraphic({
-  width,
-  height,
-  fileName,
-  headline,
-  subhead,
-  features = [],
-  logoWidth,
-  /**
-   * When set, place the headline below the rendered logo by this many pixels.
-   * Used for short landscape templates (LinkedIn) where height*0.28 overlaps the logo.
-   * Leave undefined for other platforms so their layouts stay unchanged.
-   */
-  logoHeadlineGap,
-}) {
-  const blue = hexRgb(COLORS.blue);
-  const orange = hexRgb(COLORS.orange);
-  const teal = hexRgb(COLORS.proofTeal);
-
-  const base = await sharp({
-    create: {
-      width,
-      height,
-      channels: 3,
-      background: blue,
-    },
-  })
-    .png()
-    .toBuffer();
-
-  // Accent bars (layout only — not logo artwork)
-  const accent = Buffer.from(`
-    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="${width}" height="12" fill="${COLORS.orange}"/>
-      <rect x="0" y="${height - 12}" width="${width}" height="12" fill="${COLORS.proofTeal}"/>
-      <circle cx="${width - 80}" cy="80" r="120" fill="rgba(255,255,255,0.06)"/>
-      <circle cx="40" cy="${height - 40}" r="90" fill="rgba(77,186,204,0.12)"/>
-    </svg>
-  `);
-
-  const logoPath = path.join(OUT.logos, "jobproof-primary-horizontal.png");
-  const logoBuf = await sharp(logoPath)
-    .resize({
-      width: Math.min(logoWidth, width - 96),
-      fit: "inside",
-      withoutEnlargement: true,
-    })
-    .png()
-    .toBuffer();
-  const logoMeta = await sharp(logoBuf).metadata();
-  const logoTop = 40;
-  const logoLeft = 48;
-  if ((logoMeta.width ?? 0) + logoLeft > width - 24) {
-    throw new Error(
-      `Logo too wide for ${fileName}: ${logoMeta.width}px in ${width}px canvas`
-    );
-  }
-
-  const logoRenderedHeight = logoMeta.height ?? 0;
-  const headlineFontSize = width >= 1200 ? 56 : 48;
-  const headlineLineHeight = 1.15;
-  // Default platforms keep the historical height-fraction layout unchanged.
-  // LinkedIn (logoHeadlineGap set) places the headline below the rendered logo,
-  // accounting for SVG text baseline vs glyph ascent via linkedinHeadlineY.
-  const headlineY =
-    logoHeadlineGap != null
-      ? linkedinHeadlineY(logoRenderedHeight)
-      : Math.round(height * 0.28);
-  const subheadY =
-    logoHeadlineGap != null
-      ? headlineY +
-        headline.length * headlineFontSize * headlineLineHeight +
-        24
-      : Math.round(height * 0.28) + headline.length * 64 + 24;
-
-  const headlineSvg = textSvg({
-    width,
-    height,
-    lines: headline,
-    fontSize: headlineFontSize,
-    y: headlineY,
-    x: 64,
-    lineHeight: headlineLineHeight,
-  });
-
-  const subSvg = textSvg({
-    width,
-    height,
-    lines: [subhead],
-    fontSize: 26,
-    fontWeight: 500,
-    fill: "rgba(255,255,255,0.92)",
-    y: subheadY,
-    x: 64,
-  });
-
-  const composites = [
-    { input: accent, top: 0, left: 0 },
-    { input: logoBuf, top: logoTop, left: logoLeft },
-    { input: headlineSvg, top: 0, left: 0 },
-    { input: subSvg, top: 0, left: 0 },
-  ];
-
-  if (features.length) {
-    composites.push({
-      input: featurePillsSvg(width, height, features, Math.round(height * 0.55)),
-      top: 0,
-      left: 0,
-    });
-  }
-
-  const ctaY = height - 90;
-  const cta = Buffer.from(`
-    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-      <rect x="64" y="${ctaY}" width="280" height="48" rx="10" fill="${COLORS.orange}"/>
-      <text x="204" y="${ctaY + 31}" fill="#FFFFFF" font-size="20" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Start with JobProof</text>
-    </svg>
-  `);
-  composites.push({ input: cta, top: 0, left: 0 });
-
-  // Silence unused vars from destructuring for lint in node
-  void orange;
-  void teal;
-
-  await writePng(
-    sharp(base).composite(composites),
-    path.join(OUT.social, fileName)
-  );
-}
-
 async function buildSocial() {
-  await composeSocialGraphic({
-    width: 1080,
-    height: 1080,
-    fileName: "jobproof-facebook-post-1080.png",
-    headline: ["Win more jobs.", "Get paid faster."],
-    subhead: "Quotes · Contracts · Invoices · Dispute protection",
-    features: ["Professional estimates & approvals", "Change orders & documentation", "Fast, organized payments"],
-    logoWidth: 420,
+  const logoPath = path.join(OUT.logos, "jobproof-primary-horizontal.png");
+  await buildAllSocialCampaigns({
+    root: ROOT,
+    logoPath,
+    writeLog: (dest) =>
+      console.log("wrote", path.relative(ROOT, dest)),
   });
 
-  await composeSocialGraphic({
-    width: 1080,
-    height: 1080,
-    fileName: "jobproof-instagram-post-1080.png",
-    headline: ["One platform for", "every job."],
-    subhead: "From first quote to final payment",
-    features: ["Contracts & change orders", "Invoices & proof of work", "Protect every project"],
-    logoWidth: 420,
-  });
-
-  await composeSocialGraphic({
-    width: 1080,
-    height: 1920,
-    fileName: "jobproof-instagram-story-1080x1920.png",
-    headline: ["Look more", "professional.", "Protect every", "project."],
-    subhead: "Built for contractors who want clearer systems",
-    features: ["Quotes & contracts", "Change orders", "Invoices & payments", "Dispute-ready records"],
-    logoWidth: 480,
-  });
-
-  await composeSocialGraphic({
-    width: LINKEDIN_SOCIAL_LAYOUT.width,
-    height: LINKEDIN_SOCIAL_LAYOUT.height,
-    fileName: LINKEDIN_SOCIAL_LAYOUT.fileName,
-    headline: [...LINKEDIN_SOCIAL_LAYOUT.headlineLines],
-    subhead: LINKEDIN_SOCIAL_LAYOUT.subhead,
-    features: [],
-    logoWidth: LINKEDIN_SOCIAL_LAYOUT.logoWidth,
-    // LinkedIn-only: short landscape canvas — headline must clear the full wordmark.
-    logoHeadlineGap: LINKEDIN_SOCIAL_LAYOUT.logoHeadlineGap,
-  });
-
-  await composeSocialGraphic({
-    width: 1600,
-    height: 900,
-    fileName: "jobproof-twitter-1600x900.png",
-    headline: ["Run jobs with", "professional systems."],
-    subhead: "Fast payments. Clear records. Stronger customer experience.",
-    features: [],
-    logoWidth: 420,
-  });
+  // Remove obsolete Wave-1 platform-first graphics from Media Centre display roots.
+  for (const legacy of [
+    "jobproof-facebook-post-1080.png",
+    "jobproof-instagram-post-1080.png",
+    "jobproof-instagram-story-1080x1920.png",
+    "jobproof-twitter-1600x900.png",
+  ]) {
+    const p = path.join(OUT.social, legacy);
+    if (fs.existsSync(p)) {
+      fs.unlinkSync(p);
+      console.log("removed legacy", path.relative(ROOT, p));
+    }
+  }
 }
 
 async function buildWebsiteBanners() {
@@ -666,8 +425,8 @@ async function buildWebsiteBanners() {
     } else if (isTall) {
       overlay = Buffer.from(`
         <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-          <text x="20" y="280" fill="#fff" font-size="22" font-weight="700" font-family="Arial, Helvetica, sans-serif">Win more jobs</text>
-          <text x="20" y="312" fill="rgba(255,255,255,0.9)" font-size="16" font-family="Arial, Helvetica, sans-serif">Get paid faster</text>
+          <text x="20" y="280" fill="#fff" font-size="22" font-weight="700" font-family="Arial, Helvetica, sans-serif">Win more work</text>
+          <text x="20" y="312" fill="rgba(255,255,255,0.9)" font-size="16" font-family="Arial, Helvetica, sans-serif">Get paid</text>
           <rect x="20" y="${h - 80}" width="120" height="40" rx="8" fill="${COLORS.orange}"/>
           <text x="80" y="${h - 54}" fill="#fff" font-size="14" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Learn more</text>
         </svg>
@@ -684,7 +443,7 @@ async function buildWebsiteBanners() {
     } else {
       overlay = Buffer.from(`
         <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-          <text x="64" y="${Math.round(h * 0.55)}" fill="#fff" font-size="${w > 1400 ? 48 : 36}" font-weight="700" font-family="Arial, Helvetica, sans-serif">Win more jobs. Get paid faster. Protect every project.</text>
+          <text x="64" y="${Math.round(h * 0.55)}" fill="#fff" font-size="${w > 1400 ? 48 : 36}" font-weight="700" font-family="Arial, Helvetica, sans-serif">Win more work. Get paid. Protect what you've earned.</text>
           <text x="64" y="${Math.round(h * 0.55) + 44}" fill="rgba(255,255,255,0.9)" font-size="22" font-family="Arial, Helvetica, sans-serif">Quotes · Contracts · Change Orders · Invoices · Documentation</text>
           <rect x="64" y="${h - 90}" width="220" height="48" rx="10" fill="${COLORS.orange}"/>
           <text x="174" y="${h - 59}" fill="#fff" font-size="18" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Start with JobProof</text>
@@ -784,12 +543,12 @@ async function buildPrint() {
     pdfName: "jobproof-flyer-letter.pdf",
     pageW: 612,
     pageH: 792,
-    title: "Run your contracting business with confidence",
+    title: "Win more work. Manage the work. Get paid.",
     bullets: [
-      "Professional quotes and contracts",
+      "Turn more opportunities into paying jobs",
       "Change orders and job documentation",
-      "Invoices and faster payments",
-      "Records that support dispute protection",
+      "Invoices and payment tracking",
+      "Records that protect earned revenue",
     ],
   });
 
@@ -816,11 +575,11 @@ async function buildPrint() {
     pdfName: "jobproof-flyer-halfpage.pdf",
     pageW: 612,
     pageH: 396,
-    title: "Win more jobs. Get paid faster.",
+    title: "Win more work. Get paid. Protect revenue.",
     bullets: [
-      "All-in-one contractor platform",
-      "Clear approvals and documentation",
-      "Professional image for every customer",
+      "Turn more opportunities into paying jobs",
+      "Manage quotes, contracts, and invoicing",
+      "Keep clear records that protect earned revenue",
     ],
   });
 
@@ -831,11 +590,11 @@ async function buildPrint() {
     pdfName: "jobproof-poster.pdf",
     pageW: 792,
     pageH: 1224,
-    title: "Help contractors work like pros",
+    title: "Win the job. Manage the work. Get paid.",
     bullets: [
+      "From quote request to payment — in one place",
       "Quotes · Contracts · Change Orders",
       "Invoices · Documentation · Payments",
-      "Dispute protection for every project",
       "Share your partner referral link today",
     ],
   });
@@ -953,9 +712,9 @@ function writeEmailResources() {
           <img src="https://jobproof.ca/media-kit/logos/jobproof-compact-horizontal.png" alt="JobProof" width="200" style="display:block;border:0;height:auto;"/>
         </td></tr>
         <tr><td style="padding:28px;">
-          <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#1A2558;">Help contractors win more jobs and get paid faster</h1>
+          <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#1A2558;">Help contractors win more work and grow their business</h1>
           <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#3f3f46;">
-            JobProof is an all-in-one contractor platform for quotes, contracts, change orders, invoices, documentation, and dispute protection—so contractors can present a professional image and protect every project.
+            JobProof gives contractors tools to manage the journey from quote request to payment — helping turn more opportunities into paying jobs, and keep clear records that protect earned revenue.
           </p>
           <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#3f3f46;">
             If you work with contractors who are ready for clearer systems, share JobProof with them:
@@ -972,9 +731,9 @@ function writeEmailResources() {
 </html>
 `;
 
-  const introText = `Help contractors win more jobs and get paid faster
+  const introText = `Help contractors win more work and grow their business
 
-JobProof is an all-in-one contractor platform for quotes, contracts, change orders, invoices, documentation, and dispute protection—so contractors can present a professional image and protect every project.
+JobProof gives contractors tools to manage the journey from quote request to payment — helping turn more opportunities into paying jobs, and keep clear records that protect earned revenue.
 
 Share JobProof: [PARTNER LINK]
 

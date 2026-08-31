@@ -1,39 +1,28 @@
 /**
  * LinkedIn social graphic layout constants (1200×627).
- * Shared by the media-kit builder and regression tests.
- *
- * Landscape LinkedIn is shorter than square social templates, so the headline
- * must be placed below the rendered logo rather than at a fixed height fraction.
- *
- * Note: SVG <text y> is the baseline. Headline placement must reserve font ascent
- * so the visible glyphs clear the logo box.
+ * Media Kit v2: LinkedIn exports live under campaign folders.
+ * A compatibility copy also ships at the legacy root path during Wave 1.
  */
 
 export const LINKEDIN_SOCIAL_LAYOUT = {
   width: 1200,
   height: 627,
-  fileName: "jobproof-linkedin-1200x627.png",
-  publicPath: "/media-kit/social/jobproof-linkedin-1200x627.png",
-  logoTop: 40,
+  fileName: "jobproof-win-more-work-linkedin.png",
+  publicPath:
+    "/media-kit/social/win-more-work/jobproof-win-more-work-linkedin.png",
+  legacyPublicPath: "/media-kit/social/jobproof-linkedin-1200x627.png",
+  logoTop: 36,
   logoLeft: 48,
-  logoWidth: 380,
-  /**
-   * Clear space between logo bottom and the top of the first headline glyphs
-   * (not the SVG baseline).
-   */
-  logoHeadlineGap: 40,
-  headlineFontSize: 56,
-  headlineLineHeight: 1.15,
-  /** Approximate Arial-bold ascent as a fraction of font-size. */
+  logoWidth: 320,
+  logoHeadlineGap: 36,
+  headlineFontSize: 44,
+  headlineLineHeight: 1.12,
   headlineAscentRatio: 0.8,
-  headlineLines: [
-    "The contractor platform",
-    "for growth and protection.",
-  ],
-  subhead: "Quotes · Contracts · Change Orders · Invoices · Documentation",
-  subheadGap: 24,
-  subheadFontSize: 26,
-  ctaBottomOffset: 90,
+  headlineLines: ["Win more work."],
+  subhead: "From quote request to signed job.",
+  subheadGap: 18,
+  subheadFontSize: 22,
+  ctaBottomOffset: 88,
 };
 
 export function linkedinHeadlineAscent() {
@@ -43,14 +32,10 @@ export function linkedinHeadlineAscent() {
   );
 }
 
-/** Bottom edge of the logo box (exclusive of gap). */
 export function linkedinLogoBottom(logoRenderedHeight) {
   return LINKEDIN_SOCIAL_LAYOUT.logoTop + logoRenderedHeight;
 }
 
-/**
- * Top of the first headline glyphs (approx), given rendered logo height.
- */
 export function linkedinHeadlineTop(logoRenderedHeight) {
   return (
     linkedinLogoBottom(logoRenderedHeight) +
@@ -58,9 +43,6 @@ export function linkedinHeadlineTop(logoRenderedHeight) {
   );
 }
 
-/**
- * SVG text baseline Y for the first headline line.
- */
 export function linkedinHeadlineY(logoRenderedHeight) {
   return linkedinHeadlineTop(logoRenderedHeight) + linkedinHeadlineAscent();
 }

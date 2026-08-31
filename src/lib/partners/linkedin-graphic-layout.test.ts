@@ -11,7 +11,7 @@ import {
   linkedinHeadlineY,
   linkedinLogoBottom,
 } from "../../../scripts/partner-media-linkedin-layout.mjs";
-import { MEDIA_SOCIAL_ASSETS } from "@/lib/partners/media-center-content";
+import { MEDIA_SOCIAL_CAMPAIGNS } from "@/lib/partners/social-campaigns";
 import { buildCampaignAssetDrafts } from "@/lib/partners/studio/assets";
 import { generateStudioCopy } from "@/lib/partners/studio/copy";
 
@@ -19,6 +19,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const linkedinPng = join(
   root,
   "public/media-kit/social",
+  "win-more-work",
   LINKEDIN_SOCIAL_LAYOUT.fileName
 );
 const primaryLogo = join(
@@ -65,14 +66,13 @@ describe("LinkedIn social graphic layout", () => {
             LINKEDIN_SOCIAL_LAYOUT.headlineAscentRatio
         )
     );
-    // Must clear the old broken height*0.28 placement (~176) that overlapped the logo.
     assert.ok(
       headlineBaseline > Math.round(LINKEDIN_SOCIAL_LAYOUT.height * 0.28),
       "LinkedIn headline must sit below the legacy fraction-based Y"
     );
   });
 
-  it("exported LinkedIn PNG keeps a measurable blue gap under the logo plate", async () => {
+  it("exported LinkedIn PNG has no white logo plate and readable white headline", async () => {
     assert.equal(existsSync(linkedinPng), true);
     const { data, info } = await sharp(linkedinPng)
       .ensureAlpha()
@@ -85,39 +85,41 @@ describe("LinkedIn social graphic layout", () => {
     const isWhite = (i: number) =>
       data[i] > 250 && data[i + 1] > 250 && data[i + 2] > 250 && data[i + 3] > 200;
 
-    // Dense white in the logo x-range near the top = logo plate.
-    // Cap the search below y=200 so headline glyphs are not mistaken for the plate.
-    let logoPlateMaxY = -1;
-    for (let y = 0; y < 200; y++) {
-      let dense = 0;
-      for (let x = 48; x < 430; x++) {
-        if (isWhite((y * w + x) * 4)) dense++;
+    // Dense white rows in the logo band would indicate the old opaque plate.
+    let plateRows = 0;
+    let maxWhiteRun = 0;
+    for (let y = 20; y < 160; y++) {
+      let white = 0;
+      let run = 0;
+      let rowMax = 0;
+      for (let x = 40; x < 400; x++) {
+        if (isWhite((y * w + x) * 4)) {
+          white++;
+          run++;
+          rowMax = Math.max(rowMax, run);
+        } else {
+          run = 0;
+        }
       }
-      if (dense > 200) logoPlateMaxY = y;
+      maxWhiteRun = Math.max(maxWhiteRun, rowMax);
+      if (white > 200) plateRows++;
     }
-    assert.ok(logoPlateMaxY > 40, "logo plate not found");
+    assert.equal(plateRows, 0, "LinkedIn graphic must not show a dense white logo plate");
     assert.ok(
-      logoPlateMaxY < 200,
-      `logo plate unexpectedly low (y=${logoPlateMaxY})`
+      maxWhiteRun < 100,
+      `unexpected long white run in logo band (${maxWhiteRun}px)`
     );
 
-    let headlineMinY = -1;
-    for (let y = logoPlateMaxY + 1; y < 450; y++) {
-      let outsideLogo = 0;
-      for (let x = 430; x < 950; x++) {
-        if (isWhite((y * w + x) * 4)) outsideLogo++;
+    // Headline glyphs exist in the mid band (layout places copy below the logo).
+    let headlineRows = 0;
+    for (let y = 180; y < 320; y++) {
+      let glyphs = 0;
+      for (let x = 60; x < 900; x++) {
+        if (isWhite((y * w + x) * 4)) glyphs++;
       }
-      if (outsideLogo > 20) {
-        headlineMinY = y;
-        break;
-      }
+      if (glyphs > 20) headlineRows++;
     }
-    assert.ok(headlineMinY > 0, "headline not found below logo");
-    const pixelGap = headlineMinY - logoPlateMaxY;
-    assert.ok(
-      pixelGap >= 24,
-      `logo plate (y=${logoPlateMaxY}) must clear headline (y=${headlineMinY}) by >= 24px (got ${pixelGap})`
-    );
+    assert.ok(headlineRows >= 8, "expected white headline glyphs below the logo");
   });
 
   it("ships a 1200×627 LinkedIn PNG with the full primary logo present", async () => {
@@ -126,20 +128,17 @@ describe("LinkedIn social graphic layout", () => {
     assert.equal(meta.width, 1200);
     assert.equal(meta.height, 627);
 
-    // Primary horizontal logo must exist and be wider than tall (full wordmark).
     const logo = await sharp(primaryLogo).metadata();
     assert.ok((logo.width ?? 0) > (logo.height ?? 0));
     assert.ok((logo.width ?? 0) >= 1000);
   });
 
-  it("Media Centre and Marketing Studio both reference the same LinkedIn path", () => {
-    const mediaAsset = MEDIA_SOCIAL_ASSETS.find((a) => a.id === "linkedin-graphic");
-    assert.ok(mediaAsset);
-    assert.equal(mediaAsset!.previewSrc, LINKEDIN_SOCIAL_LAYOUT.publicPath);
-    assert.equal(
-      mediaAsset!.downloads[0]?.href,
-      LINKEDIN_SOCIAL_LAYOUT.publicPath
-    );
+  it("Media Centre campaigns and Marketing Studio reference win-more-work LinkedIn path", () => {
+    const winMore = MEDIA_SOCIAL_CAMPAIGNS.find((c) => c.id === "win-more-work");
+    assert.ok(winMore);
+    const linkedinFormat = winMore!.formats.find((f) => f.id === "linkedin");
+    assert.ok(linkedinFormat);
+    assert.equal(linkedinFormat!.href, LINKEDIN_SOCIAL_LAYOUT.publicPath);
 
     const copy = generateStudioCopy({
       theme: "everything_jobproof",
@@ -160,31 +159,14 @@ describe("LinkedIn social graphic layout", () => {
     assert.equal(linkedin!.downloadHref, LINKEDIN_SOCIAL_LAYOUT.publicPath);
   });
 
-  it("applies logoHeadlineGap only to the LinkedIn compose call", async () => {
+  it("builds LinkedIn via the social campaign compositor (not legacy per-platform compose)", async () => {
     const source = await readFile(
       join(root, "scripts/build-partner-media-kit.mjs"),
       "utf8"
     );
-    assert.match(source, /LINKEDIN_SOCIAL_LAYOUT/);
-    assert.match(source, /logoHeadlineGap:\s*LINKEDIN_SOCIAL_LAYOUT\.logoHeadlineGap/);
-
-    // Other social platforms must not pass logoHeadlineGap.
-    const facebookBlock = source.match(
-      /fileName:\s*"jobproof-facebook-post-1080\.png"[\s\S]*?logoWidth:\s*\d+/
-    );
-    assert.ok(facebookBlock);
-    assert.doesNotMatch(facebookBlock![0], /logoHeadlineGap/);
-
-    const instagramBlock = source.match(
-      /fileName:\s*"jobproof-instagram-post-1080\.png"[\s\S]*?logoWidth:\s*\d+/
-    );
-    assert.ok(instagramBlock);
-    assert.doesNotMatch(instagramBlock![0], /logoHeadlineGap/);
-
-    const twitterBlock = source.match(
-      /fileName:\s*"jobproof-twitter-1600x900\.png"[\s\S]*?logoWidth:\s*\d+/
-    );
-    assert.ok(twitterBlock);
-    assert.doesNotMatch(twitterBlock![0], /logoHeadlineGap/);
+    assert.match(source, /buildAllSocialCampaigns/);
+    assert.match(source, /partner-media-social-campaigns/);
+    assert.doesNotMatch(source, /await composeSocialGraphic/);
+    assert.match(source, /Remove obsolete Wave-1 platform-first/);
   });
 });

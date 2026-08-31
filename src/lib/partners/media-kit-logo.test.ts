@@ -78,7 +78,7 @@ describe("partner media-kit horizontal logos", () => {
     }
   });
 
-  it("does not use the obsolete cropped sheet coordinates in the builder", async () => {
+  it("does not use the obsolete cropped sheet coordinates or hull-pad white plates", async () => {
     const source = await readFile(
       join(root, "scripts/build-partner-media-kit.mjs"),
       "utf8"
@@ -89,14 +89,57 @@ describe("partner media-kit horizontal logos", () => {
       source,
       /\.extract\(\s*\{\s*left:\s*80\s*,\s*top:\s*420/
     );
-    assert.doesNotMatch(
-      source,
-      /extractLogoKeepWhites\(primarySourceBuf/
-    );
-    assert.match(source, /jobproof-logo\.png\.png/);
+    assert.match(source, /stripExteriorWhitePlate/);
+    assert.match(source, /prepareTransparentLogo/);
+    assert.match(source, /jobproof-logo-horizontal-transparent\.png/);
     assert.match(source, /ensureSafePadding/);
-    assert.match(source, /primaryHorizontal/);
-    assert.match(source, /findNonWhiteBounds/);
+    assert.match(source, /hasSubstantialTransparency/);
+    // Hull pad of 18 was recreating the white sticker plate on blue backgrounds.
+    assert.doesNotMatch(source, /extractLogoKeepWhites\([\s\S]{0,80}pad:\s*18/);
+  });
+
+  it("ships horizontal logos without a long opaque white plate", async () => {
+    for (const rel of HORIZONTAL_LOGOS) {
+      const { data, info } = await sharp(join(root, rel))
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      let transparent = 0;
+      let maxWhiteRun = 0;
+      let plateRows = 0;
+      for (let y = 0; y < info.height; y++) {
+        let run = 0;
+        let rowMax = 0;
+        for (let x = 0; x < info.width; x++) {
+          const i = (y * info.width + x) * 4;
+          if (data[i + 3] < 10) {
+            transparent++;
+            run = 0;
+            continue;
+          }
+          if (data[i] > 248 && data[i + 1] > 248 && data[i + 2] > 248) {
+            run++;
+            rowMax = Math.max(rowMax, run);
+          } else {
+            run = 0;
+          }
+        }
+        maxWhiteRun = Math.max(maxWhiteRun, rowMax);
+        if (rowMax > 150) plateRows++;
+      }
+      assert.ok(
+        transparent / (info.width * info.height) > 0.15,
+        `${rel} should keep substantial transparency`
+      );
+      assert.ok(
+        plateRows === 0,
+        `${rel} still has white-plate rows (maxRun=${maxWhiteRun}, plateRows=${plateRows})`
+      );
+      assert.ok(
+        maxWhiteRun < 120,
+        `${rel} max opaque-white run ${maxWhiteRun} looks like a plate`
+      );
+    }
   });
 });
 

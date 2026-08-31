@@ -22,12 +22,12 @@ import {
   MEDIA_CONTACT,
   MEDIA_EMAIL_RESOURCES,
   MEDIA_PRINT_ASSETS,
-  MEDIA_SOCIAL_ASSETS,
   MEDIA_WEBSITE_ASSETS,
   PARTNER_COPY_LIBRARY,
   buildMediaCenterFaqs,
   personalizePartnerCopy,
 } from "@/lib/partners/media-center-content";
+import { MEDIA_SOCIAL_CAMPAIGNS } from "@/lib/partners/social-campaigns";
 import {
   buildOrganizationKitContext,
   ORGANIZATION_PARTNER_KIT,
@@ -39,6 +39,7 @@ import { GuidelinesList } from "@/components/partners/media/guidelines-list";
 import { CopyContentCard } from "@/components/partners/media/copy-content-card";
 import { ComingSoonResourceCard } from "@/components/partners/media/coming-soon-resource-card";
 import { EmailResourceCard } from "@/components/partners/media/email-resource-card";
+import { SocialCampaignCard } from "@/components/partners/media/social-campaign-card";
 import { MediaFaq } from "@/components/partners/media/media-faq";
 import { OrganizationPartnerCallout } from "@/components/partners/organization-partner-callout";
 import { OrganizationKitCard } from "@/components/partners/media/organization-kit-card";
@@ -206,11 +207,15 @@ export default async function PartnerMediaCenterPage() {
       <section>
         <MediaSectionHeader
           title="Social Media Kit"
-          description="High-resolution graphics using the real JobProof logo and current product messaging."
+          description="Ready-to-share JobProof campaigns designed to help you introduce JobProof to contractors. Each campaign includes Square, Portrait, Story, LinkedIn, and X downloads plus a suggested caption with your referral link."
         />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {MEDIA_SOCIAL_ASSETS.map((asset) => (
-            <MediaAssetCard key={asset.id} asset={asset} />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {MEDIA_SOCIAL_CAMPAIGNS.map((campaign) => (
+            <SocialCampaignCard
+              key={campaign.id}
+              campaign={campaign}
+              caption={personalizePartnerCopy(campaign.caption, referralUrl)}
+            />
           ))}
         </div>
       </section>

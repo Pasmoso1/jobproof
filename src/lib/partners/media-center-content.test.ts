@@ -18,6 +18,7 @@ import {
   partnerRewardFaqAnswer,
   personalizePartnerCopy,
 } from "@/lib/partners/media-center-content";
+import { MEDIA_SOCIAL_CAMPAIGNS } from "@/lib/partners/social-campaigns";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -42,7 +43,9 @@ describe("partner media center content", () => {
   it("includes required sections and approved notice copy", () => {
     assert.match(MEDIA_CENTER_NOTICE, /approved assets/i);
     assert.ok(MEDIA_BRAND_ASSETS.length >= 7);
-    assert.ok(MEDIA_SOCIAL_ASSETS.length >= 5);
+    // Legacy flat social list retired — campaigns own Social Media Kit downloads.
+    assert.equal(MEDIA_SOCIAL_ASSETS.length, 0);
+    assert.equal(MEDIA_SOCIAL_CAMPAIGNS.length, 6);
     assert.ok(MEDIA_WEBSITE_ASSETS.length >= 5);
     assert.ok(MEDIA_PRINT_ASSETS.length >= 4);
     assert.ok(MEDIA_EMAIL_RESOURCES.length >= 3);
@@ -52,7 +55,6 @@ describe("partner media center content", () => {
 
   it("points brand and media downloads at real public asset files", () => {
     assertAssetFilesExist(MEDIA_BRAND_ASSETS);
-    assertAssetFilesExist(MEDIA_SOCIAL_ASSETS);
     assertAssetFilesExist(MEDIA_WEBSITE_ASSETS);
     assertAssetFilesExist(MEDIA_PRINT_ASSETS);
     assertAssetFilesExist([BRAND_GUIDELINES_ASSET]);
@@ -60,6 +62,12 @@ describe("partner media center content", () => {
       if (!email.htmlHref) continue;
       const absolute = join(root, "public", email.htmlHref.replace(/^\//, ""));
       assert.equal(existsSync(absolute), true, `missing ${email.htmlHref}`);
+    }
+    for (const campaign of MEDIA_SOCIAL_CAMPAIGNS) {
+      for (const format of campaign.formats) {
+        const absolute = join(root, "public", format.href.replace(/^\//, ""));
+        assert.equal(existsSync(absolute), true, `missing ${format.href}`);
+      }
     }
   });
 
@@ -141,6 +149,22 @@ describe("partner media center route access conventions", () => {
     assert.match(source, /getActivePartnerForCurrentUser/);
     assert.match(source, /Brand Assets/);
     assert.match(source, /Social Media Kit/);
+    assert.match(source, /MEDIA_SOCIAL_CAMPAIGNS/);
+    assert.match(source, /SocialCampaignCard/);
     assert.match(source, /Partner Copy Library/);
+  });
+
+  it("keeps social campaign previews responsive with object-contain", async () => {
+    const cardPath = join(
+      root,
+      "src/components/partners/media/social-campaign-card.tsx"
+    );
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(cardPath, "utf8")
+    );
+    assert.match(source, /aspectRatio/);
+    assert.match(source, /object-contain/);
+    assert.doesNotMatch(source, /object-cover/);
+    assert.match(source, /min-h-11/);
   });
 });
