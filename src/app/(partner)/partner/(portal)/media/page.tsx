@@ -22,12 +22,12 @@ import {
   MEDIA_CONTACT,
   MEDIA_EMAIL_RESOURCES,
   MEDIA_PRINT_ASSETS,
-  MEDIA_WEBSITE_ASSETS,
   PARTNER_COPY_LIBRARY,
   buildMediaCenterFaqs,
   personalizePartnerCopy,
 } from "@/lib/partners/media-center-content";
 import { MEDIA_SOCIAL_CAMPAIGNS } from "@/lib/partners/social-campaigns";
+import { MEDIA_WEB_BANNER_GROUPS } from "@/lib/partners/web-banners";
 import {
   buildOrganizationKitContext,
   ORGANIZATION_PARTNER_KIT,
@@ -40,6 +40,7 @@ import { CopyContentCard } from "@/components/partners/media/copy-content-card";
 import { ComingSoonResourceCard } from "@/components/partners/media/coming-soon-resource-card";
 import { EmailResourceCard } from "@/components/partners/media/email-resource-card";
 import { SocialCampaignCard } from "@/components/partners/media/social-campaign-card";
+import { WebBannerFormatGroupCard } from "@/components/partners/media/web-banner-format-group-card";
 import { MediaFaq } from "@/components/partners/media/media-faq";
 import { OrganizationPartnerCallout } from "@/components/partners/organization-partner-callout";
 import { OrganizationKitCard } from "@/components/partners/media/organization-kit-card";
@@ -263,13 +264,42 @@ export default async function PartnerMediaCenterPage() {
 
       <section>
         <MediaSectionHeader
-          title="Website Resources"
-          description="Banners with the real JobProof logo and a clear call to action."
+          title="Website & Display Banners"
+          description="Ready-to-use JobProof banners for partner websites, association pages, newsletters and digital placements. Link each banner to your personal referral URL."
         />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {MEDIA_WEBSITE_ASSETS.map((asset) => (
-            <MediaAssetCard key={asset.id} asset={asset} />
-          ))}
+
+        <div className="mb-8">
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+            Website banners
+          </h3>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {MEDIA_WEB_BANNER_GROUPS.filter((g) => g.section === "website").map(
+              (group) => (
+                <WebBannerFormatGroupCard
+                  key={group.id}
+                  group={group}
+                  referralUrl={referralUrl}
+                />
+              )
+            )}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+            Display banners
+          </h3>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {MEDIA_WEB_BANNER_GROUPS.filter((g) => g.section === "display").map(
+              (group) => (
+                <WebBannerFormatGroupCard
+                  key={group.id}
+                  group={group}
+                  referralUrl={referralUrl}
+                />
+              )
+            )}
+          </div>
         </div>
       </section>
 

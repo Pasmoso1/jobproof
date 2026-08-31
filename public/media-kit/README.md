@@ -13,7 +13,7 @@ node scripts/build-partner-media-kit.mjs
 
 Folders:
 
-- `logos/` `icons/` `favicons/` `social/` `email/` `website/` `print/` `brand/`
+- `logos/` `icons/` `favicons/` `social/` `web/` `email/` `website/` `print/` `brand/`
 
 Intentionally pending until vector masters exist:
 

@@ -2,6 +2,7 @@ import type { StudioPlatformId } from "@/lib/partners/studio/catalog";
 import type { GeneratedCopy } from "@/lib/partners/studio/copy";
 import { buildCoBrandDataUrl } from "@/lib/partners/studio/co-brand";
 import { SOCIAL_CAMPAIGN_STUDIO_DEFAULTS } from "@/lib/partners/social-campaigns";
+import { WEB_BANNER_STUDIO_DEFAULT } from "@/lib/partners/web-banners";
 
 export type CampaignAssetDraft = {
   /** Wizard platform id, or "qr" / "co_brand" for referral / co-brand assets. */
@@ -80,9 +81,9 @@ const PLATFORM_MEDIA: Record<
   website_banner: {
     kind: "banner",
     title: "Website Banner",
-    previewSrc: "/media-kit/website/jobproof-banner-1600.png",
-    downloadHref: "/media-kit/website/jobproof-banner-1600.png",
-    downloadFileName: "jobproof-banner-1600.png",
+    previewSrc: WEB_BANNER_STUDIO_DEFAULT,
+    downloadHref: WEB_BANNER_STUDIO_DEFAULT,
+    downloadFileName: "jobproof-win-more-work-1600x400.png",
   },
   rack_card: {
     kind: "print",

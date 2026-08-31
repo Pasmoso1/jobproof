@@ -11,6 +11,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { buildAllSocialCampaigns } from "./partner-media-social-campaigns.mjs";
+import { buildAllWebBanners } from "./partner-media-web-banners.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const DOWNLOADS = path.join(process.env.USERPROFILE || process.env.HOME || "", "Downloads");
@@ -37,6 +38,7 @@ const OUT = {
   social: path.join(ROOT, "public/media-kit/social"),
   email: path.join(ROOT, "public/media-kit/email"),
   website: path.join(ROOT, "public/media-kit/website"),
+  web: path.join(ROOT, "public/media-kit/web"),
   print: path.join(ROOT, "public/media-kit/print"),
   brand: path.join(ROOT, "public/media-kit/brand"),
   source: path.join(ROOT, "public/media-kit/source"),
@@ -284,6 +286,12 @@ async function prepareLogos() {
   const compactBuf = await ensureSafePadding(compactResized, 8);
   await writePng(sharp(compactBuf), path.join(OUT.logos, "jobproof-compact-horizontal.png"));
 
+  // Site header logo — same transparent lockup used across white/zinc app chrome.
+  await writePng(
+    sharp(primaryBuf).resize({ width: 1154, fit: "inside", withoutEnlargement: true }),
+    path.join(ROOT, "public/jobproof-logo.png")
+  );
+
   // Shield — prefer true-transparent master
   const shieldClean = await prepareTransparentLogo(shieldPath);
   const shieldBuf = await ensureSafePadding(shieldClean, 24);
@@ -359,15 +367,6 @@ async function prepareFavicons() {
   await writePng(await resizeContain(shield32, 16, 16), path.join(OUT.favicons, "jobproof-favicon-16.png"));
 }
 
-function hexRgb(hex) {
-  const h = hex.replace("#", "");
-  return {
-    r: parseInt(h.slice(0, 2), 16),
-    g: parseInt(h.slice(2, 4), 16),
-    b: parseInt(h.slice(4, 6), 16),
-  };
-}
-
 async function buildSocial() {
   const logoPath = path.join(OUT.logos, "jobproof-primary-horizontal.png");
   await buildAllSocialCampaigns({
@@ -393,87 +392,12 @@ async function buildSocial() {
 }
 
 async function buildWebsiteBanners() {
-  const specs = [
-    { w: 1920, h: 480, file: "jobproof-banner-1920.png", logoW: 520 },
-    { w: 1600, h: 400, file: "jobproof-banner-1600.png", logoW: 440 },
-    { w: 728, h: 90, file: "jobproof-banner-728x90.png", logoW: 200 },
-    { w: 300, h: 250, file: "jobproof-banner-300x250.png", logoW: 220 },
-    { w: 160, h: 600, file: "jobproof-banner-160x600.png", logoW: 130 },
-  ];
-
   const logoPath = path.join(OUT.logos, "jobproof-primary-horizontal.png");
-
-  for (const spec of specs) {
-    const { w, h, file, logoW } = spec;
-    const blue = hexRgb(COLORS.blue);
-    const logoBuf = await sharp(logoPath)
-      .resize({ width: logoW, fit: "inside" })
-      .png()
-      .toBuffer();
-
-    const isTall = h > w;
-    const isShort = h <= 100;
-
-    let overlay;
-    if (isShort) {
-      overlay = Buffer.from(`
-        <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-          <rect x="${w - 210}" y="22" width="180" height="46" rx="8" fill="${COLORS.orange}"/>
-          <text x="${w - 120}" y="51" fill="#fff" font-size="16" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Try JobProof</text>
-        </svg>
-      `);
-    } else if (isTall) {
-      overlay = Buffer.from(`
-        <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-          <text x="20" y="280" fill="#fff" font-size="22" font-weight="700" font-family="Arial, Helvetica, sans-serif">Win more work</text>
-          <text x="20" y="312" fill="rgba(255,255,255,0.9)" font-size="16" font-family="Arial, Helvetica, sans-serif">Get paid</text>
-          <rect x="20" y="${h - 80}" width="120" height="40" rx="8" fill="${COLORS.orange}"/>
-          <text x="80" y="${h - 54}" fill="#fff" font-size="14" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Learn more</text>
-        </svg>
-      `);
-    } else if (w === 300) {
-      overlay = Buffer.from(`
-        <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-          <text x="24" y="140" fill="#fff" font-size="22" font-weight="700" font-family="Arial, Helvetica, sans-serif">Quotes to invoices</text>
-          <text x="24" y="168" fill="rgba(255,255,255,0.9)" font-size="14" font-family="Arial, Helvetica, sans-serif">in one platform</text>
-          <rect x="24" y="195" width="140" height="36" rx="8" fill="${COLORS.orange}"/>
-          <text x="94" y="218" fill="#fff" font-size="14" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Get started</text>
-        </svg>
-      `);
-    } else {
-      overlay = Buffer.from(`
-        <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-          <text x="64" y="${Math.round(h * 0.55)}" fill="#fff" font-size="${w > 1400 ? 48 : 36}" font-weight="700" font-family="Arial, Helvetica, sans-serif">Win more work. Get paid. Protect what you've earned.</text>
-          <text x="64" y="${Math.round(h * 0.55) + 44}" fill="rgba(255,255,255,0.9)" font-size="22" font-family="Arial, Helvetica, sans-serif">Quotes · Contracts · Change Orders · Invoices · Documentation</text>
-          <rect x="64" y="${h - 90}" width="220" height="48" rx="10" fill="${COLORS.orange}"/>
-          <text x="174" y="${h - 59}" fill="#fff" font-size="18" font-weight="700" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">Start with JobProof</text>
-        </svg>
-      `);
-    }
-
-    const logoTop = isTall ? 40 : isShort ? Math.round((h - 50) / 2) : 36;
-    const logoLeft = isTall ? 15 : 48;
-
-    await writePng(
-      sharp({
-        create: { width: w, height: h, channels: 3, background: blue },
-      }).composite([
-        {
-          input: Buffer.from(`
-            <svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-              <rect x="0" y="0" width="${w}" height="6" fill="${COLORS.orange}"/>
-              <rect x="0" y="${h - 6}" width="${w}" height="6" fill="${COLORS.proofTeal}"/>
-            </svg>
-          `),
-          top: 0,
-          left: 0,
-        },
-        { input: logoBuf, top: logoTop, left: logoLeft },
-        { input: overlay, top: 0, left: 0 },
-      ]),
-      path.join(OUT.website, file)
-    );
-  }
+  await buildAllWebBanners({
+    root: ROOT,
+    logoPath,
+    writeLog: (dest) => console.log("wrote", path.relative(ROOT, dest)),
+  });
 }
 
 async function pngToPdf(pngPath, pdfPath, pageWidthPt, pageHeightPt) {
@@ -827,7 +751,7 @@ node scripts/build-partner-media-kit.mjs
 
 Folders:
 
-- \`logos/\` \`icons/\` \`favicons/\` \`social/\` \`email/\` \`website/\` \`print/\` \`brand/\`
+- \`logos/\` \`icons/\` \`favicons/\` \`social/\` \`web/\` \`email/\` \`website/\` \`print/\` \`brand/\`
 
 Intentionally pending until vector masters exist:
 

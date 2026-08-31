@@ -19,6 +19,10 @@ import {
   personalizePartnerCopy,
 } from "@/lib/partners/media-center-content";
 import { MEDIA_SOCIAL_CAMPAIGNS } from "@/lib/partners/social-campaigns";
+import {
+  MEDIA_WEB_BANNER_GROUPS,
+  allWebBannerAssets,
+} from "@/lib/partners/web-banners";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -43,10 +47,12 @@ describe("partner media center content", () => {
   it("includes required sections and approved notice copy", () => {
     assert.match(MEDIA_CENTER_NOTICE, /approved assets/i);
     assert.ok(MEDIA_BRAND_ASSETS.length >= 7);
-    // Legacy flat social list retired — campaigns own Social Media Kit downloads.
+    // Legacy flat lists retired — campaigns / format groups own those sections.
     assert.equal(MEDIA_SOCIAL_ASSETS.length, 0);
+    assert.equal(MEDIA_WEBSITE_ASSETS.length, 0);
     assert.equal(MEDIA_SOCIAL_CAMPAIGNS.length, 6);
-    assert.ok(MEDIA_WEBSITE_ASSETS.length >= 5);
+    assert.equal(MEDIA_WEB_BANNER_GROUPS.length, 5);
+    assert.ok(allWebBannerAssets().length >= 13);
     assert.ok(MEDIA_PRINT_ASSETS.length >= 4);
     assert.ok(MEDIA_EMAIL_RESOURCES.length >= 3);
     assert.ok(PARTNER_COPY_LIBRARY.length >= 8);
@@ -55,7 +61,6 @@ describe("partner media center content", () => {
 
   it("points brand and media downloads at real public asset files", () => {
     assertAssetFilesExist(MEDIA_BRAND_ASSETS);
-    assertAssetFilesExist(MEDIA_WEBSITE_ASSETS);
     assertAssetFilesExist(MEDIA_PRINT_ASSETS);
     assertAssetFilesExist([BRAND_GUIDELINES_ASSET]);
     for (const email of MEDIA_EMAIL_RESOURCES) {
@@ -68,6 +73,10 @@ describe("partner media center content", () => {
         const absolute = join(root, "public", format.href.replace(/^\//, ""));
         assert.equal(existsSync(absolute), true, `missing ${format.href}`);
       }
+    }
+    for (const asset of allWebBannerAssets()) {
+      const absolute = join(root, "public", asset.href.replace(/^\//, ""));
+      assert.equal(existsSync(absolute), true, `missing ${asset.href}`);
     }
   });
 
@@ -149,8 +158,11 @@ describe("partner media center route access conventions", () => {
     assert.match(source, /getActivePartnerForCurrentUser/);
     assert.match(source, /Brand Assets/);
     assert.match(source, /Social Media Kit/);
+    assert.match(source, /Website & Display Banners/);
     assert.match(source, /MEDIA_SOCIAL_CAMPAIGNS/);
+    assert.match(source, /MEDIA_WEB_BANNER_GROUPS/);
     assert.match(source, /SocialCampaignCard/);
+    assert.match(source, /WebBannerFormatGroupCard/);
     assert.match(source, /Partner Copy Library/);
   });
 
