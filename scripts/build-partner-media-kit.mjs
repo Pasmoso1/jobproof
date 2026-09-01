@@ -12,6 +12,7 @@ import sharp from "sharp";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { buildAllSocialCampaigns } from "./partner-media-social-campaigns.mjs";
 import { buildAllWebBanners } from "./partner-media-web-banners.mjs";
+import { buildAllPrintAssets } from "./partner-media-print.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const DOWNLOADS = path.join(process.env.USERPROFILE || process.env.HOME || "", "Downloads");
@@ -400,127 +401,12 @@ async function buildWebsiteBanners() {
   });
 }
 
-async function pngToPdf(pngPath, pdfPath, pageWidthPt, pageHeightPt) {
-  const doc = await PDFDocument.create();
-  const bytes = fs.readFileSync(pngPath);
-  const image = await doc.embedPng(bytes);
-  const page = doc.addPage([pageWidthPt, pageHeightPt]);
-  page.drawImage(image, {
-    x: 0,
-    y: 0,
-    width: pageWidthPt,
-    height: pageHeightPt,
-  });
-  fs.writeFileSync(pdfPath, await doc.save());
-  console.log("wrote", path.relative(ROOT, pdfPath));
-}
-
-async function buildPrintFlyer({
-  widthPx,
-  heightPx,
-  pngName,
-  pdfName,
-  pageW,
-  pageH,
-  title,
-  bullets,
-}) {
-  const logoPath = path.join(OUT.logos, "jobproof-primary-horizontal.png");
-  const logoBuf = await sharp(logoPath)
-    .resize({ width: Math.round(widthPx * 0.45), fit: "inside" })
-    .png()
-    .toBuffer();
-
-  const bulletText = bullets
-    .map((b, i) => {
-      const y = Math.round(heightPx * 0.38) + i * 70;
-      return `<text x="96" y="${y}" fill="${COLORS.zinc900}" font-size="36" font-family="Arial, Helvetica, sans-serif">•  ${b.replace(/&/g, "&amp;")}</text>`;
-    })
-    .join("");
-
-  const overlay = Buffer.from(`
-    <svg width="${widthPx}" height="${heightPx}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${widthPx}" height="${heightPx}" fill="${COLORS.white}"/>
-      <rect width="${widthPx}" height="28" fill="${COLORS.blue}"/>
-      <rect y="${heightPx - 28}" width="${widthPx}" height="28" fill="${COLORS.orange}"/>
-      <text x="96" y="${Math.round(heightPx * 0.28)}" fill="${COLORS.navy}" font-size="64" font-weight="700" font-family="Arial, Helvetica, sans-serif">${title.replace(/&/g, "&amp;")}</text>
-      ${bulletText}
-      <text x="96" y="${heightPx - 160}" fill="${COLORS.blue}" font-size="32" font-weight="700" font-family="Arial, Helvetica, sans-serif">jobproof.ca</text>
-      <text x="96" y="${heightPx - 110}" fill="${COLORS.zinc700}" font-size="26" font-family="Arial, Helvetica, sans-serif">Replace [PARTNER LINK] with your referral URL</text>
-    </svg>
-  `);
-
-  const pngPath = path.join(OUT.print, pngName);
-  await writePng(
-    sharp(overlay).composite([{ input: logoBuf, top: 80, left: 80 }]),
-    pngPath
-  );
-  await pngToPdf(pngPath, path.join(OUT.print, pdfName), pageW, pageH);
-}
-
 async function buildPrint() {
-  // 300 DPI sizes
-  await buildPrintFlyer({
-    widthPx: 2550,
-    heightPx: 3300,
-    pngName: "jobproof-flyer-letter.png",
-    pdfName: "jobproof-flyer-letter.pdf",
-    pageW: 612,
-    pageH: 792,
-    title: "Win more work. Manage the work. Get paid.",
-    bullets: [
-      "Turn more opportunities into paying jobs",
-      "Change orders and job documentation",
-      "Invoices and payment tracking",
-      "Records that protect earned revenue",
-    ],
-  });
-
-  await buildPrintFlyer({
-    widthPx: 1200,
-    heightPx: 2700,
-    pngName: "jobproof-rack-card.png",
-    pdfName: "jobproof-rack-card.pdf",
-    pageW: 288,
-    pageH: 648,
-    title: "JobProof for contractors",
-    bullets: [
-      "Quotes & contracts",
-      "Change orders",
-      "Invoices & payments",
-      "Protect every project",
-    ],
-  });
-
-  await buildPrintFlyer({
-    widthPx: 2550,
-    heightPx: 1650,
-    pngName: "jobproof-flyer-halfpage.png",
-    pdfName: "jobproof-flyer-halfpage.pdf",
-    pageW: 612,
-    pageH: 396,
-    title: "Win more work. Get paid. Protect revenue.",
-    bullets: [
-      "Turn more opportunities into paying jobs",
-      "Manage quotes, contracts, and invoicing",
-      "Keep clear records that protect earned revenue",
-    ],
-  });
-
-  await buildPrintFlyer({
-    widthPx: 3300,
-    heightPx: 5100,
-    pngName: "jobproof-poster.png",
-    pdfName: "jobproof-poster.pdf",
-    pageW: 792,
-    pageH: 1224,
-    title: "Win the job. Manage the work. Get paid.",
-    bullets: [
-      "From quote request to payment — in one place",
-      "Quotes · Contracts · Change Orders",
-      "Invoices · Documentation · Payments",
-      "Share your partner referral link today",
-    ],
+  const logoPath = path.join(OUT.logos, "jobproof-primary-horizontal.png");
+  await buildAllPrintAssets({
+    root: ROOT,
+    logoPath,
+    writeLog: (dest) => console.log("wrote", path.relative(ROOT, dest)),
   });
 }
 

@@ -266,7 +266,7 @@ export const ORGANIZATION_LANDING_VARIANTS: Record<
       eyebrow: "HVAC Association Partners",
       headline: "Help HVAC members run cleaner jobs.",
       subtitle:
-        "From quote requests to invoices, JobProof helps HVAC contractors stay organized and get paid faster.",
+        "From quote requests to invoices, JobProof helps HVAC contractors stay organized from first quote to final payment.",
       supporting:
         "Recommend a tool members can use every week — not just once a year at conference.",
       photographyNote:
@@ -289,7 +289,7 @@ export const ORGANIZATION_LANDING_VARIANTS: Record<
       },
       {
         title: "Owner roundtable",
-        body: "Discuss getting paid faster and reducing paperwork friction.",
+        body: "Discuss clearer payment workflows and reducing paperwork friction.",
       },
     ],
     marketingExamples: [
@@ -306,7 +306,7 @@ export const ORGANIZATION_LANDING_VARIANTS: Record<
       "Support plumbers with professional proposals, contracts, and organized job history through JobProof.",
     hero: {
       eyebrow: "Plumbing Association Partners",
-      headline: "Help plumbers quote clearly and get paid faster.",
+      headline: "Help plumbers quote clearly and grow their business.",
       subtitle:
         "Members can manage customers, projects, contracts, and invoices without losing details across texts and paper.",
       supporting:

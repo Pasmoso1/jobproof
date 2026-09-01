@@ -88,6 +88,7 @@ const PLATFORM_MEDIA: Record<
   rack_card: {
     kind: "print",
     title: "Rack Card",
+    /** Static base assets; personalized downloads live in Media Centre API. */
     previewSrc: "/media-kit/print/jobproof-rack-card.png",
     downloadHref: "/media-kit/print/jobproof-rack-card.pdf",
     downloadFileName: "jobproof-rack-card.pdf",

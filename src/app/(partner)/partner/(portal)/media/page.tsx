@@ -21,13 +21,13 @@ import {
   MEDIA_CENTER_POSITIONING,
   MEDIA_CONTACT,
   MEDIA_EMAIL_RESOURCES,
-  MEDIA_PRINT_ASSETS,
   PARTNER_COPY_LIBRARY,
   buildMediaCenterFaqs,
   personalizePartnerCopy,
 } from "@/lib/partners/media-center-content";
 import { MEDIA_SOCIAL_CAMPAIGNS } from "@/lib/partners/social-campaigns";
 import { MEDIA_WEB_BANNER_GROUPS } from "@/lib/partners/web-banners";
+import { MEDIA_PRINT_RESOURCES } from "@/lib/partners/print-assets";
 import {
   buildOrganizationKitContext,
   ORGANIZATION_PARTNER_KIT,
@@ -41,6 +41,7 @@ import { ComingSoonResourceCard } from "@/components/partners/media/coming-soon-
 import { EmailResourceCard } from "@/components/partners/media/email-resource-card";
 import { SocialCampaignCard } from "@/components/partners/media/social-campaign-card";
 import { WebBannerFormatGroupCard } from "@/components/partners/media/web-banner-format-group-card";
+import { PrintResourceCard } from "@/components/partners/media/print-resource-card";
 import { MediaFaq } from "@/components/partners/media/media-faq";
 import { OrganizationPartnerCallout } from "@/components/partners/organization-partner-callout";
 import { OrganizationKitCard } from "@/components/partners/media/organization-kit-card";
@@ -306,11 +307,18 @@ export default async function PartnerMediaCenterPage() {
       <section>
         <MediaSectionHeader
           title="Print Resources"
-          description="Print-ready PDFs at 300 DPI, plus high-resolution PNG previews."
+          description="Professional JobProof materials you can print, share and distribute to contractors. Downloads include your personalized QR code when your referral link is available."
         />
+        <p className="mb-4 text-sm text-zinc-600">
+          Your QR code links contractors through your JobProof referral link.
+        </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {MEDIA_PRINT_ASSETS.map((asset) => (
-            <MediaAssetCard key={asset.id} asset={asset} />
+          {MEDIA_PRINT_RESOURCES.map((resource) => (
+            <PrintResourceCard
+              key={resource.id}
+              resource={resource}
+              referralUrl={referralUrl}
+            />
           ))}
         </div>
       </section>

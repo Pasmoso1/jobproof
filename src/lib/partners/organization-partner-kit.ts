@@ -396,7 +396,7 @@ function buildBannerSvg(
   <text x="48" y="80" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="700" fill="#2436BB">${escapeXml(kicker.toUpperCase())}</text>
   <text x="48" y="140" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="700" fill="#18181b">Recommended by ${escapeXml(name)}</text>
   <text x="48" y="200" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="600" fill="#2436BB">JobProof for contractors</text>
-  <text x="48" y="250" font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#52525b">Get more jobs · Quote professionally · Get paid faster · Protect every job</text>
+  <text x="48" y="250" font-family="Segoe UI, Arial, sans-serif" font-size="20" fill="#52525b">Win more work · Quote professionally · Get paid · Protect every job</text>
   <text x="48" y="${height - 60}" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#71717a">${escapeXml(truncate(ctx.referralUrl, 56))}</text>
   <text x="48" y="${height - 28}" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#2436BB">Code ${escapeXml(ctx.referralCode)} · Powered by JobProof</text>
   <image href="${escapeXml(ctx.qrImageUrl)}" x="${width - 220}" y="${Math.max(70, height / 2 - 90)}" width="170" height="170"/>
@@ -422,7 +422,7 @@ function buildPrintSvg(
   <text x="48" y="370" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#3f3f46">• Get more jobs &amp; quote requests</text>
   <text x="48" y="400" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#3f3f46">• Create quotes, contracts &amp; invoices</text>
   <text x="48" y="430" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#3f3f46">• Manage customers &amp; projects</text>
-  <text x="48" y="460" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#3f3f46">• Handle change orders &amp; get paid faster</text>
+  <text x="48" y="460" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#3f3f46">• Handle change orders &amp; protect earned revenue</text>
   <image href="${escapeXml(ctx.qrImageUrl)}" x="${width / 2 - 140}" y="${height - 420}" width="280" height="280"/>
   <text x="${width / 2}" y="${height - 110}" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="18" fill="#52525b">${escapeXml(ctx.referralUrl)}</text>
   <text x="${width / 2}" y="${height - 70}" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#2436BB">Code ${escapeXml(ctx.referralCode)}</text>

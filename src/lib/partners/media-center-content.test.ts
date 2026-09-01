@@ -18,6 +18,7 @@ import {
   partnerRewardFaqAnswer,
   personalizePartnerCopy,
 } from "@/lib/partners/media-center-content";
+import { MEDIA_PRINT_RESOURCES } from "@/lib/partners/print-assets";
 import { MEDIA_SOCIAL_CAMPAIGNS } from "@/lib/partners/social-campaigns";
 import {
   MEDIA_WEB_BANNER_GROUPS,
@@ -53,7 +54,8 @@ describe("partner media center content", () => {
     assert.equal(MEDIA_SOCIAL_CAMPAIGNS.length, 6);
     assert.equal(MEDIA_WEB_BANNER_GROUPS.length, 5);
     assert.ok(allWebBannerAssets().length >= 13);
-    assert.ok(MEDIA_PRINT_ASSETS.length >= 4);
+    assert.equal(MEDIA_PRINT_ASSETS.length, 0);
+    assert.equal(MEDIA_PRINT_RESOURCES.length, 4);
     assert.ok(MEDIA_EMAIL_RESOURCES.length >= 3);
     assert.ok(PARTNER_COPY_LIBRARY.length >= 8);
     assert.ok(BRAND_GUIDELINES_ASSET.downloads.length > 0);
@@ -61,7 +63,6 @@ describe("partner media center content", () => {
 
   it("points brand and media downloads at real public asset files", () => {
     assertAssetFilesExist(MEDIA_BRAND_ASSETS);
-    assertAssetFilesExist(MEDIA_PRINT_ASSETS);
     assertAssetFilesExist([BRAND_GUIDELINES_ASSET]);
     for (const email of MEDIA_EMAIL_RESOURCES) {
       if (!email.htmlHref) continue;
@@ -163,7 +164,9 @@ describe("partner media center route access conventions", () => {
     assert.match(source, /MEDIA_WEB_BANNER_GROUPS/);
     assert.match(source, /SocialCampaignCard/);
     assert.match(source, /WebBannerFormatGroupCard/);
-    assert.match(source, /Partner Copy Library/);
+    assert.match(source, /Print Resources/);
+    assert.match(source, /MEDIA_PRINT_RESOURCES/);
+    assert.match(source, /PrintResourceCard/);
   });
 
   it("keeps social campaign previews responsive with object-contain", async () => {

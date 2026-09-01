@@ -1,0 +1,82 @@
+{
+  "qrSlots": {
+    "full-page": {
+      "left": 1780,
+      "top": 1960,
+      "size": 520
+    },
+    "half-page": {
+      "left": 1860,
+      "top": 420,
+      "size": 480
+    },
+    "rack-card-front": {
+      "left": 280,
+      "top": 1480,
+      "size": 640
+    },
+    "poster": {
+      "left": 1050,
+      "top": 1780,
+      "size": 1200
+    }
+  },
+  "rackBackLinkArea": {
+    "left": 90,
+    "top": 1580,
+    "width": 1020,
+    "height": 220
+  },
+  "specs": {
+    "full-page": {
+      "widthPx": 2550,
+      "heightPx": 3300,
+      "pageW": 612,
+      "pageH": 792,
+      "folder": "full-page",
+      "basePng": "jobproof-full-page-flyer.png",
+      "basePdf": "jobproof-full-page-flyer.pdf",
+      "hasQr": true
+    },
+    "half-page": {
+      "widthPx": 2550,
+      "heightPx": 1650,
+      "pageW": 612,
+      "pageH": 396,
+      "folder": "half-page",
+      "basePng": "jobproof-half-page-flyer.png",
+      "basePdf": "jobproof-half-page-flyer.pdf",
+      "hasQr": true
+    },
+    "rack-card-front": {
+      "widthPx": 1200,
+      "heightPx": 2700,
+      "pageW": 288,
+      "pageH": 648,
+      "folder": "rack-card",
+      "basePng": "jobproof-rack-card-front.png",
+      "basePdf": "jobproof-rack-card-front.pdf",
+      "hasQr": true
+    },
+    "rack-card-back": {
+      "widthPx": 1200,
+      "heightPx": 2700,
+      "pageW": 288,
+      "pageH": 648,
+      "folder": "rack-card",
+      "basePng": "jobproof-rack-card-back.png",
+      "basePdf": "jobproof-rack-card-back.pdf",
+      "hasQr": false
+    },
+    "poster": {
+      "widthPx": 3300,
+      "heightPx": 5100,
+      "pageW": 792,
+      "pageH": 1224,
+      "folder": "poster",
+      "basePng": "jobproof-poster.png",
+      "basePdf": "jobproof-poster.pdf",
+      "hasQr": true
+    }
+  }
+}
