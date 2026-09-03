@@ -4,6 +4,33 @@ import { rewardAmountForPartner, type PartnerLevel } from "@/lib/partners/consta
 import { normalizePartnerReferralCode } from "@/lib/partners/referral-code";
 import { sendPartnerReferralLifecycleEmail } from "@/lib/partners/emails";
 
+export function normalizePartnerSubscriptionStatus(
+  status: string | null | undefined
+): string {
+  return String(status ?? "").trim().toLowerCase();
+}
+
+export function isQualifyingPaidSubscriptionStatus(
+  status: string | null | undefined
+): boolean {
+  return normalizePartnerSubscriptionStatus(status) === "active";
+}
+
+export function resolvePartnerReferralSubscriptionStartedAt(input: {
+  rewardStatus: string | null | undefined;
+  currentStartedAt: string | null | undefined;
+  nextSubscriptionStatus: string | null | undefined;
+  now?: Date;
+}): string | null | undefined {
+  if (String(input.rewardStatus ?? "") !== "pending") {
+    return undefined;
+  }
+  if (isQualifyingPaidSubscriptionStatus(input.nextSubscriptionStatus)) {
+    return input.currentStartedAt ? undefined : (input.now ?? new Date()).toISOString();
+  }
+  return input.currentStartedAt ? null : undefined;
+}
+
 /**
  * Attach a contractor profile to a partner permanently (first referral wins).
  * Safe to call multiple times — no-ops if already attributed.
@@ -143,23 +170,45 @@ export async function markPartnerReferralSubscriptionStarted(
   admin: SupabaseClient,
   contractorProfileId: string
 ): Promise<void> {
+  await syncPartnerReferralSubscriptionStatus(admin, contractorProfileId, "active");
+}
+
+export async function syncPartnerReferralSubscriptionStatus(
+  admin: SupabaseClient,
+  contractorProfileId: string,
+  nextSubscriptionStatus: string,
+  now: Date = new Date()
+): Promise<{ updated: boolean; started: boolean; reset: boolean }> {
   const { data: row } = await admin
     .from("partner_referrals")
     .select(
-      "id, partner_id, subscription_started_at, contractor_business_name, partners(contact_name, email)"
+      "id, partner_id, reward_status, subscription_started_at, contractor_business_name, partners(contact_name, email)"
     )
     .eq("contractor_profile_id", contractorProfileId)
     .maybeSingle();
-  if (!row) return;
-  if (row.subscription_started_at) return;
+  if (!row) return { updated: false, started: false, reset: false };
+  const nextStartedAt = resolvePartnerReferralSubscriptionStartedAt({
+    rewardStatus: row.reward_status,
+    currentStartedAt: row.subscription_started_at,
+    nextSubscriptionStatus,
+    now,
+  });
+  if (nextStartedAt === undefined) {
+    return { updated: false, started: false, reset: false };
+  }
 
   await admin
     .from("partner_referrals")
     .update({
-      subscription_started_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      subscription_started_at: nextStartedAt,
+      updated_at: now.toISOString(),
     })
-    .eq("id", row.id);
+    .eq("id", row.id)
+    .eq("reward_status", "pending");
+
+  if (nextStartedAt === null) {
+    return { updated: true, started: false, reset: true };
+  }
 
   trackProductEventSafe({
     profileId: contractorProfileId,
@@ -181,4 +230,6 @@ export async function markPartnerReferralSubscriptionStarted(
       businessName: row.contractor_business_name,
     });
   }
+
+  return { updated: true, started: true, reset: false };
 }

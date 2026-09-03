@@ -198,12 +198,16 @@ export async function processStripeBillingWebhook(
             },
           });
 
-          if (["active", "trialing", "past_due"].includes(String(newStatus))) {
+          if (["active", "trialing", "past_due", "unpaid", "canceled", "cancelled"].includes(String(newStatus))) {
             try {
-              const { markPartnerReferralSubscriptionStarted } = await import(
+              const { syncPartnerReferralSubscriptionStatus } = await import(
                 "@/lib/partners/attribution"
               );
-              await markPartnerReferralSubscriptionStarted(admin, String(profile.id));
+              await syncPartnerReferralSubscriptionStatus(
+                admin,
+                String(profile.id),
+                String(newStatus)
+              );
             } catch (err) {
               console.error("[stripe-webhook] partner subscription started", err);
             }
@@ -348,6 +352,18 @@ export async function processStripeBillingWebhook(
           newSubscriptionStatus: sub.status,
           metadata: { ...classification.metadata, stripe_event_type: event.type },
         });
+        try {
+          const { syncPartnerReferralSubscriptionStatus } = await import(
+            "@/lib/partners/attribution"
+          );
+          await syncPartnerReferralSubscriptionStatus(
+            admin,
+            String(profile.id),
+            sub.status
+          );
+        } catch (err) {
+          console.error("[stripe-webhook] partner subscription sync", err);
+        }
       }
       break;
     }
@@ -384,6 +400,18 @@ export async function processStripeBillingWebhook(
           newSubscriptionStatus: "canceled",
           metadata: { stripe_event_type: event.type },
         });
+        try {
+          const { syncPartnerReferralSubscriptionStatus } = await import(
+            "@/lib/partners/attribution"
+          );
+          await syncPartnerReferralSubscriptionStatus(
+            admin,
+            String(profile.id),
+            "canceled"
+          );
+        } catch (err) {
+          console.error("[stripe-webhook] partner subscription delete", err);
+        }
       }
       break;
     }
@@ -417,7 +445,6 @@ export async function processStripeBillingWebhook(
             metadata: {
               kind: "invoice_paid",
               invoice_id: inv.id,
-              // Tax ledger stays in Stripe; log amounts for support only.
               currency: inv.currency ?? null,
               subtotal:
                 typeof inv.subtotal === "number" ? inv.subtotal / 100 : null,
@@ -442,6 +469,18 @@ export async function processStripeBillingWebhook(
               customer_address_state: inv.customer_address?.state ?? null,
             },
           });
+          try {
+            const { syncPartnerReferralSubscriptionStatus } = await import(
+              "@/lib/partners/attribution"
+            );
+            await syncPartnerReferralSubscriptionStatus(
+              admin,
+              String(profile.id),
+              "active"
+            );
+          } catch (err) {
+            console.error("[stripe-webhook] partner invoice paid sync", err);
+          }
         }
       }
       break;
@@ -481,6 +520,18 @@ export async function processStripeBillingWebhook(
               attempt_count: inv.attempt_count ?? null,
             },
           });
+          try {
+            const { syncPartnerReferralSubscriptionStatus } = await import(
+              "@/lib/partners/attribution"
+            );
+            await syncPartnerReferralSubscriptionStatus(
+              admin,
+              String(profile.id),
+              "past_due"
+            );
+          } catch (err) {
+            console.error("[stripe-webhook] partner payment failed sync", err);
+          }
         }
       }
       break;

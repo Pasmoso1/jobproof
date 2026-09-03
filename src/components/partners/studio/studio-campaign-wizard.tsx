@@ -323,7 +323,9 @@ export function StudioCampaignWizard({
             <p className="mt-1 text-sm text-zinc-600">
               Campaigns automatically include your referral link, referral code, QR
               code, and JobProof branding
-              {isFounding ? ", plus your Founding Partner badge" : ""}.
+              {!isOrganizationPartnerResolved && isFounding
+                ? ", plus your Founding Partner badge"
+                : ""}.
               {isOrganizationPartnerResolved
                 ? " Uploaded organization logos are applied to co-branded graphics automatically."
                 : ""}

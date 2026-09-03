@@ -38,7 +38,10 @@ export default async function PartnerStudioCreatePage() {
 
       <StudioCampaignWizard
         organizationName={session.partner.organization_name}
-        isFounding={session.partner.partner_level === "founding"}
+        isFounding={
+          !isOrganizationPartner &&
+          session.partner.partner_level === "founding"
+        }
         initialLogoUrl={logo?.logoUrl ?? null}
         isOrganizationPartner={isOrganizationPartner}
         partnerType={normalizePartnerType(session.partner.partner_type)}

@@ -11,6 +11,7 @@ import {
   buildPartnerReferralUrl,
   FOUNDING_PARTNER_LIMIT,
   isCanonicalPartnerType,
+  isOrganizationPartnerType,
   type PartnerLevel,
   type PartnerTypeValue,
 } from "@/lib/partners/constants";
@@ -77,6 +78,12 @@ export async function adminApprovePartnerApplication(
   if (!["submitted", "under_review"].includes(app.status)) {
     return { ok: false as const, error: "This application cannot be approved." };
   }
+  if (isOrganizationPartnerType(app.partner_type) && levelOverride) {
+    return {
+      ok: false as const,
+      error: "Organization applications are approved as Organization Partners, not Founding or Standard.",
+    };
+  }
   if (!app.agreement_version || !app.agreement_accepted_at) {
     return {
       ok: false as const,
@@ -114,6 +121,7 @@ export async function adminApprovePartnerApplication(
       contactName: app.contact_name,
       organizationName: app.organization_name,
       level: created.level,
+      partnerType: app.partner_type,
       referralCode: created.referralCode,
       referralUrl,
       username: app.username,
@@ -129,15 +137,17 @@ export async function adminApprovePartnerApplication(
         partner_level: created.level,
       },
     });
-    trackProductEventSafe({
-      profileId: null,
-      eventName:
-        created.level === "founding"
-          ? PRODUCT_ANALYTICS_EVENTS.founding_partner_approved
-          : PRODUCT_ANALYTICS_EVENTS.standard_partner_approved,
-      source: "admin_partners",
-      metadata: { partner_id: created.partnerId },
-    });
+    if (!isOrganizationPartnerType(app.partner_type)) {
+      trackProductEventSafe({
+        profileId: null,
+        eventName:
+          created.level === "founding"
+            ? PRODUCT_ANALYTICS_EVENTS.founding_partner_approved
+            : PRODUCT_ANALYTICS_EVENTS.standard_partner_approved,
+        source: "admin_partners",
+        metadata: { partner_id: created.partnerId },
+      });
+    }
 
     revalidatePath("/admin/partners");
     return { ok: true as const, partnerId: created.partnerId };
@@ -252,12 +262,18 @@ export async function adminChangePartnerType(
 export async function adminChangePartnerLevel(partnerId: string, level: PartnerLevel) {
   const ctx = await requireAdminService();
   if (!ctx.ok) return ctx;
+  const { data: existing } = await ctx.admin
+    .from("partners")
+    .select("partner_level, partner_type")
+    .eq("id", partnerId)
+    .maybeSingle();
+  if (isOrganizationPartnerType(existing?.partner_type)) {
+    return {
+      ok: false as const,
+      error: "Organization Partners do not use Founding or Standard levels.",
+    };
+  }
   if (level === "founding") {
-    const { data: existing } = await ctx.admin
-      .from("partners")
-      .select("partner_level")
-      .eq("id", partnerId)
-      .maybeSingle();
     if (existing?.partner_level !== "founding") {
       const foundingCount = await countFoundingPartners(ctx.admin);
       if (foundingCount >= FOUNDING_PARTNER_LIMIT) {

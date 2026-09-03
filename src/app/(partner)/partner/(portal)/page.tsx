@@ -51,7 +51,7 @@ export default async function PartnerDashboardPage() {
     },
     {
       label: "Qualified",
-      value: String(stats.qualifiedCount + stats.approvedRewardCount),
+      value: String(stats.qualifiedCount),
     },
     { label: "Paid", value: `$${stats.totalPaidCad.toFixed(0)} CAD` },
   ];

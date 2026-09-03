@@ -62,7 +62,7 @@ describe("Partner payout copy — no discretionary approval messaging", () => {
     const whenPaid = PARTNER_PORTAL_FAQS.find((f) => f.question === "When do I get paid?");
     assert.ok(whenPaid);
     assert.doesNotMatch(whenPaid!.answer, /once the referral qualifies and is approved/i);
-    assert.match(whenPaid!.answer, /Once the referral qualifies, your reward will be sent by Interac e-Transfer/i);
+    assert.match(whenPaid!.answer, /Once the referral qualifies, it becomes eligible for your next Interac e-Transfer payout/i);
     assert.match(whenPaid!.answer, /90 consecutive days/);
   });
 

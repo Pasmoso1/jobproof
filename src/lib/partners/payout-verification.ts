@@ -1,13 +1,12 @@
 /** Automated pre-payment verification for partner referral rewards. */
 
+import { isQualifyingPaidSubscriptionStatus } from "@/lib/partners/attribution";
 import {
   PARTNER_QUALIFICATION_DAYS,
   rewardAmountForPartner,
   type PartnerLevel,
 } from "@/lib/partners/constants";
 import { hasPartnerPaymentEmail } from "@/lib/partners/payment-details";
-
-const PAID_STATUSES = new Set(["active", "past_due"]);
 
 export const VERIFICATION_REASONS = {
   missingPaymentEmail: "Missing payment email",
@@ -93,7 +92,7 @@ export function verifyReferralForPayout(
   }
 
   const subStatus = String(contractor.subscription_status ?? "").toLowerCase();
-  if (!PAID_STATUSES.has(subStatus)) {
+  if (!isQualifyingPaidSubscriptionStatus(subStatus)) {
     reasons.push(VERIFICATION_REASONS.subscriptionInconsistency);
   }
 

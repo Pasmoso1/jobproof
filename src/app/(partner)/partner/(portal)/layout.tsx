@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 import { JobProofLogo } from "@/components/jobproof-logo";
 import { getPartnerAccountStatusForCurrentUser } from "@/lib/partners/session";
 import { resolvePartnerEntryPath } from "@/lib/partners/login-href";
-import { partnerLevelLabel, partnerTypeLabel } from "@/lib/partners/constants";
+import {
+  isOrganizationPartnerType,
+  partnerLevelLabel,
+  partnerTypeLabel,
+} from "@/lib/partners/constants";
 import { LogoutButton } from "@/app/(app)/logout-button";
 import { FoundingPartnerBadge } from "@/components/partners/founding-partner-badge";
 
@@ -35,6 +39,7 @@ export default async function PartnerPortalLayout({
   }
 
   const { partner } = account;
+  const isOrg = isOrganizationPartnerType(partner.partner_type);
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -54,13 +59,13 @@ export default async function PartnerPortalLayout({
               <span className="hidden text-xs font-medium text-zinc-500 sm:inline">
                 {partnerTypeLabel(partner.partner_type)}
               </span>
-              {partner.partner_level === "founding" ? (
+              {!isOrg && partner.partner_level === "founding" ? (
                 <FoundingPartnerBadge className="hidden sm:inline-flex" />
-              ) : (
+              ) : !isOrg ? (
                 <span className="hidden text-zinc-600 lg:inline">
                   {partnerLevelLabel(partner.partner_level)}
                 </span>
-              )}
+              ) : null}
               <LogoutButton />
             </div>
           </div>

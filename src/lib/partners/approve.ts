@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   FOUNDING_PARTNER_LIMIT,
+  isOrganizationPartnerType,
   type PartnerLevel,
 } from "@/lib/partners/constants";
 import { generatePartnerReferralCode } from "@/lib/partners/referral-code";
@@ -9,6 +10,7 @@ export async function countFoundingPartners(admin: SupabaseClient): Promise<numb
   const { count, error } = await admin
     .from("partners")
     .select("id", { count: "exact", head: true })
+    .neq("partner_type", "organization")
     .eq("partner_level", "founding")
     .neq("status", "declined");
   if (error) {
@@ -73,7 +75,9 @@ export async function createPartnerFromApplication(
   }
 
   let level: PartnerLevel;
-  if (options?.levelOverride === "founding") {
+  if (isOrganizationPartnerType(application.partner_type)) {
+    level = "standard";
+  } else if (options?.levelOverride === "founding") {
     const foundingCount = await countFoundingPartners(admin);
     if (foundingCount >= FOUNDING_PARTNER_LIMIT) {
       throw new Error("All Founding Partner positions have been filled.");

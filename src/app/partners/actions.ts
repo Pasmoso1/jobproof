@@ -146,8 +146,8 @@ export async function submitPartnerApplication(
     insertClient: {
       from: (table) => ({
         insert: (row) =>
-          // Intentionally no .select() — anon/authenticated INSERT without SELECT under RLS.
-          supabase.from(table).insert(row) as PromiseLike<{
+          // Intentionally no .select() — application flow remains insert-only.
+          admin.from(table).insert(row) as PromiseLike<{
             error: {
               code?: string;
               message?: string;

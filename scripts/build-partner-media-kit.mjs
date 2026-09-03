@@ -17,20 +17,6 @@ import { buildAllPrintAssets } from "./partner-media-print.mjs";
 const ROOT = path.resolve(import.meta.dirname, "..");
 const DOWNLOADS = path.join(process.env.USERPROFILE || process.env.HOME || "", "Downloads");
 
-const COLORS = {
-  blue: "#2436BB",
-  brightBlue: "#2C37EC",
-  softTeal: "#4DB6AC",
-  proofTeal: "#4DBACC",
-  orange: "#F28C38",
-  navy: "#1A2558",
-  white: "#FFFFFF",
-  zinc50: "#FAFAFA",
-  zinc100: "#F4F4F5",
-  zinc700: "#3F3F46",
-  zinc900: "#18181B",
-};
-
 const OUT = {
   root: path.join(ROOT, "public/media-kit"),
   logos: path.join(ROOT, "public/media-kit/logos"),

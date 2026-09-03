@@ -1,5 +1,6 @@
 import {
   FOUNDING_REWARD_CAD,
+  isOrganizationPartnerType,
   PARTNER_QUALIFICATION_DAYS,
   STANDARD_REWARD_CAD,
   type PartnerLevel,
@@ -495,14 +496,23 @@ export function personalizePartnerCopy(
   return body.split(PARTNER_LINK_TOKEN).join(referralUrl);
 }
 
-export function partnerRewardFaqAnswer(level: PartnerLevel): string {
+export function partnerRewardFaqAnswer(
+  level: PartnerLevel,
+  partnerType?: string | null
+): string {
+  if (isOrganizationPartnerType(partnerType)) {
+    return "Organization Partners earn a fixed $150 CAD one-time reward for each qualified referral. Each reward is one-time, and the amount shown in your Partner Portal is authoritative.";
+  }
   const amount =
     level === "founding" ? FOUNDING_REWARD_CAD : STANDARD_REWARD_CAD;
   const label = level === "founding" ? "Founding Partner" : "Standard Partner";
   return `As a ${label}, your standard one-time reward is $${amount} CAD for each qualified referral. Founding Partners and Standard Partners may have different reward amounts, and custom agreements may apply to strategic organizations. Always follow the reward amount shown in your Partner Portal.`;
 }
 
-export function buildMediaCenterFaqs(level: PartnerLevel): MediaFaqItem[] {
+export function buildMediaCenterFaqs(
+  level: PartnerLevel,
+  partnerType?: string | null
+): MediaFaqItem[] {
   const essential = getPublicPlanPriceLine("essential", "standard");
   const professional = getPublicPlanPriceLine("professional", "standard");
   return [
@@ -527,11 +537,11 @@ export function buildMediaCenterFaqs(level: PartnerLevel): MediaFaqItem[] {
     },
     {
       question: "How do partner referrals work?",
-      answer: `Each approved partner receives a referral code or link. A referral is permanently attributed according to JobProof referral rules. Rewards qualify after the referred contractor remains a paying subscriber for ${PARTNER_QUALIFICATION_DAYS} consecutive days and are paid by Interac e-Transfer.`,
+      answer: `Each approved partner receives a referral code or link. A referral is permanently attributed according to JobProof referral rules. Rewards qualify after the referred contractor remains a paying subscriber for ${PARTNER_QUALIFICATION_DAYS} consecutive days and qualified referrals are included in an upcoming Interac e-Transfer payout.`,
     },
     {
       question: "How much do partners earn?",
-      answer: partnerRewardFaqAnswer(level),
+      answer: partnerRewardFaqAnswer(level, partnerType),
     },
     {
       question: "Can I change the JobProof logo or write my own claims?",

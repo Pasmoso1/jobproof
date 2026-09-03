@@ -9,7 +9,7 @@ export const PARTNER_PORTAL_FAQS: PartnerFaqItem[] = [
   {
     question: "When do I get paid?",
     answer:
-      "A referral qualifies for payment after the referred contractor has remained a paying JobProof subscriber for 90 consecutive days. Once the referral qualifies, your reward will be sent by Interac e-Transfer to the payment email listed in your Partner account.",
+      "A referral qualifies for payment after the referred contractor has remained a paying JobProof subscriber for 90 consecutive days. Once the referral qualifies, it becomes eligible for your next Interac e-Transfer payout to the payment email listed in your Partner account.",
   },
   {
     question: "What qualifies for a reward?",
@@ -47,7 +47,7 @@ export const PARTNER_LANDING_FAQS: PartnerFaqItem[] = [
   {
     question: "When do I get paid?",
     answer:
-      "A referral qualifies for payment after the referred contractor has remained a paying JobProof subscriber for 90 consecutive days. Once the referral qualifies, rewards are sent by Interac e-Transfer to the payment email on your Partner account.",
+      "A referral qualifies for payment after the referred contractor has remained a paying JobProof subscriber for 90 consecutive days. Once the referral qualifies, rewards are included in your upcoming Interac e-Transfer payout to the payment email on your Partner account.",
   },
   {
     question: "Can I refer multiple contractors?",

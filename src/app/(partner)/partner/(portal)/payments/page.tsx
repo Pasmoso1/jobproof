@@ -48,7 +48,7 @@ export default async function PartnerPaymentsPage() {
         />
         <Stat
           label="Qualified"
-          value={`$${(stats.qualifiedAmountCad + stats.approvedAmountCad).toFixed(0)} CAD`}
+          value={`$${stats.qualifiedAmountCad.toFixed(0)} CAD`}
         />
         <Stat label="Paid" value={`$${stats.totalPaidCad.toFixed(0)} CAD`} />
         <Stat

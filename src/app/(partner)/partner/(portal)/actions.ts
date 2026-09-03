@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
 import { reverifyPartnerReferralsAfterPaymentEmailUpdate } from "@/lib/partners/payout-verification-runner";
@@ -23,21 +22,19 @@ export async function updatePartnerPaymentEmail(
     return { success: false, error: "Enter a valid payment email." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
+  const admin = createServiceRoleClient();
+  if (!admin) {
+    return { success: false, error: "Payment update service is temporarily unavailable." };
+  }
+
+  const { error } = await admin
     .from("partners")
     .update({ payment_email: paymentEmail, updated_at: new Date().toISOString() })
     .eq("id", session.partner.id);
 
   if (error) return { success: false, error: error.message };
 
-  const serviceAdmin = createServiceRoleClient();
-  if (serviceAdmin) {
-    await reverifyPartnerReferralsAfterPaymentEmailUpdate(
-      serviceAdmin,
-      session.partner.id
-    );
-  }
+  await reverifyPartnerReferralsAfterPaymentEmailUpdate(admin, session.partner.id);
 
   revalidatePath("/partner/payments");
   revalidatePath("/partner");

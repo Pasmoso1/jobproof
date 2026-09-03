@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
           );
           await applyPartnerReferralAttributionForUser({
             userId: user.id,
+            userEmail: user.email ?? null,
             partnerRefCookieValue: request.cookies.get(PARTNER_REF_COOKIE_NAME)?.value,
             source: "auth_callback_code",
           });
@@ -146,6 +147,7 @@ export async function GET(request: NextRequest) {
           );
           await applyPartnerReferralAttributionForUser({
             userId: user.id,
+            userEmail: user.email ?? null,
             partnerRefCookieValue: request.cookies.get(PARTNER_REF_COOKIE_NAME)?.value,
             source: "auth_callback_signup",
           });

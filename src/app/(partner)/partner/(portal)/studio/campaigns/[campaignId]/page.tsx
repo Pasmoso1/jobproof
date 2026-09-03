@@ -4,6 +4,7 @@ import { getActivePartnerForCurrentUser } from "@/lib/partners/session";
 import { getPartnerCampaignDetail } from "@/lib/partners/studio/actions";
 import { StudioAssetCard } from "@/components/partners/studio/studio-asset-card";
 import { StudioCopyVariantBar } from "@/components/partners/studio/studio-copy-variant-bar";
+import { isOrganizationPartnerType } from "@/lib/partners/constants";
 import {
   STUDIO_AUDIENCES,
   STUDIO_GOALS,
@@ -24,6 +25,7 @@ export default async function PartnerStudioCampaignPage({
   const { campaignId } = await params;
   const campaign = await getPartnerCampaignDetail(campaignId);
   if (!campaign) notFound();
+  const isOrg = isOrganizationPartnerType(session.partner.partner_type);
 
   return (
     <div className="space-y-8">
@@ -36,7 +38,7 @@ export default async function PartnerStudioCampaignPage({
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold text-zinc-950">{campaign.name}</h1>
-          {session.partner.partner_level === "founding" ? (
+          {!isOrg && session.partner.partner_level === "founding" ? (
             <FoundingPartnerBadge />
           ) : null}
         </div>
@@ -63,7 +65,7 @@ export default async function PartnerStudioCampaignPage({
         </p>
         <p className="mt-1 text-sm text-zinc-600">
           Recommended by {session.partner.organization_name}
-          {session.partner.partner_level === "founding"
+          {!isOrg && session.partner.partner_level === "founding"
             ? " · Founding Partner"
             : ""}{" "}
           · Powered by JobProof

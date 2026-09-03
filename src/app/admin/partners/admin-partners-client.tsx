@@ -659,6 +659,7 @@ function ApplicationDetailPanel({
   const actions = getApplicationReviewActions(app.status);
   const agreementOk = hasValidAgreementAcceptance(app);
   const site = websiteHref(app.website);
+  const isOrgApplication = isOrganizationPartnerType(app.partner_type_value);
 
   return (
     <div className="flex max-h-[90vh] flex-col">
@@ -911,19 +912,21 @@ function ApplicationDetailPanel({
                   >
                     Approve
                   </button>
-                  <button
-                    type="button"
-                    disabled={pending || !agreementOk}
-                    title={
-                      agreementOk
-                        ? undefined
-                        : "Agreement acceptance is required before approval"
-                    }
-                    className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium disabled:opacity-60"
-                    onClick={() => onApprove("founding")}
-                  >
-                    Approve founding
-                  </button>
+                  {!isOrgApplication ? (
+                    <button
+                      type="button"
+                      disabled={pending || !agreementOk}
+                      title={
+                        agreementOk
+                          ? undefined
+                          : "Agreement acceptance is required before approval"
+                      }
+                      className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium disabled:opacity-60"
+                      onClick={() => onApprove("founding")}
+                    >
+                      Approve founding
+                    </button>
+                  ) : null}
                 </>
               ) : null}
             </div>

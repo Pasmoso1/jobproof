@@ -1,9 +1,9 @@
 import { Resend } from "resend";
 import { resolveAppUrl } from "@/lib/stripe";
 import {
-  FOUNDING_REWARD_CAD,
+  isOrganizationPartnerType,
   partnerLevelLabel,
-  STANDARD_REWARD_CAD,
+  rewardAmountForPartner,
   type PartnerLevel,
 } from "@/lib/partners/constants";
 
@@ -72,26 +72,32 @@ export async function sendPartnerApplicationReceivedEmail(input: {
   return sendSimpleEmail({ to: input.to, subject, html, text });
 }
 
-export async function sendPartnerApprovedEmail(input: {
+export function buildPartnerApprovedEmailContent(input: {
   to: string;
   contactName: string;
   organizationName: string;
   level: PartnerLevel;
+  partnerType?: string | null;
   referralCode: string;
   referralUrl: string;
   username?: string | null;
   legacyAccountSetupRequired?: boolean;
 }) {
-  const reward = input.level === "founding" ? FOUNDING_REWARD_CAD : STANDARD_REWARD_CAD;
+  const isOrg = isOrganizationPartnerType(input.partnerType);
+  const reward = rewardAmountForPartner({
+    partner_level: input.level,
+    partner_type: input.partnerType,
+  });
   const portalUrl = `${resolveAppUrl()}/partner`;
   const loginUrl = `${resolveAppUrl()}/login?next=${encodeURIComponent("/partner")}`;
   const forgotUrl = `${resolveAppUrl()}/forgot-password`;
   const agreementUrl = `${resolveAppUrl()}/partners/agreement`;
   const subject = "Welcome to the JobProof Partner Program";
   const foundingBadge =
-    input.level === "founding"
+    !isOrg && input.level === "founding"
       ? '<p><span style="display:inline-block;border:1px solid #b8c0f2;background:#f4f5ff;color:#2436BB;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;">Founding Partner</span></p>'
       : "";
+  const partnerLabel = isOrg ? "Organization Partner" : partnerLevelLabel(input.level);
   const signInCopy = input.legacyAccountSetupRequired
     ? `<p style="font-size:13px;color:#52525b;">This is a legacy partner record. Follow the account setup instructions from our team, then sign in at <a href="${loginUrl}" style="color:#2436BB;">${escape(loginUrl)}</a>.</p>`
     : `<p style="font-size:13px;color:#52525b;">You can sign in now with the username${input.username ? ` <strong>${escape(input.username)}</strong>` : ""} and password you chose during your application. Portal login: <a href="${loginUrl}" style="color:#2436BB;">${escape(loginUrl)}</a>. Forgot your password? <a href="${forgotUrl}" style="color:#2436BB;">Reset it here</a>.</p>`;
@@ -102,7 +108,7 @@ export async function sendPartnerApprovedEmail(input: {
     <p>Hi ${escape(input.contactName)},</p>
     <p>Your application for <strong>${escape(input.organizationName)}</strong> has been approved.</p>
     ${foundingBadge}
-    <p>You are a <strong>${escape(partnerLevelLabel(input.level))}</strong> and earn <strong>$${reward} CAD</strong> for each qualified referral. A referral qualifies after the contractor remains a paying JobProof subscriber for 90 consecutive days. Qualified rewards are paid by Interac e-Transfer, and there are no recurring commissions.</p>
+    <p>You are approved as a <strong>${escape(partnerLabel)}</strong> and earn <strong>$${reward} CAD</strong> for each qualified referral. A referral qualifies after the contractor remains a paying JobProof subscriber for 90 consecutive days. Qualified referrals are included in your upcoming Interac e-Transfer payout, and there are no recurring commissions.</p>
     <p><strong>Your referral link:</strong><br/><a href="${escape(input.referralUrl)}" style="color:#2436BB;">${escape(input.referralUrl)}</a></p>
     <p><strong>Referral code:</strong> ${escape(input.referralCode)}</p>
     <p><a href="${portalUrl}" style="display:inline-block;margin-top:12px;background:#2436BB;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">Open Partner Portal</a></p>
@@ -110,7 +116,22 @@ export async function sendPartnerApprovedEmail(input: {
     ${signInCopy}
     <p>— The JobProof Team</p>
   `);
-  const text = `Hi ${input.contactName},\n\nYour JobProof Partner application is approved (${partnerLevelLabel(input.level)}, $${reward} CAD per qualified referral). A referral qualifies after 90 consecutive days as a paying JobProof subscriber. Qualified rewards are paid by Interac e-Transfer; there are no recurring commissions.\n\nReferral link: ${input.referralUrl}\nCode: ${input.referralCode}\nPortal: ${portalUrl}\nAgreement: ${agreementUrl}\n\n${signInText}\n\n— The JobProof Team\n`;
+  const text = `Hi ${input.contactName},\n\nYour JobProof Partner application is approved (${partnerLabel}, $${reward} CAD per qualified referral). A referral qualifies after 90 consecutive days as a paying JobProof subscriber. Qualified referrals are included in your upcoming Interac e-Transfer payout; there are no recurring commissions.\n\nReferral link: ${input.referralUrl}\nCode: ${input.referralCode}\nPortal: ${portalUrl}\nAgreement: ${agreementUrl}\n\n${signInText}\n\n— The JobProof Team\n`;
+  return { subject, html, text };
+}
+
+export async function sendPartnerApprovedEmail(input: {
+  to: string;
+  contactName: string;
+  organizationName: string;
+  level: PartnerLevel;
+  partnerType?: string | null;
+  referralCode: string;
+  referralUrl: string;
+  username?: string | null;
+  legacyAccountSetupRequired?: boolean;
+}) {
+  const { subject, html, text } = buildPartnerApprovedEmailContent(input);
   return sendSimpleEmail({ to: input.to, subject, html, text });
 }
 
@@ -169,11 +190,11 @@ export async function sendPartnerReferralLifecycleEmail(input: {
     },
     qualified: {
       subject: "Referral reward qualified",
-      body: `${biz} has met the 90 consecutive-day paying-subscriber requirement. Your $${input.amountCad ?? ""} CAD reward has qualified and will be sent by Interac e-Transfer to the payment email on your Partner account.`,
+      body: `${biz} has met the 90 consecutive-day paying-subscriber requirement. Your $${input.amountCad ?? ""} CAD reward is now eligible for your next Interac e-Transfer payout to the payment email on your Partner account.`,
     },
     reward_approved: {
       subject: "Referral reward qualified",
-      body: `Your $${input.amountCad ?? ""} CAD referral reward for ${biz} has qualified. It will be sent by Interac e-Transfer to the payment email on your Partner account.`,
+      body: `Your $${input.amountCad ?? ""} CAD referral reward for ${biz} has qualified and is included in an upcoming Interac e-Transfer payout to the payment email on your Partner account.`,
     },
     reward_paid: {
       subject: "Referral reward paid",

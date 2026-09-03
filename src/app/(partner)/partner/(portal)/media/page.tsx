@@ -55,7 +55,7 @@ export default async function PartnerMediaCenterPage() {
     resolveAppUrl(),
     partner.referral_code
   );
-  const faqs = buildMediaCenterFaqs(partner.partner_level);
+  const faqs = buildMediaCenterFaqs(partner.partner_level, partner.partner_type);
   const reward = rewardAmountForPartner({
     partner_level: partner.partner_level,
     partner_type: partner.partner_type,
@@ -92,8 +92,9 @@ export default async function PartnerMediaCenterPage() {
               {MEDIA_CENTER_NOTICE}
             </p>
             <p className="mt-3 text-sm text-zinc-500">
-              Signed in as {partnerLevelLabel(partner.partner_level)} · ${reward}{" "}
-              CAD per qualified referral
+              Signed in as{" "}
+              {isOrg ? "Organization Partner" : partnerLevelLabel(partner.partner_level)} · $
+              {reward} CAD per qualified referral
             </p>
           </div>
           <div className="flex w-full shrink-0 items-center justify-center overflow-hidden rounded-xl border border-zinc-100 bg-[length:16px_16px] bg-[linear-gradient(45deg,#e4e4e7_25%,transparent_25%,transparent_75%,#e4e4e7_75%,#e4e4e7),linear-gradient(45deg,#e4e4e7_25%,#fafafa_25%,#fafafa_75%,#e4e4e7_75%,#e4e4e7)] bg-[position:0_0,8px_8px] p-5 sm:w-64">

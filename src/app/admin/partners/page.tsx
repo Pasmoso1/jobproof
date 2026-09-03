@@ -47,6 +47,7 @@ export default async function AdminPartnersPage() {
     admin
       .from("partners")
       .select("id", { count: "exact", head: true })
+      .neq("partner_type", "organization")
       .eq("partner_level", "founding")
       .neq("status", "declined"),
   ]);

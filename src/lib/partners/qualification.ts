@@ -1,16 +1,31 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
 import { PARTNER_QUALIFICATION_DAYS } from "@/lib/partners/constants";
+import { isQualifyingPaidSubscriptionStatus } from "@/lib/partners/attribution";
 import { sendPartnerReferralLifecycleEmail } from "@/lib/partners/emails";
 import { verifyAndRouteQualifiedReferral } from "@/lib/partners/payout-verification-runner";
 
-const PAID_STATUSES = new Set(["active", "past_due"]);
-
 /**
  * Promote pending referrals to qualified when the contractor has been a paying
- * subscriber for PARTNER_QUALIFICATION_DAYS and still has an active-like status.
+ * subscriber for PARTNER_QUALIFICATION_DAYS and still has an active paid status.
  * Runs automated pre-payment verification after qualification.
  */
+export function isPartnerReferralQualificationEligible(input: {
+  subscriptionStartedAt: string | null | undefined;
+  subscriptionStatus: string | null | undefined;
+  now?: Date;
+}): boolean {
+  if (!input.subscriptionStartedAt) return false;
+  if (!isQualifyingPaidSubscriptionStatus(input.subscriptionStatus)) return false;
+  const startedAt = new Date(input.subscriptionStartedAt).getTime();
+  if (!Number.isFinite(startedAt)) return false;
+  const now = input.now ?? new Date();
+  return (
+    now.getTime() - startedAt >=
+    PARTNER_QUALIFICATION_DAYS * 24 * 60 * 60 * 1000
+  );
+}
+
 export async function qualifyEligiblePartnerReferrals(
   admin: SupabaseClient,
   now: Date = new Date()
@@ -53,7 +68,15 @@ export async function qualifyEligiblePartnerReferrals(
       | null;
     const p = Array.isArray(profile) ? profile[0] : profile;
     const status = String(p?.subscription_status ?? "").toLowerCase();
-    if (!PAID_STATUSES.has(status)) continue;
+    if (
+      !isPartnerReferralQualificationEligible({
+        subscriptionStartedAt: row.subscription_started_at,
+        subscriptionStatus: status,
+        now,
+      })
+    ) {
+      continue;
+    }
 
     const { error: updErr } = await admin
       .from("partner_referrals")

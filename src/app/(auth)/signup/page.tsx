@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
 import { createClient } from "@/lib/supabase/client";
@@ -10,6 +10,10 @@ import {
   captureFirstTouchIfMissing,
   persistHeardAboutSourceClient,
 } from "@/lib/attribution-first-touch";
+import {
+  normalizeStoredPartnerRef,
+  readPartnerRefClient,
+} from "@/lib/partners/partner-ref-cookie";
 
 type PostSubmitView =
   | null
@@ -59,7 +63,20 @@ export default function SignupPage() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
   const [heardAboutSource, setHeardAboutSource] = useState("");
+  const [hasPartnerReferralContext, setHasPartnerReferralContext] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const fromQuery = normalizeStoredPartnerRef(
+      new URLSearchParams(window.location.search).get("ref")
+    );
+    const fromStored = normalizeStoredPartnerRef(readPartnerRefClient());
+    const nextValue = Boolean(fromQuery || fromStored);
+    const frame = window.requestAnimationFrame(() => {
+      setHasPartnerReferralContext(nextValue);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   async function branchExistingEmail(
     supabase: ReturnType<typeof createClient>
@@ -415,6 +432,20 @@ export default function SignupPage() {
           <p className="mt-1 text-sm text-zinc-500">
             Sign up to start protecting your jobs.
           </p>
+          {hasPartnerReferralContext ? (
+            <div className="mt-4 rounded-xl border border-[#2436BB]/20 bg-[#2436BB]/5 p-4">
+              <p className="text-sm font-semibold text-[#2436BB]">
+                Win more work. Manage every job. Get paid.
+              </p>
+              <p className="mt-2 text-sm text-zinc-700">
+                JobProof gives contractors one place to manage the journey from
+                quote request through quotes, contracts, changes, and invoicing.
+              </p>
+              <p className="mt-2 text-xs text-zinc-500">
+                You&apos;re continuing from a JobProof partner referral.
+              </p>
+            </div>
+          ) : null}
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {error && (
