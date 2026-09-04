@@ -35,6 +35,10 @@ import {
   ORGANIZATION_TYPES,
 } from "@/lib/partners/organization-types";
 import {
+  ORGANIZATION_WEBSITE_FIELD_HINT,
+  ORGANIZATION_WEBSITE_FIELD_PLACEHOLDER,
+} from "@/lib/partners/profile-links";
+import {
   PARTNER_APPLY_SUCCESS_CTA_RETURN,
   PARTNER_APPLY_SUCCESS_CTA_STATUS,
   getPartnerApplyStatusCheckHref,
@@ -402,7 +406,9 @@ export default function OrganizationPartnerApplyPage() {
             <Field
               label="Website"
               name="website"
-              type="url"
+              inputMode="url"
+              placeholder={ORGANIZATION_WEBSITE_FIELD_PLACEHOLDER}
+              hint={ORGANIZATION_WEBSITE_FIELD_HINT}
               defaultValue={draftDefaults.website}
               error={fieldErrors.website}
             />
@@ -690,16 +696,22 @@ function Field({
   label,
   name,
   type = "text",
+  inputMode,
   required,
   error,
+  hint,
+  placeholder,
   defaultValue,
   readOnly,
 }: {
   label: string;
   name: string;
   type?: string;
+  inputMode?: "url";
   required?: boolean;
   error?: string;
+  hint?: string;
+  placeholder?: string;
   defaultValue?: string;
   readOnly?: boolean;
 }) {
@@ -713,11 +725,16 @@ function Field({
         id={name}
         name={name}
         type={type}
+        inputMode={inputMode}
         required={required}
+        placeholder={placeholder}
         defaultValue={defaultValue}
         readOnly={readOnly}
         className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm read-only:bg-zinc-50"
       />
+      {hint && !error ? (
+        <p className="mt-1 text-xs text-zinc-500">{hint}</p>
+      ) : null}
       {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
     </div>
   );

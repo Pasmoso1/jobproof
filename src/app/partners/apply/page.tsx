@@ -19,6 +19,8 @@ import {
 import {
   ADDITIONAL_PROFILE_LINKS_HINT,
   CREATOR_PROFILE_FIELD_HINT,
+  PARTNER_WEBSITE_FIELD_HINT,
+  PARTNER_WEBSITE_FIELD_PLACEHOLDER,
   creatorProfilePlaceholder,
 } from "@/lib/partners/profile-links";
 import {
@@ -668,8 +670,9 @@ export default function PartnerApplyPage() {
                       <Field
                         label="Website, LinkedIn, or primary business URL"
                         name="website"
-                        type="url"
-                        placeholder="https://"
+                        inputMode="url"
+                        placeholder={PARTNER_WEBSITE_FIELD_PLACEHOLDER}
+                        hint={PARTNER_WEBSITE_FIELD_HINT}
                         defaultValue={draftDefaults.website}
                         error={fieldErrors.website}
                       />
@@ -972,6 +975,7 @@ function Field({
   label,
   name,
   type = "text",
+  inputMode,
   required,
   error,
   hint,
@@ -981,6 +985,7 @@ function Field({
   label: string;
   name: string;
   type?: string;
+  inputMode?: "url";
   required?: boolean;
   error?: string;
   hint?: string;
@@ -996,6 +1001,7 @@ function Field({
         id={name}
         name={name}
         type={type}
+        inputMode={inputMode}
         required={required}
         placeholder={placeholder}
         defaultValue={defaultValue}

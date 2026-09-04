@@ -614,8 +614,8 @@ function normalizeParsedWebsite(formData: FormData): string | null {
   if (type === "creator") {
     const platform = String(formData.get("primary_platform") ?? "").trim();
     const result = normalizeCreatorProfileLink(platform, raw);
-    return result.ok ? result.url : raw;
+    return result.ok ? result.url : null;
   }
   const generic = normalizeExternalHttpsUrl(raw);
-  return generic.ok ? generic.url : raw;
+  return generic.ok ? generic.url : null;
 }

@@ -26,6 +26,18 @@ export const CREATOR_PROFILE_FIELD_HINT =
 export const ADDITIONAL_PROFILE_LINKS_HINT =
   "Other profiles, one per line or comma-separated. You don't need to include https:// or www.";
 
+/** Shared website / business URL field copy for Marketing and Organization applications. */
+export const PARTNER_WEBSITE_FIELD_HINT =
+  "Example: jobproof.ca or linkedin.com/in/yourname";
+
+export const ORGANIZATION_WEBSITE_FIELD_HINT =
+  "Example: yourassociation.ca or yourchamber.ca";
+
+export const PARTNER_WEBSITE_FIELD_PLACEHOLDER =
+  "jobproof.ca or linkedin.com/in/yourname";
+
+export const ORGANIZATION_WEBSITE_FIELD_PLACEHOLDER = "yourassociation.ca";
+
 export const CREATOR_PLATFORM_LINK_SPECS: readonly PlatformLinkSpec[] = [
   {
     id: "instagram",
@@ -93,13 +105,13 @@ export const CREATOR_PLATFORM_LINK_SPECS: readonly PlatformLinkSpec[] = [
 ] as const;
 
 const UNSAFE_SCHEME_RE =
-  /^(javascript|data|file|vbscript|about|blob|intent):/i;
+  /^(javascript|data|file|vbscript|about|blob|intent|mailto|ftp):/i;
 
 const GENERIC_UNSAFE_ERROR =
-  "That link doesn't look safe. Please use a regular https website or profile link.";
+  "That link doesn't look safe. Please use a regular http or https website or profile link.";
 
 const GENERIC_INVALID_ERROR =
-  "Enter a website or profile link. You don't need to include https:// or www.";
+  "Enter a valid website or profile address, such as jobproof.ca or linkedin.com/in/yourname.";
 
 export function creatorProfilePlaceholder(platform: string | null | undefined): string {
   return (
@@ -173,8 +185,13 @@ export function normalizeAdditionalProfileLinks(raw: string): ProfileLinkResult 
 }
 
 /**
- * Generic public https URL. Accepts domain-only input; does not invent a
- * hostname from a bare handle.
+ * Generic public http(s) URL for partner applications.
+ * Accepts domain-only input (e.g. www.hic.ca, linkedin.com/in/name),
+ * prepends https:// when the scheme is missing, and rejects unsafe schemes.
+ * Does not invent a hostname from a bare handle.
+ *
+ * Existing JobProof behavior stores canonical https:// URLs even when the
+ * applicant entered http://.
  */
 export function normalizeExternalHttpsUrl(raw: string): ProfileLinkResult {
   const trimmed = String(raw ?? "").trim();
@@ -189,6 +206,11 @@ export function normalizeExternalHttpsUrl(raw: string): ProfileLinkResult {
         ? GENERIC_UNSAFE_ERROR
         : GENERIC_INVALID_ERROR,
     };
+  }
+
+  // Reject scheme-only / empty-host entries before URL parsing quirks.
+  if (/^(https?:)?\/?\/?$/i.test(trimmed) || /^(https?):$/i.test(trimmed)) {
+    return { ok: false, error: GENERIC_INVALID_ERROR };
   }
 
   let candidate = trimmed.replace(/^\/\//, "https://");
@@ -209,13 +231,22 @@ export function normalizeExternalHttpsUrl(raw: string): ProfileLinkResult {
   if (parsed.username || parsed.password) {
     return { ok: false, error: GENERIC_UNSAFE_ERROR };
   }
-  if (isBlockedHost(parsed.hostname)) {
-    return { ok: false, error: GENERIC_UNSAFE_ERROR };
+  if (!parsed.hostname || isBlockedHost(parsed.hostname)) {
+    return {
+      ok: false,
+      error: !parsed.hostname ? GENERIC_INVALID_ERROR : GENERIC_UNSAFE_ERROR,
+    };
+  }
+
+  // Require a real hostname with a dot (localhost already blocked above).
+  if (!parsed.hostname.includes(".")) {
+    return { ok: false, error: GENERIC_INVALID_ERROR };
   }
 
   parsed.protocol = "https:";
   parsed.hash = "";
-  const host = stripWww(parsed.hostname);
+  // Preserve www. when the applicant entered it.
+  const host = parsed.hostname.toLowerCase();
   const path = parsed.pathname === "/" ? "" : parsed.pathname.replace(/\/+$/, "");
   const search = parsed.search;
   return { ok: true, url: `https://${host}${path}${search}` };

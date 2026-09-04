@@ -138,10 +138,11 @@ describe("partner application types", () => {
   });
 
   it("accepts a marketing application without requiring an audience", () => {
-    const fd = marketingForm();
+    const fd = marketingForm({ website: "www.hic.ca" });
     fd.set("estimated_audience", "");
     const parsed = parsePartnerApplicationFormData(fd);
     assert.equal(parsed.partnerType, "marketing");
+    assert.equal(parsed.website, "https://www.hic.ca");
     assert.match(parsed.promotionPlan, /Paid media/);
     const errors = {
       ...validateTypeSpecificApplicationFields(fd),
@@ -172,6 +173,32 @@ describe("partner application types", () => {
     assert.equal(prepared.ok, true);
     if (!prepared.ok) return;
     assert.equal(prepared.formData.get("partner_type"), "organization");
+  });
+
+  it("normalizes organization website domain-only input", () => {
+    const fd = new FormData();
+    fd.set("organization_name", "Metro Chamber");
+    fd.set("organization_type", "chamber_of_commerce");
+    fd.set("contact_name", "Pat Contact");
+    fd.set("channel_newsletter", "on");
+    fd.set("website", "www.hic.ca");
+    const prepared = prepareOrganizationApplicationFormData(fd);
+    assert.equal(prepared.ok, true);
+    if (!prepared.ok) return;
+    assert.equal(prepared.formData.get("website"), "https://www.hic.ca");
+  });
+
+  it("rejects unsafe organization website values server-side", () => {
+    const fd = new FormData();
+    fd.set("organization_name", "Metro Chamber");
+    fd.set("organization_type", "chamber_of_commerce");
+    fd.set("contact_name", "Pat Contact");
+    fd.set("channel_newsletter", "on");
+    fd.set("website", "javascript:alert(1)");
+    const prepared = prepareOrganizationApplicationFormData(fd);
+    assert.equal(prepared.ok, false);
+    if (prepared.ok) return;
+    assert.ok(prepared.fieldErrors.website);
   });
 });
 

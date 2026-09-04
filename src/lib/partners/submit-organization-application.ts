@@ -6,6 +6,7 @@ import {
   ORGANIZATION_PROMOTION_CHANNELS,
   ORGANIZATION_TYPES,
 } from "@/lib/partners/organization-types";
+import { normalizeExternalHttpsUrl } from "@/lib/partners/profile-links";
 
 export type OrganizationApplyFieldErrors = Record<string, string>;
 
@@ -45,7 +46,16 @@ export function prepareOrganizationApplicationFormData(
   const organizationType = String(formData.get("organization_type") ?? "").trim();
   const contactName = String(formData.get("contact_name") ?? "").trim();
   const jobTitle = blankToNull(String(formData.get("job_title") ?? ""));
-  const website = blankToNull(String(formData.get("website") ?? ""));
+  const websiteRaw = blankToNull(String(formData.get("website") ?? ""));
+  let website: string | null = null;
+  if (websiteRaw) {
+    const normalizedWebsite = normalizeExternalHttpsUrl(websiteRaw);
+    if (!normalizedWebsite.ok) {
+      fieldErrors.website = normalizedWebsite.error;
+    } else {
+      website = normalizedWebsite.url;
+    }
+  }
   const memberCount = blankToNull(String(formData.get("member_count") ?? ""));
   const primaryIndustries = blankToNull(
     String(formData.get("primary_industries") ?? "")

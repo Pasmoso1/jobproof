@@ -110,6 +110,62 @@ describe("creator profile link normalization", () => {
     );
   });
 
+  it("normalizes partner website URLs without requiring a scheme", () => {
+    assert.equal(urlOf(normalizeExternalHttpsUrl("hic.ca")), "https://hic.ca");
+    assert.equal(
+      urlOf(normalizeExternalHttpsUrl("www.hic.ca")),
+      "https://www.hic.ca"
+    );
+    assert.equal(
+      urlOf(normalizeExternalHttpsUrl("https://hic.ca")),
+      "https://hic.ca"
+    );
+    assert.equal(
+      urlOf(normalizeExternalHttpsUrl("https://www.hic.ca")),
+      "https://www.hic.ca"
+    );
+    assert.equal(
+      urlOf(normalizeExternalHttpsUrl("linkedin.com/in/example")),
+      "https://linkedin.com/in/example"
+    );
+    assert.equal(
+      urlOf(normalizeExternalHttpsUrl("www.linkedin.com/in/example")),
+      "https://www.linkedin.com/in/example"
+    );
+    assert.equal(
+      urlOf(normalizeExternalHttpsUrl("https://linkedin.com/in/example")),
+      "https://linkedin.com/in/example"
+    );
+    assert.equal(
+      urlOf(normalizeExternalHttpsUrl("  www.hic.ca  ")),
+      "https://www.hic.ca"
+    );
+    assert.equal(
+      urlOf(normalizeExternalHttpsUrl("http://example.com")),
+      "https://example.com"
+    );
+  });
+
+  it("rejects malformed and unsafe website URLs", () => {
+    for (const value of [
+      "not a website",
+      "http://",
+      "https://",
+      "javascript:alert(1)",
+      "data:text/html,test",
+      "mailto:test@example.com",
+      "ftp://files.example.com",
+    ]) {
+      assert.equal(normalizeExternalHttpsUrl(value).ok, false, value);
+    }
+    const invalid = normalizeExternalHttpsUrl("not a website");
+    assert.equal(invalid.ok, false);
+    if (!invalid.ok) {
+      assert.match(invalid.error, /valid website or profile address/i);
+      assert.doesNotMatch(invalid.error, /https:\/\//i);
+    }
+  });
+
   it("normalizes generic additional profile links and rejects unsafe schemes", () => {
     const domain = normalizeAdditionalProfileLinks("instagram.com/example");
     assert.equal(domain.ok, true);
@@ -145,13 +201,48 @@ describe("creator profile link normalization", () => {
     assert.deepEqual(errors, {});
   });
 
-  it("does not change Marketing or Organization type-specific URL rules", () => {
+  it("accepts domain-only website values for Marketing applications", () => {
     const marketing = new FormData();
     marketing.set("partner_type", "marketing");
     marketing.set("promotion_method", "paid_media");
     marketing.set("reason", "Paid search.");
+    marketing.set("website", "www.hic.ca");
     assert.deepEqual(validateTypeSpecificApplicationFields(marketing), {});
 
+    const parsed = parsePartnerApplicationFormData(
+      creatorForm({
+        partner_type: "marketing",
+        promotion_method: "paid_media",
+        reason: "Paid search.",
+        website: "www.hic.ca",
+        primary_platform: "",
+      })
+    );
+    assert.equal(parsed.website, "https://www.hic.ca");
+  });
+
+  it("rejects malformed Marketing website values server-side", () => {
+    const marketing = new FormData();
+    marketing.set("partner_type", "marketing");
+    marketing.set("promotion_method", "paid_media");
+    marketing.set("reason", "Paid search.");
+    marketing.set("website", "javascript:alert(1)");
+    const errors = validateTypeSpecificApplicationFields(marketing);
+    assert.ok(errors.website);
+    assert.doesNotMatch(errors.website, /Please enter a URL/i);
+
+    const parsed = parsePartnerApplicationFormData(
+      creatorForm({
+        partner_type: "marketing",
+        promotion_method: "paid_media",
+        reason: "Paid search.",
+        website: "javascript:alert(1)",
+      })
+    );
+    assert.equal(parsed.website, null);
+  });
+
+  it("does not invent type-specific rules for Organization via Creator/Marketing validator", () => {
     const organization = new FormData();
     organization.set("partner_type", "organization");
     assert.deepEqual(validateTypeSpecificApplicationFields(organization), {});

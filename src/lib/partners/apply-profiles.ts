@@ -14,6 +14,7 @@ import { CANADIAN_PROVINCES } from "@/lib/canada/provinces";
 import {
   normalizeAdditionalProfileLinks,
   normalizeCreatorProfileLink,
+  normalizeExternalHttpsUrl,
 } from "@/lib/partners/profile-links";
 
 export const CREATOR_PLATFORMS = [
@@ -147,6 +148,13 @@ export function validateTypeSpecificApplicationFields(
     const method = String(formData.get("promotion_method") ?? "").trim();
     if (!MARKETING_PROMOTION_METHODS.some((m) => m.value === method)) {
       fieldErrors.promotion_method = "Select a primary promotion method.";
+    }
+    const website = String(formData.get("website") ?? "").trim();
+    if (website) {
+      const normalized = normalizeExternalHttpsUrl(website);
+      if (!normalized.ok) {
+        fieldErrors.website = normalized.error;
+      }
     }
     const intro = String(formData.get("reason") ?? "").trim();
     if (!intro) {
