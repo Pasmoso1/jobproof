@@ -29,6 +29,9 @@ import {
   releasePartnerUsernameClaim,
 } from "@/lib/partners/auth-account";
 import { validatePartnerLoginIdentifier } from "@/lib/partners/username";
+import { getPartnerAccountStatusForCurrentUser } from "@/lib/partners/session";
+import { resolvePartnerEntryPath } from "@/lib/partners/login-href";
+import type { EmailApplyBlocker } from "@/lib/partners/apply-existing-account";
 
 export async function trackPartnerPublicEvent(
   event: "founding_partner_section_viewed" | "partner_agreement_viewed"
@@ -64,6 +67,9 @@ export async function checkPartnerUsernameAvailableAction(
 /**
  * Trusted apply-page auth state from server getUser() (validates JWT).
  * Never trust client-only session caches for flow selection.
+ *
+ * When already signed in with an open application or active partner,
+ * `redirectTo` points away from the apply form (declined may re-apply).
  */
 export async function getPartnerApplySessionState(): Promise<{
   resolved: true;
@@ -71,6 +77,7 @@ export async function getPartnerApplySessionState(): Promise<{
   email: string | null;
   userId: string | null;
   flow: "new_account" | "existing_account";
+  redirectTo: string | null;
 }> {
   const supabase = await createClient();
   const {
@@ -93,12 +100,37 @@ export async function getPartnerApplySessionState(): Promise<{
     flow,
   });
 
+  let redirectTo: string | null = null;
+  if (authenticatedUser) {
+    const account = await getPartnerAccountStatusForCurrentUser();
+    if (account.kind === "active") {
+      redirectTo = resolvePartnerEntryPath({
+        kind: "active",
+        emailVerified: account.emailVerified,
+      });
+    } else if (account.kind === "partner_inactive") {
+      redirectTo = resolvePartnerEntryPath({
+        kind: "partner_inactive",
+        emailVerified: account.emailVerified,
+      });
+    } else if (
+      account.kind === "application" &&
+      account.status !== "declined"
+    ) {
+      redirectTo = resolvePartnerEntryPath({
+        kind: "application",
+        emailVerified: account.emailVerified,
+      });
+    }
+  }
+
   return {
     resolved: true,
     signedIn: Boolean(authenticatedUser),
     email: authenticatedUser?.email ?? null,
     userId: authenticatedUser?.id ?? null,
     flow,
+    redirectTo,
   };
 }
 
@@ -158,21 +190,53 @@ export async function submitPartnerApplication(
       }),
     },
     authenticatedUser,
-    findOpenApplicationIdByEmail: async (email) => {
-      const { data, error } = await admin
+    findEmailApplyBlocker: async (email): Promise<EmailApplyBlocker | null> => {
+      const { data: openApps, error: openErr } = await admin
         .from("partner_applications")
         .select("id")
-        .eq("email", email)
+        .ilike("email", email)
         .in("status", ["submitted", "under_review"])
         .limit(1);
-      if (error) {
+      if (openErr) {
         console.error("[partners] open-application lookup failed", {
-          code: error.code ?? null,
-          message: error.message ?? null,
+          code: openErr.code ?? null,
+          message: openErr.message ?? null,
         });
-        return null;
+      } else if (openApps?.[0]?.id) {
+        return { kind: "open_application" };
       }
-      return data?.[0]?.id ? String(data[0].id) : null;
+
+      const { data: partner, error: partnerErr } = await admin
+        .from("partners")
+        .select("id, status")
+        .ilike("email", email)
+        .limit(1)
+        .maybeSingle();
+      if (partnerErr) {
+        console.error("[partners] partner-email lookup failed", {
+          code: partnerErr.code ?? null,
+          message: partnerErr.message ?? null,
+        });
+      } else if (partner?.id && partner.status === "active") {
+        return { kind: "active_partner" };
+      }
+
+      const { data: approvedApp, error: approvedErr } = await admin
+        .from("partner_applications")
+        .select("id")
+        .ilike("email", email)
+        .eq("status", "approved")
+        .limit(1);
+      if (approvedErr) {
+        console.error("[partners] approved-application lookup failed", {
+          code: approvedErr.code ?? null,
+          message: approvedErr.message ?? null,
+        });
+      } else if (approvedApp?.[0]?.id) {
+        return { kind: "active_partner" };
+      }
+
+      return null;
     },
     checkUsernameAvailable: async (normalized) => {
       const { data } = await admin

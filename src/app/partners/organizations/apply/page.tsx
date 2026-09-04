@@ -19,9 +19,13 @@ import {
   loadPartnerApplicationDraft,
   markPartnerApplicationDraftRestored,
   ORGANIZATION_APPLY_LOGIN_NEXT,
-  partnerApplyLoginHref,
   savePartnerApplicationDraft,
 } from "@/lib/partners/application-draft";
+import {
+  partnerExistingAccountLoginHref,
+  type PartnerExistingAccountContinueKind,
+} from "@/lib/partners/apply-existing-account";
+import { ExistingAccountContinuePanel } from "@/components/partners/existing-account-continue-panel";
 import {
   checkPartnerUsernameAvailableAction,
   getPartnerApplySessionState,
@@ -66,6 +70,8 @@ export default function OrganizationPartnerApplyPage() {
   const [submittedFlow, setSubmittedFlow] =
     useState<PartnerApplyFlow>("new_account");
   const [existingAccount, setExistingAccount] = useState(false);
+  const [continueKind, setContinueKind] =
+    useState<PartnerExistingAccountContinueKind | null>(null);
   const [authUi, setAuthUi] = useState<AuthUiState>({ status: "loading" });
   const [loginIdentifier, setLoginIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -94,15 +100,14 @@ export default function OrganizationPartnerApplyPage() {
     });
   }
 
-  function continueToSignIn() {
-    persistDraft(true);
-    window.location.assign(
-      partnerApplyLoginHref(ORGANIZATION_APPLY_LOGIN_NEXT)
-    );
+  function prepareSignInContinue() {
+    const kind = continueKind ?? "existing_account";
+    persistDraft(kind === "existing_account");
   }
 
   function useDifferentEmail() {
     setExistingAccount(false);
+    setContinueKind(null);
     setError(null);
     setFieldErrors((prev) => {
       const next = { ...prev };
@@ -126,6 +131,10 @@ export default function OrganizationPartnerApplyPage() {
     setAuthUi({ status: "loading" });
     try {
       const state = await getPartnerApplySessionState();
+      if (state.redirectTo) {
+        window.location.assign(state.redirectTo);
+        return;
+      }
       if (state.signedIn && state.email && state.userId) {
         setAuthUi({
           status: "signed_in",
@@ -193,6 +202,7 @@ export default function OrganizationPartnerApplyPage() {
     setError(null);
     setFieldErrors({});
     setExistingAccount(false);
+    setContinueKind(null);
     const fd = new FormData(e.currentTarget);
     if (authUi.status === "signed_in") {
       fd.set("email", authUi.email);
@@ -205,9 +215,14 @@ export default function OrganizationPartnerApplyPage() {
     if (!result.success) {
       setError(result.error);
       setFieldErrors(result.fieldErrors ?? {});
-      if (result.code === "existing_account") {
+      if (
+        result.code === "existing_account" ||
+        result.code === "existing_application" ||
+        result.code === "existing_partner"
+      ) {
         setExistingAccount(true);
-        persistDraft(true);
+        setContinueKind(result.code);
+        persistDraft(result.code === "existing_account");
       }
       return;
     }
@@ -338,28 +353,17 @@ export default function OrganizationPartnerApplyPage() {
           </div>
         ) : null}
 
-        {existingAccount ? (
-          <div className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-            <p className="font-medium text-red-900">
-              You already have a JobProof account. Sign in to continue your
-              Partner application.
-            </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <button
-                type="button"
-                onClick={continueToSignIn}
-                className="inline-flex items-center justify-center rounded-xl bg-[#2436BB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2a96]"
-              >
-                Sign in and continue
-              </button>
-              <button
-                type="button"
-                onClick={useDifferentEmail}
-                className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
-              >
-                Use a different email
-              </button>
-            </div>
+        {existingAccount && continueKind ? (
+          <div className="mt-6">
+            <ExistingAccountContinuePanel
+              kind={continueKind}
+              signInHref={partnerExistingAccountLoginHref(
+                continueKind,
+                ORGANIZATION_APPLY_LOGIN_NEXT
+              )}
+              onSignIn={prepareSignInContinue}
+              onUseDifferentEmail={useDifferentEmail}
+            />
           </div>
         ) : null}
 

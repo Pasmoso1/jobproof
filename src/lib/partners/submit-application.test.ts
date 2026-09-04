@@ -106,7 +106,7 @@ function authHooks(overrides?: {
         if (overrides?.existingAccount) {
           return {
             ok: false as const,
-            error: "An account with this email already exists.",
+            error: "This email is already associated with a JobProof account.",
             code: "existing_account" as const,
           };
         }

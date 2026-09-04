@@ -163,7 +163,7 @@ export async function createPartnerAuthUserViaSignUp(input: {
     return {
       ok: false,
       error: existing
-        ? "An account with this email already exists. Sign in first, then continue your partner application."
+        ? "This email is already associated with a JobProof account. Sign in with that account to continue your Partner application."
         : "Could not create your account. Please try again.",
       code: "code" in error ? String((error as { code?: string }).code ?? "") : undefined,
       existingAccount: existing,
@@ -175,7 +175,7 @@ export async function createPartnerAuthUserViaSignUp(input: {
     return {
       ok: false,
       error:
-        "An account with this email already exists. Sign in first, then continue your partner application.",
+        "This email is already associated with a JobProof account. Sign in with that account to continue your Partner application.",
       existingAccount: true,
     };
   }
@@ -186,7 +186,7 @@ export async function createPartnerAuthUserViaSignUp(input: {
     return {
       ok: false,
       error:
-        "An account with this email already exists. Sign in first, then continue your partner application.",
+        "This email is already associated with a JobProof account. Sign in with that account to continue your Partner application.",
       existingAccount: true,
     };
   }

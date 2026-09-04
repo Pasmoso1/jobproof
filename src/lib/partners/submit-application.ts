@@ -23,6 +23,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type PartnerApplyErrorCode =
   | "existing_account"
+  | "existing_application"
+  | "existing_partner"
   | "username_taken"
   | "validation"
   | "auth_failed"
@@ -335,6 +337,17 @@ export async function submitPartnerApplicationCore(input: {
   formData: FormData;
   insertClient: PartnerApplicationInsertClient;
   findOpenApplicationIdByEmail?: (email: string) => Promise<string | null>;
+  /**
+   * Server-side email blocker for signed-out/signed-in apply.
+   * Prefer this over findOpenApplicationIdByEmail when both are provided.
+   */
+  findEmailApplyBlocker?: (
+    email: string
+  ) => Promise<
+    | { kind: "open_application" }
+    | { kind: "active_partner" }
+    | null
+  >;
   /** Trusted session from server getUser() only — never trust client claims. */
   authenticatedUser?: TrustedPartnerApplySession | null;
   provisionAuthUser: (args: {
@@ -442,9 +455,51 @@ export async function submitPartnerApplicationCore(input: {
     };
   }
 
-  if (input.findOpenApplicationIdByEmail) {
+  if (input.findEmailApplyBlocker) {
+    const blocker = await input.findEmailApplyBlocker(parsed.email);
+    if (blocker?.kind === "open_application") {
+      if (flow === "new_account") {
+        return {
+          success: false,
+          error:
+            "An application with this email is already on file. Sign in to check your Partner application status.",
+          code: "existing_application",
+        };
+      }
+      return {
+        success: false,
+        error:
+          "An application with this email is already under review. Check your Partner application status instead of submitting again.",
+        code: "duplicate_application",
+      };
+    }
+    if (blocker?.kind === "active_partner") {
+      if (flow === "new_account") {
+        return {
+          success: false,
+          error:
+            "This email is already linked to a JobProof Partner account. Sign in to open the Partner Portal.",
+          code: "existing_partner",
+        };
+      }
+      return {
+        success: false,
+        error:
+          "This account is already an active JobProof Partner. Open the Partner Portal instead of applying again.",
+        code: "duplicate_application",
+      };
+    }
+  } else if (input.findOpenApplicationIdByEmail) {
     const existingId = await input.findOpenApplicationIdByEmail(parsed.email);
     if (existingId) {
+      if (flow === "new_account") {
+        return {
+          success: false,
+          error:
+            "An application with this email is already on file. Sign in to check your Partner application status.",
+          code: "existing_application",
+        };
+      }
       return {
         success: false,
         error:

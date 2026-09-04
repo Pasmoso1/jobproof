@@ -34,9 +34,13 @@ import {
   loadPartnerApplicationDraft,
   markPartnerApplicationDraftRestored,
   PARTNER_APPLY_LOGIN_NEXT,
-  partnerApplyLoginHref,
   savePartnerApplicationDraft,
 } from "@/lib/partners/application-draft";
+import {
+  partnerExistingAccountLoginHref,
+  type PartnerExistingAccountContinueKind,
+} from "@/lib/partners/apply-existing-account";
+import { ExistingAccountContinuePanel } from "@/components/partners/existing-account-continue-panel";
 import {
   checkPartnerUsernameAvailableAction,
   getPartnerApplySessionState,
@@ -78,6 +82,8 @@ export default function PartnerApplyPage() {
   const [submittedFlow, setSubmittedFlow] =
     useState<PartnerApplyFlow>("new_account");
   const [existingAccount, setExistingAccount] = useState(false);
+  const [continueKind, setContinueKind] =
+    useState<PartnerExistingAccountContinueKind | null>(null);
   const [authUi, setAuthUi] = useState<AuthUiState>({ status: "loading" });
   const [loginIdentifier, setLoginIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -112,13 +118,14 @@ export default function PartnerApplyPage() {
     });
   }
 
-  function continueToSignIn() {
-    persistDraft(true);
-    window.location.assign(partnerApplyLoginHref(PARTNER_APPLY_LOGIN_NEXT));
+  function prepareSignInContinue() {
+    const kind = continueKind ?? "existing_account";
+    persistDraft(kind === "existing_account");
   }
 
   function useDifferentEmail() {
     setExistingAccount(false);
+    setContinueKind(null);
     setError(null);
     setFieldErrors((prev) => {
       const next = { ...prev };
@@ -146,6 +153,10 @@ export default function PartnerApplyPage() {
     setAuthUi({ status: "loading" });
     try {
       const state = await getPartnerApplySessionState();
+      if (state.redirectTo) {
+        router.replace(state.redirectTo);
+        return;
+      }
       if (state.signedIn && state.email && state.userId) {
         setAuthUi({
           status: "signed_in",
@@ -164,6 +175,8 @@ export default function PartnerApplyPage() {
 
   useEffect(() => {
     void refreshAuthState();
+    // Mount-only: trusted session bootstrap for guest vs signed-in apply UX.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot session check
   }, []);
 
   useEffect(() => {
@@ -284,6 +297,7 @@ export default function PartnerApplyPage() {
     setError(null);
     setFieldErrors({});
     setExistingAccount(false);
+    setContinueKind(null);
     try {
       const fd = new FormData(e.currentTarget);
       // Existing-account: force trusted email + login identifier into the payload.
@@ -301,9 +315,14 @@ export default function PartnerApplyPage() {
       if (!result.success) {
         setError(result.error);
         if (result.fieldErrors) setFieldErrors(result.fieldErrors);
-        if (result.code === "existing_account") {
+        if (
+          result.code === "existing_account" ||
+          result.code === "existing_application" ||
+          result.code === "existing_partner"
+        ) {
           setExistingAccount(true);
-          persistDraft(true);
+          setContinueKind(result.code);
+          persistDraft(result.code === "existing_account");
         }
         return;
       }
@@ -403,34 +422,19 @@ export default function PartnerApplyPage() {
               </div>
             ) : null}
 
-            {error || existingAccount ? (
-              <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-                {existingAccount ? (
-                  <>
-                    <p className="font-medium text-red-900">
-                      You already have a JobProof account. Sign in to continue
-                      your Partner application.
-                    </p>
-                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                      <button
-                        type="button"
-                        onClick={continueToSignIn}
-                        className="inline-flex items-center justify-center rounded-xl bg-[#2436BB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c2a96]"
-                      >
-                        Sign in and continue
-                      </button>
-                      <button
-                        type="button"
-                        onClick={useDifferentEmail}
-                        className="inline-flex items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
-                      >
-                        Use a different email
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <p>{error}</p>
+            {existingAccount && continueKind ? (
+              <ExistingAccountContinuePanel
+                kind={continueKind}
+                signInHref={partnerExistingAccountLoginHref(
+                  continueKind,
+                  PARTNER_APPLY_LOGIN_NEXT
                 )}
+                onSignIn={prepareSignInContinue}
+                onUseDifferentEmail={useDifferentEmail}
+              />
+            ) : error ? (
+              <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+                <p>{error}</p>
               </div>
             ) : null}
 

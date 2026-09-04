@@ -95,8 +95,7 @@ describe("partner username auth security invariants", () => {
       /Your existing JobProof account will be linked to your[\s\S]*Partner application/
     );
     assert.match(source, /Not you\? Sign out and use another account/);
-    assert.match(source, /Sign in and continue/);
-    assert.match(source, /Use a different email/);
+    assert.match(source, /ExistingAccountContinuePanel/);
     assert.match(source, /savePartnerApplicationDraft/);
     assert.match(source, /type="hidden" name="username"/);
     assert.match(source, /getPartnerApplySessionState/);
@@ -105,6 +104,8 @@ describe("partner username auth security invariants", () => {
     // Guests (signed_out) see password fields; signed-in users do not.
     assert.match(source, /passwordRequired = authUi\.status === "signed_out"/);
     assert.match(source, /readOnly/);
+    assert.match(source, /redirectTo/);
+    assert.match(source, /Use a different email|PARTNER_EXISTING_ACCOUNT_SECONDARY|onUseDifferentEmail/);
   });
 
   it("server actions use getUser not getSession for apply auth", () => {
