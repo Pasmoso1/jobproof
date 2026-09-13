@@ -14,6 +14,7 @@ import {
   normalizeStoredPartnerRef,
   readPartnerRefClient,
 } from "@/lib/partners/partner-ref-cookie";
+import { applyPartnerReferralAttributionFromSession } from "@/app/(auth)/signup/actions";
 
 type PostSubmitView =
   | null
@@ -104,6 +105,7 @@ export default function SignupPage() {
     });
 
     if (!signInError && signInData.session) {
+      // Existing JobProof account — do not apply Partner cookie attribution.
       router.push("/dashboard");
       router.refresh();
       return "signed_in";
@@ -185,6 +187,11 @@ export default function SignupPage() {
 
     if (data.session) {
       setLoading(false);
+      try {
+        await applyPartnerReferralAttributionFromSession();
+      } catch (err) {
+        console.error("[signup] partner attribution", err);
+      }
       router.push("/dashboard");
       router.refresh();
       return;

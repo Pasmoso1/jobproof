@@ -5,7 +5,11 @@ import {
   resolvePartnerAttributionFailure,
 } from "@/lib/partners/attribution-failures";
 import { attributeContractorToPartnerReferral } from "@/lib/partners/attribution";
-import { decodePartnerRefCookie, PARTNER_REF_COOKIE_NAME } from "@/lib/partners/partner-ref-cookie";
+import {
+  decodePartnerRefCookie,
+  isAuthUserEligibleForCookiePartnerAttribution,
+  PARTNER_REF_COOKIE_NAME,
+} from "@/lib/partners/partner-ref-cookie";
 
 type AttributionProfileRow = {
   id: string;
@@ -21,6 +25,8 @@ async function wait(ms: number): Promise<void> {
 export async function applyPartnerReferralAttributionForUser(input: {
   userId: string;
   userEmail?: string | null;
+  /** Auth user created_at — required to block retroactive credit for old accounts. */
+  userCreatedAt?: string | null;
   cookieHeader?: string | null;
   partnerRefCookieValue?: string | null;
   source: string;
@@ -48,6 +54,13 @@ export async function applyPartnerReferralAttributionForUser(input: {
       code = decodePartnerRefCookie(part.slice(PARTNER_REF_COOKIE_NAME.length + 1));
     }
   }
+
+  let userCreatedAt = input.userCreatedAt ?? null;
+  if (!userCreatedAt) {
+    const { data: userData } = await admin.auth.admin.getUserById(input.userId);
+    userCreatedAt = userData.user?.created_at ?? null;
+  }
+
   if (!code) {
     // Fall back to profile column if already set somehow
     const { data } = await admin
@@ -73,6 +86,13 @@ export async function applyPartnerReferralAttributionForUser(input: {
     return;
   }
 
+  // Cookie-driven attribution is only for new contractor acquisition.
+  // Existing accounts (outside the anonymous window) must not receive
+  // retroactive Partner credit from a later referral click.
+  if (!isAuthUserEligibleForCookiePartnerAttribution(userCreatedAt)) {
+    return;
+  }
+
   let profile: AttributionProfileRow | null = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const { data } = await admin
@@ -93,6 +113,24 @@ export async function applyPartnerReferralAttributionForUser(input: {
       stage: "missing_profile",
       errorMessage: "Profile row was not available during attribution retry window.",
     });
+    return;
+  }
+
+  // Already permanently attributed — never overwrite from a later cookie.
+  if (profile.signup_partner_referral_code) {
+    const existingCode = String(profile.signup_partner_referral_code);
+    const result = await attributeContractorToPartnerReferral(admin, {
+      contractorProfileId: String(profile.id),
+      referralCode: existingCode,
+      businessName: profile.business_name,
+      source: input.source,
+    });
+    if (result.attributed || result.referralId) {
+      await resolvePartnerAttributionFailure({
+        userId: input.userId,
+        referralCode: existingCode,
+      });
+    }
     return;
   }
 

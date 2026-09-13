@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
           await applyPartnerReferralAttributionForUser({
             userId: user.id,
             userEmail: user.email ?? null,
+            userCreatedAt: user.created_at ?? null,
             partnerRefCookieValue: request.cookies.get(PARTNER_REF_COOKIE_NAME)?.value,
             source: "auth_callback_code",
           });
@@ -141,20 +142,6 @@ export async function GET(request: NextRequest) {
           await supabase.from("profiles").update(patch).eq("user_id", user.id);
         }
 
-        try {
-          const { applyPartnerReferralAttributionForUser } = await import(
-            "@/lib/partners/apply-attribution"
-          );
-          await applyPartnerReferralAttributionForUser({
-            userId: user.id,
-            userEmail: user.email ?? null,
-            partnerRefCookieValue: request.cookies.get(PARTNER_REF_COOKIE_NAME)?.value,
-            source: "auth_callback_signup",
-          });
-        } catch (err) {
-          console.error("[auth/callback] partner attribution", err);
-        }
-
         if (profile && !profile.trial_email_welcome_sent_at && user.email) {
           const { sendTrialWelcomeEmail } = await import("@/lib/trial-emails");
           const { parseBillingPlanTier } = await import("@/lib/billing-plan-display");
@@ -192,6 +179,25 @@ export async function GET(request: NextRequest) {
             .eq("id", profile.id);
         }
       }
+
+      // Partner referral attribution is independent of UTM first-touch cookie presence.
+      if (user) {
+        try {
+          const { applyPartnerReferralAttributionForUser } = await import(
+            "@/lib/partners/apply-attribution"
+          );
+          await applyPartnerReferralAttributionForUser({
+            userId: user.id,
+            userEmail: user.email ?? null,
+            userCreatedAt: user.created_at ?? null,
+            partnerRefCookieValue: request.cookies.get(PARTNER_REF_COOKIE_NAME)?.value,
+            source: "auth_callback_signup",
+          });
+        } catch (err) {
+          console.error("[auth/callback] partner attribution", err);
+        }
+      }
+
       return NextResponse.redirect(new URL("/dashboard?confirmed=true", request.url));
     }
 
