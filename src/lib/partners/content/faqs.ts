@@ -1,10 +1,31 @@
+import {
+  FAQ_ATTRIBUTION_VS_QUALIFICATION_QUESTION,
+  FAQ_MULTIPLE_PARTNERS_QUESTION,
+  FAQ_REFERRAL_WINDOW_QUESTION,
+  faqAttributionVsQualificationAnswer,
+  faqMultiplePartnersAnswer,
+  faqReferralWindowAnswer,
+  portalHowReferralsWorkAnswer,
+} from "@/lib/partners/content/referral-attribution-copy";
+
 export type PartnerFaqItem = { question: string; answer: string };
 
 export const PARTNER_PORTAL_FAQS: PartnerFaqItem[] = [
   {
     question: "How do referrals work?",
-    answer:
-      "Share your unique referral link or code. When a contractor signs up with it, they are permanently attributed to you.",
+    answer: portalHowReferralsWorkAnswer(),
+  },
+  {
+    question: FAQ_REFERRAL_WINDOW_QUESTION,
+    answer: faqReferralWindowAnswer(),
+  },
+  {
+    question: FAQ_MULTIPLE_PARTNERS_QUESTION,
+    answer: faqMultiplePartnersAnswer(),
+  },
+  {
+    question: FAQ_ATTRIBUTION_VS_QUALIFICATION_QUESTION,
+    answer: faqAttributionVsQualificationAnswer(),
   },
   {
     question: "When do I get paid?",
@@ -14,7 +35,7 @@ export const PARTNER_PORTAL_FAQS: PartnerFaqItem[] = [
   {
     question: "What qualifies for a reward?",
     answer:
-      "One qualified referral equals one one-time reward. The referred contractor must become a paying JobProof subscriber and remain subscribed for 90 consecutive days. There are no recurring or percentage commissions.",
+      "One qualified referral equals one one-time reward. The referred contractor must become a paying JobProof subscriber and remain subscribed for 90 consecutive days. There are no recurring or percentage commissions. The 30-day referral window only covers attribution at signup; it is not the qualification period.",
   },
   {
     question: "How much is each reward?",
@@ -40,9 +61,21 @@ export const PARTNER_LANDING_FAQS: PartnerFaqItem[] = [
       "Organizations and individuals who regularly work with independent contractors — including influencers, trade groups, coaches, accounting firms, insurers, financing partners, and existing JobProof contractors.",
   },
   {
+    question: FAQ_REFERRAL_WINDOW_QUESTION,
+    answer: faqReferralWindowAnswer(),
+  },
+  {
+    question: FAQ_MULTIPLE_PARTNERS_QUESTION,
+    answer: faqMultiplePartnersAnswer(),
+  },
+  {
+    question: FAQ_ATTRIBUTION_VS_QUALIFICATION_QUESTION,
+    answer: faqAttributionVsQualificationAnswer(),
+  },
+  {
     question: "How are referrals tracked?",
     answer:
-      "Each approved partner receives a unique referral link and code. Signups that use your link or code are attributed to you permanently.",
+      "Each approved partner receives a unique referral link and code. JobProof uses a 30-day first-touch referral window. When someone creates a JobProof account within that window through your link, the referral can be attached to their account and remains associated with you afterward.",
   },
   {
     question: "When do I get paid?",

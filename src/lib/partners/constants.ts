@@ -5,7 +5,7 @@ export const FOUNDING_REWARD_CAD = 150;
 export const STANDARD_REWARD_CAD = 100;
 /** Days of continuous paying subscription required before reward qualifies. */
 export const PARTNER_QUALIFICATION_DAYS = 90;
-export const PARTNER_AGREEMENT_VERSION = "2026-07-01";
+export const PARTNER_AGREEMENT_VERSION = "2026-09-13";
 export const PARTNER_AGREEMENT_PATH = "/partners/agreement";
 
 export const PARTNER_TYPE_CREATOR = "creator" as const;

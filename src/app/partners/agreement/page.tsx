@@ -3,10 +3,12 @@ import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
 import { PartnerAgreementViewTracker } from "@/components/partners/partner-public-analytics";
 import {
-  FOUNDING_REWARD_CAD,
   PARTNER_AGREEMENT_VERSION,
-  STANDARD_REWARD_CAD,
 } from "@/lib/partners/constants";
+import {
+  agreementAttributionSectionBody,
+  agreementQualificationSectionBody,
+} from "@/lib/partners/content/referral-attribution-copy";
 
 export const metadata: Metadata = {
   title: "Partner Program Agreement — JobProof",
@@ -64,24 +66,11 @@ export default function PartnerAgreementPage() {
           </Section>
 
           <Section title="3. Referrals and attribution">
-            <p>
-              A referral is normally attributed through your unique referral link or code.
-              Once a contractor is validly attributed, that attribution remains attached.
-              JobProof records are used to resolve attribution questions. Self-referrals
-              require explicit written approval. Duplicate, fraudulent, fabricated, or
-              manipulated referrals are not eligible.
-            </p>
+            <p>{agreementAttributionSectionBody()}</p>
           </Section>
 
           <Section title="4. Qualification and reward amounts">
-            <p>
-              A referral qualifies only after the referred contractor becomes a paying
-              JobProof subscriber and remains a paying subscriber for 90 consecutive days.
-              Founding Partners earn ${FOUNDING_REWARD_CAD} CAD per qualified referral.
-              Standard Partners earn ${STANDARD_REWARD_CAD} CAD per qualified referral.
-              One qualified referral earns one one-time reward. There are no recurring,
-              percentage, lifetime, or multi-level commissions.
-            </p>
+            <p>{agreementQualificationSectionBody()}</p>
           </Section>
 
           <Section title="5. Review, approval, and payment">

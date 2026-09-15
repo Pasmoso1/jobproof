@@ -157,7 +157,13 @@ Yes. JobProof is built for Canadian contractors.
 No. Once they sign up with your link, JobProof supports them directly.
 
 **When do I earn a reward?**  
-Referral rewards qualify after the contractor remains a paying JobProof subscriber for 90 consecutive days.
+Referral rewards qualify after the contractor remains a paying JobProof subscriber for 90 consecutive days. That 90-day paid qualification is separate from the 30-day referral window used to attribute a visitor at signup.
+
+**How long does my referral link track a visitor?**  
+JobProof uses a 30-day first-touch referral window. Someone can leave after clicking your link and still create their account later within that window. Once their JobProof account is created with valid attribution, you do not need them to keep using your referral link.
+
+**What if they click another Partner’s link too?**  
+During your active 30-day window, first-touch attribution generally keeps the original Partner. After the window expires without a signup, a later Partner referral may start a new window.
 
 **How much is the reward?**  
 Creator and Marketing Founding Partners earn $150 CAD and Standard Partners earn $100 CAD for each qualified referral. Organization Partners earn a fixed $150 CAD per qualified referral. Rewards are one-time; there are no recurring commissions.`,
@@ -172,8 +178,9 @@ Creator and Marketing Founding Partners earn $150 CAD and Standard Partners earn
 - Mention quotes, contracts, change orders, invoicing, and documentation as the tools that support those outcomes
 - Use JobProof marketing resources for consistent branding
 - Follow up once—then let the product speak for itself
+- Remember the 30-day first-touch referral window: contractors do not have to sign up in the same session. Once they create an account with your attribution attached, they do not need to keep using your link
 
-Referral quality matters more than signup volume.`,
+Referral quality matters more than signup volume. Do not ask people to repeatedly click referral links to try to manipulate attribution.`,
   },
 ];
 

@@ -1,11 +1,11 @@
 import {
   FOUNDING_REWARD_CAD,
   isOrganizationPartnerType,
-  PARTNER_QUALIFICATION_DAYS,
   STANDARD_REWARD_CAD,
   type PartnerLevel,
 } from "@/lib/partners/constants";
 import { getPublicPlanPriceLine } from "@/lib/billing-plan-display";
+import { mediaCenterReferralsAnswer } from "@/lib/partners/content/referral-attribution-copy";
 
 export type MediaAsset = {
   id: string;
@@ -537,7 +537,7 @@ export function buildMediaCenterFaqs(
     },
     {
       question: "How do partner referrals work?",
-      answer: `Each approved partner receives a referral code or link. A referral is permanently attributed according to JobProof referral rules. Rewards qualify after the referred contractor remains a paying subscriber for ${PARTNER_QUALIFICATION_DAYS} consecutive days and qualified referrals are included in an upcoming Interac e-Transfer payout.`,
+      answer: mediaCenterReferralsAnswer(),
     },
     {
       question: "How much do partners earn?",

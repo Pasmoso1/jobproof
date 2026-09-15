@@ -239,12 +239,12 @@ export const ORGANIZATION_FAQS = [
   {
     question: "How much do Organization Partners earn?",
     answer:
-      "Approved Organization Partners earn $150 CAD for each qualified contractor referral. A referral qualifies after the existing qualification requirements are met. Payout timing and referral attribution follow the same Partner Program rules.",
+      "Approved Organization Partners earn a fixed $150 CAD for each qualified contractor referral. There is no Founding or Standard distinction for Organization Partners. A referral qualifies after the contractor remains a paying JobProof subscriber for 90 consecutive days. Payout timing and referral attribution follow the same Partner Program rules, including the 30-day first-touch referral window.",
   },
   {
     question: "How are referrals tracked?",
     answer:
-      "Approved organizations receive a unique referral link and code. Signups that use your link are attributed to your partner account so you can monitor referrals and payouts in the Partner Portal.",
+      "Approved organizations receive a unique referral link and code. JobProof uses the same 30-day first-touch referral window as the rest of the Partner Program. When a contractor creates an account within that window through your link, the referral can be attributed to your organization partner account and remains attached afterward. Reward qualification is the separate 90-consecutive-paid-day requirement.",
   },
   {
     question: "Can we customize marketing materials?",

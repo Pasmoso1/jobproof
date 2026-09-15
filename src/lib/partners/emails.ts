@@ -108,7 +108,7 @@ export function buildPartnerApprovedEmailContent(input: {
     <p>Hi ${escape(input.contactName)},</p>
     <p>Your application for <strong>${escape(input.organizationName)}</strong> has been approved.</p>
     ${foundingBadge}
-    <p>You are approved as a <strong>${escape(partnerLabel)}</strong> and earn <strong>$${reward} CAD</strong> for each qualified referral. A referral qualifies after the contractor remains a paying JobProof subscriber for 90 consecutive days. Qualified referrals are included in your upcoming Interac e-Transfer payout, and there are no recurring commissions.</p>
+    <p>You are approved as a <strong>${escape(partnerLabel)}</strong> and earn <strong>$${reward} CAD</strong> for each qualified referral. JobProof uses a 30-day first-touch referral window for attributing visitors who create an account through your link. Separately, a referral qualifies after the contractor remains a paying JobProof subscriber for 90 consecutive days. Qualified referrals are included in your upcoming Interac e-Transfer payout, and there are no recurring commissions.</p>
     <p><strong>Your referral link:</strong><br/><a href="${escape(input.referralUrl)}" style="color:#2436BB;">${escape(input.referralUrl)}</a></p>
     <p><strong>Referral code:</strong> ${escape(input.referralCode)}</p>
     <p><a href="${portalUrl}" style="display:inline-block;margin-top:12px;background:#2436BB;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600;">Open Partner Portal</a></p>
@@ -116,7 +116,7 @@ export function buildPartnerApprovedEmailContent(input: {
     ${signInCopy}
     <p>— The JobProof Team</p>
   `);
-  const text = `Hi ${input.contactName},\n\nYour JobProof Partner application is approved (${partnerLabel}, $${reward} CAD per qualified referral). A referral qualifies after 90 consecutive days as a paying JobProof subscriber. Qualified referrals are included in your upcoming Interac e-Transfer payout; there are no recurring commissions.\n\nReferral link: ${input.referralUrl}\nCode: ${input.referralCode}\nPortal: ${portalUrl}\nAgreement: ${agreementUrl}\n\n${signInText}\n\n— The JobProof Team\n`;
+  const text = `Hi ${input.contactName},\n\nYour JobProof Partner application is approved (${partnerLabel}, $${reward} CAD per qualified referral). JobProof uses a 30-day first-touch referral window for attributing visitors who create an account through your link. Separately, a referral qualifies after 90 consecutive days as a paying JobProof subscriber. Qualified referrals are included in your upcoming Interac e-Transfer payout; there are no recurring commissions.\n\nReferral link: ${input.referralUrl}\nCode: ${input.referralCode}\nPortal: ${portalUrl}\nAgreement: ${agreementUrl}\n\n${signInText}\n\n— The JobProof Team\n`;
   return { subject, html, text };
 }
 
