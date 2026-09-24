@@ -15,6 +15,13 @@ import {
   readPartnerRefClient,
 } from "@/lib/partners/partner-ref-cookie";
 import { applyPartnerReferralAttributionFromSession } from "@/app/(auth)/signup/actions";
+import {
+  trackSignupError,
+  trackSignupStart,
+  trackSignupSubmit,
+  trackSignupSuccess,
+  trackSignupView,
+} from "@/lib/signup-funnel-analytics";
 
 type PostSubmitView =
   | null
@@ -79,6 +86,14 @@ export default function SignupPage() {
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
+  useEffect(() => {
+    trackSignupView();
+  }, []);
+
+  function markSignupStarted() {
+    trackSignupStart();
+  }
+
   async function branchExistingEmail(
     supabase: ReturnType<typeof createClient>
   ): Promise<"signed_in" | "explicit_unconfirmed" | "neutral"> {
@@ -141,8 +156,10 @@ export default function SignupPage() {
     setResendSuccess(false);
     if (password !== confirmPassword) {
       setPasswordMismatch(true);
+      trackSignupError({ kind: "password_mismatch" });
       return;
     }
+    trackSignupSubmit();
     setLoading(true);
     captureFirstTouchIfMissing(
       `${window.location.pathname}${window.location.search || ""}`
@@ -172,8 +189,10 @@ export default function SignupPage() {
       if (isEmailAlreadyRegisteredError(signUpError.message)) {
         const branch = await branchExistingEmail(supabase);
         if (branch === "signed_in") {
+          trackSignupError({ kind: "existing_account" });
           return;
         }
+        trackSignupError({ kind: "existing_account" });
         setPostSubmitView(
           branch === "explicit_unconfirmed"
             ? "existing_explicit_unconfirmed"
@@ -181,12 +200,20 @@ export default function SignupPage() {
         );
         return;
       }
+      trackSignupError({
+        message: signUpError.message,
+        code:
+          "code" in signUpError
+            ? String((signUpError as { code?: string }).code ?? "")
+            : null,
+      });
       setError(signUpError.message);
       return;
     }
 
     if (data.session) {
       setLoading(false);
+      trackSignupSuccess({ requiresEmailVerification: false });
       try {
         await applyPartnerReferralAttributionFromSession();
       } catch (err) {
@@ -208,6 +235,7 @@ export default function SignupPage() {
       });
       const branch = await branchExistingEmail(supabase);
       setLoading(false);
+      trackSignupError({ kind: "existing_account" });
       if (branch === "signed_in") {
         return;
       }
@@ -220,6 +248,7 @@ export default function SignupPage() {
     }
 
     setLoading(false);
+    trackSignupSuccess({ requiresEmailVerification: true });
     setPostSubmitView("new_user_check_email");
   }
 
@@ -473,7 +502,10 @@ export default function SignupPage() {
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  markSignupStarted();
+                  setEmail(e.target.value);
+                }}
                 placeholder="you@example.com"
                 autoComplete="email"
                 className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
@@ -491,7 +523,10 @@ export default function SignupPage() {
               <select
                 id="heardAboutSource"
                 value={heardAboutSource}
-                onChange={(e) => setHeardAboutSource(e.target.value)}
+                onChange={(e) => {
+                  markSignupStarted();
+                  setHeardAboutSource(e.target.value);
+                }}
                 className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
               >
                 <option value="">Select one</option>
@@ -518,6 +553,7 @@ export default function SignupPage() {
                   minLength={6}
                   value={password}
                   onChange={(e) => {
+                    markSignupStarted();
                     setPassword(e.target.value);
                     setPasswordMismatch(false);
                   }}
@@ -560,6 +596,7 @@ export default function SignupPage() {
                   required
                   value={confirmPassword}
                   onChange={(e) => {
+                    markSignupStarted();
                     setConfirmPassword(e.target.value);
                     setPasswordMismatch(false);
                   }}

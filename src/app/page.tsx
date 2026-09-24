@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
+import {
+  ContractorAcquisitionCtaLink,
+  ContractorLandingViewTracker,
+} from "@/components/contractor-funnel-trackers";
 import { getPublicPlanPriceLine } from "@/lib/billing-plan-display";
 import {
   formatActiveJobLimit,
@@ -78,18 +82,22 @@ const COMPARISON_ROWS: Array<{
 function TrialCta({
   centered = false,
   label = "Start Your 14-Day Free Trial",
+  ctaLocation = "hero",
 }: {
   centered?: boolean;
   label?: string;
+  ctaLocation?: string;
 }) {
   return (
     <div className={centered ? "flex flex-col items-center" : undefined}>
-      <Link
+      <ContractorAcquisitionCtaLink
         href="/signup"
+        ctaText={label}
+        ctaLocation={ctaLocation}
         className="inline-flex w-full items-center justify-center rounded-xl bg-[#2436BB] px-8 py-4 text-base font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
       >
         {label}
-      </Link>
+      </ContractorAcquisitionCtaLink>
       <p className={`mt-3 max-w-sm text-sm leading-relaxed text-zinc-500 ${centered ? "text-center" : ""}`}>
         No credit card required. Cancel anytime during your trial.
       </p>
@@ -288,17 +296,28 @@ const SWITCH_COMPARISON = [
 export default function Home() {
   return (
     <div className="min-h-screen bg-white font-sans text-zinc-900">
+      <ContractorLandingViewTracker />
       <header className="border-b border-zinc-200 bg-white px-6 py-4 sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <Link href="/">
             <JobProofLogo />
           </Link>
-          <Link
-            href="/login"
-            className="text-sm font-medium text-[#2436BB] hover:text-[#1c2a96]"
-          >
-            Sign in
-          </Link>
+          <nav className="flex items-center gap-3 sm:gap-6">
+            <Link
+              href="/login"
+              className="text-sm font-medium text-[#2436BB] hover:text-[#1c2a96]"
+            >
+              Sign in
+            </Link>
+            <ContractorAcquisitionCtaLink
+              href="/signup"
+              ctaText="Start Free Trial"
+              ctaLocation="header_nav"
+              className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#1c2a96]"
+            >
+              Start Free Trial
+            </ContractorAcquisitionCtaLink>
+          </nav>
         </div>
       </header>
 
@@ -324,7 +343,7 @@ export default function Home() {
               quote.
             </p>
             <div className="mt-10">
-              <TrialCta centered />
+              <TrialCta centered ctaLocation="hero" />
             </div>
           </div>
         </section>
@@ -410,12 +429,14 @@ export default function Home() {
                   </p>
                 </div>
                 <PlanFeatureList items={SOLO_FEATURES} />
-                <Link
+                <ContractorAcquisitionCtaLink
                   href="/signup"
+                  ctaText="Start Free Trial"
+                  ctaLocation="pricing_solo"
                   className="mt-8 inline-flex w-full items-center justify-center rounded-xl bg-[#2436BB] px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2"
                 >
                   Start Free Trial
-                </Link>
+                </ContractorAcquisitionCtaLink>
               </div>
 
               <div className="relative flex flex-col rounded-2xl border-2 border-[#2436BB] bg-[#2436BB]/5 p-6 shadow-md sm:p-8">
@@ -438,12 +459,14 @@ export default function Home() {
                   Built to help your company grow:
                 </p>
                 <PlanFeatureList items={PRO_FEATURES} />
-                <Link
+                <ContractorAcquisitionCtaLink
                   href="/signup"
+                  ctaText="Start Free Trial"
+                  ctaLocation="pricing_pro"
                   className="mt-8 inline-flex w-full items-center justify-center rounded-xl bg-[#2436BB] px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2"
                 >
                   Start Free Trial
-                </Link>
+                </ContractorAcquisitionCtaLink>
               </div>
             </div>
 
@@ -693,12 +716,14 @@ export default function Home() {
               Look professional from the very first customer message.
             </p>
             <div className="mt-10 flex flex-col items-center">
-              <Link
+              <ContractorAcquisitionCtaLink
                 href="/signup"
+                ctaText="Start Your Free Trial"
+                ctaLocation="final_cta"
                 className="inline-flex w-full items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-zinc-950 transition-colors hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-zinc-950 sm:w-auto"
               >
                 Start Your Free Trial
-              </Link>
+              </ContractorAcquisitionCtaLink>
             </div>
           </div>
         </section>
@@ -726,9 +751,14 @@ export default function Home() {
             <Link href="/login" className="font-medium text-zinc-600 hover:text-zinc-900">
               Sign in
             </Link>
-            <Link href="/signup" className="font-medium text-[#2436BB] hover:text-[#1c2a96]">
+            <ContractorAcquisitionCtaLink
+              href="/signup"
+              ctaText="Start free trial"
+              ctaLocation="footer"
+              className="font-medium text-[#2436BB] hover:text-[#1c2a96]"
+            >
               Start free trial
-            </Link>
+            </ContractorAcquisitionCtaLink>
           </div>
         </div>
       </footer>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { SignupVerifiedTracker } from "@/components/contractor-onboarding-analytics";
 
 function readDashboardFlashFromLocation(): { confirmed: boolean; onboarded: boolean } {
   if (typeof window === "undefined") {
@@ -28,6 +29,7 @@ export function DashboardAlerts() {
 
   return (
     <div className="space-y-3">
+      <SignupVerifiedTracker confirmed={flash.confirmed} />
       {flash.confirmed && (
         <div
           className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"

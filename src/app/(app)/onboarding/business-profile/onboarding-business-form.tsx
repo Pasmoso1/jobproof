@@ -9,6 +9,13 @@ import { ContractorTradesServicesFields } from "@/components/contractor/contract
 import { ProvinceSelect } from "@/components/canada/province-select";
 import { provinceSelectValue } from "@/lib/canada/provinces";
 import { formatCanadianPhoneForDisplay } from "@/lib/canada/phone";
+import {
+  GA4_FUNNEL_EVENTS,
+  buildAcquisitionContext,
+  trackGa4EventOnce,
+} from "@/lib/ga4";
+import { readFirstTouchClient } from "@/lib/attribution-first-touch";
+import { readPartnerRefClient } from "@/lib/partners/partner-ref-cookie";
 
 type Profile = {
   id: string;
@@ -123,6 +130,19 @@ export function OnboardingBusinessForm({
       setError(result.error);
       return;
     }
+
+    // Initial onboarding only — settings/business edits use a different form.
+    trackGa4EventOnce(
+      "onboarding_complete",
+      GA4_FUNNEL_EVENTS.onboarding_complete,
+      {
+        ...buildAcquisitionContext({
+          firstTouch: readFirstTouchClient(),
+          partnerReferralPresent: Boolean(readPartnerRefClient()),
+        }),
+        completion_step: "business_profile",
+      }
+    );
 
     router.push("/dashboard");
     router.refresh();

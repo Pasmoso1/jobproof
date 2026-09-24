@@ -6,6 +6,10 @@ import { JobProofLogo } from "@/components/jobproof-logo";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { isOnboardingCompleteForTrial } from "@/lib/trial-lifecycle";
 import { OnboardingBusinessForm } from "./onboarding-business-form";
+import {
+  OnboardingStartTracker,
+  SignupVerifiedTracker,
+} from "@/components/contractor-onboarding-analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +26,7 @@ export default async function OnboardingBusinessProfilePage({
 
   const profile = await getProfile();
   const params = await searchParams;
+  const confirmed = params.confirmed === "true";
 
   if (needsPlanSelection(profile)) {
     redirect(BETA_PLAN_ONBOARDING_PATH);
@@ -33,6 +38,8 @@ export default async function OnboardingBusinessProfilePage({
 
   return (
     <div className="mx-auto max-w-xl">
+      <SignupVerifiedTracker confirmed={confirmed} />
+      <OnboardingStartTracker step="business_profile" />
       <div className="mb-8 text-center">
         <JobProofLogo className="mx-auto mb-6 h-10 w-auto" />
         <h1 className="text-2xl font-bold text-zinc-900">Set up your business profile</h1>
@@ -44,7 +51,7 @@ export default async function OnboardingBusinessProfilePage({
       <OnboardingBusinessForm
         profile={profile}
         userEmail={user.email ?? ""}
-        confirmed={params.confirmed === "true"}
+        confirmed={confirmed}
         maxTotalTrades={getPlanEntitlements(profile).maxTotalTrades}
       />
     </div>
