@@ -6,11 +6,13 @@ import {
   decideSignupVerifiedAnalyticsMarker,
   GA4_EMAIL_VERIFY_PENDING_COOKIE,
   GA4_SIGNUP_VERIFIED_PENDING_COOKIE,
+  NON_SIGNUP_CONFIRM_OTP_TYPES,
+  SIGNUP_CONFIRM_OTP_TYPES,
 } from "@/lib/ga4-signup-verified-marker";
 import { clearGa4OnceFiredForTests, trackGa4EventOnce } from "@/lib/ga4";
 
 describe("decideSignupVerifiedAnalyticsMarker", () => {
-  it("A: new-account signup OTP confirmation schedules signup_verified", () => {
+  it("authoritative type=signup schedules signup_verified without Device A cookie", () => {
     const d = decideSignupVerifiedAnalyticsMarker({
       authSucceeded: true,
       type: "signup",
@@ -18,10 +20,10 @@ describe("decideSignupVerifiedAnalyticsMarker", () => {
       emailVerifyPendingCookie: false,
     });
     assert.equal(d.markSignupVerifiedPending, true);
-    assert.equal(d.clearEmailVerifyPending, true);
+    assert.equal(d.reason, "explicit_signup_otp");
   });
 
-  it("A2: type=email confirmation also schedules signup_verified", () => {
+  it("C: cross-device — type=email (JobProof confirm template) with NO pending cookie", () => {
     const d = decideSignupVerifiedAnalyticsMarker({
       authSucceeded: true,
       type: "email",
@@ -29,9 +31,11 @@ describe("decideSignupVerifiedAnalyticsMarker", () => {
       emailVerifyPendingCookie: false,
     });
     assert.equal(d.markSignupVerifiedPending, true);
+    assert.equal(d.clearEmailVerifyPending, true);
+    assert.equal(d.reason, "explicit_signup_otp");
   });
 
-  it("A3: PKCE without type uses email-verify pending cookie", () => {
+  it("same-browser PKCE fallback uses email-verify pending cookie", () => {
     const d = decideSignupVerifiedAnalyticsMarker({
       authSucceeded: true,
       type: null,
@@ -39,10 +43,10 @@ describe("decideSignupVerifiedAnalyticsMarker", () => {
       emailVerifyPendingCookie: true,
     });
     assert.equal(d.markSignupVerifiedPending, true);
-    assert.equal(d.clearEmailVerifyPending, true);
+    assert.equal(d.reason, "email_verify_pending_cookie");
   });
 
-  it("D: ordinary login / session without pending marker does not schedule", () => {
+  it("D: ordinary login / session without pending cookie does not schedule", () => {
     const d = decideSignupVerifiedAnalyticsMarker({
       authSucceeded: true,
       type: null,
@@ -50,10 +54,10 @@ describe("decideSignupVerifiedAnalyticsMarker", () => {
       emailVerifyPendingCookie: false,
     });
     assert.equal(d.markSignupVerifiedPending, false);
-    assert.equal(d.clearEmailVerifyPending, false);
+    assert.equal(d.reason, "no_signal");
   });
 
-  it("E: password-reset / recovery never schedules signup_verified", () => {
+  it("E: password recovery never schedules signup_verified", () => {
     assert.equal(
       decideSignupVerifiedAnalyticsMarker({
         authSucceeded: true,
@@ -74,14 +78,55 @@ describe("decideSignupVerifiedAnalyticsMarker", () => {
     );
   });
 
-  it("F: failed auth does not schedule signup_verified", () => {
+  it("F: email-change confirmation never schedules signup_verified", () => {
     const d = decideSignupVerifiedAnalyticsMarker({
-      authSucceeded: false,
-      type: "signup",
+      authSucceeded: true,
+      type: "email_change",
       nextPath: "/dashboard",
       emailVerifyPendingCookie: true,
     });
     assert.equal(d.markSignupVerifiedPending, false);
+    assert.equal(d.reason, "non_signup_otp_type");
+  });
+
+  it("G: magic-link login never schedules signup_verified", () => {
+    const d = decideSignupVerifiedAnalyticsMarker({
+      authSucceeded: true,
+      type: "magiclink",
+      nextPath: "/dashboard",
+      emailVerifyPendingCookie: true,
+    });
+    assert.equal(d.markSignupVerifiedPending, false);
+    assert.equal(d.reason, "non_signup_otp_type");
+  });
+
+  it("invite OTP never schedules signup_verified", () => {
+    const d = decideSignupVerifiedAnalyticsMarker({
+      authSucceeded: true,
+      type: "invite",
+      nextPath: "/dashboard",
+      emailVerifyPendingCookie: true,
+    });
+    assert.equal(d.markSignupVerifiedPending, false);
+  });
+
+  it("H: failed auth does not schedule signup_verified", () => {
+    const d = decideSignupVerifiedAnalyticsMarker({
+      authSucceeded: false,
+      type: "email",
+      nextPath: "/dashboard",
+      emailVerifyPendingCookie: true,
+    });
+    assert.equal(d.markSignupVerifiedPending, false);
+    assert.equal(d.reason, "auth_failed");
+  });
+
+  it("OTP type sets cover signup confirm vs denylist", () => {
+    assert.ok(SIGNUP_CONFIRM_OTP_TYPES.has("email"));
+    assert.ok(SIGNUP_CONFIRM_OTP_TYPES.has("signup"));
+    assert.ok(NON_SIGNUP_CONFIRM_OTP_TYPES.has("magiclink"));
+    assert.ok(NON_SIGNUP_CONFIRM_OTP_TYPES.has("recovery"));
+    assert.ok(NON_SIGNUP_CONFIRM_OTP_TYPES.has("email_change"));
   });
 });
 
@@ -153,7 +198,7 @@ describe("signup_verified consume + dedupe", () => {
     delete (globalThis as { document?: unknown }).document;
   });
 
-  it("A+B: confirmation journey fires signup_verified once", async () => {
+  it("A+B: same-browser confirmation journey fires signup_verified once", async () => {
     const {
       trackSignupSuccess,
       consumeSignupVerifiedPendingAndTrack,
@@ -165,7 +210,6 @@ describe("signup_verified consume + dedupe", () => {
     assert.equal(gtagCalls.some((c) => c[1] === "signup_verified"), false);
     assert.match(cookies, new RegExp(`${GA4_EMAIL_VERIFY_PENDING_COOKIE}=1`));
 
-    // Auth callback would set sv_pending (simulated).
     cookies = `${GA4_SIGNUP_VERIFIED_PENDING_COOKIE}=1`;
 
     assert.equal(consumeSignupVerifiedPendingAndTrack(), true);
@@ -184,13 +228,25 @@ describe("signup_verified consume + dedupe", () => {
     assert.doesNotMatch(JSON.stringify(params), /@/);
   });
 
-  it("C: refresh after verification does not fire again (session once-key)", async () => {
+  it("C: cross-device phone consume — only sv_pending, no ev_pending", async () => {
+    const { consumeSignupVerifiedPendingAndTrack } = await import(
+      "@/lib/signup-funnel-analytics"
+    );
+    // Phone never had jp_ga4_ev_pending; callback set jp_ga4_sv_pending from type=email.
+    cookies = `${GA4_SIGNUP_VERIFIED_PENDING_COOKIE}=1`;
+    assert.equal(consumeSignupVerifiedPendingAndTrack(), true);
+    assert.equal(
+      gtagCalls.filter((c) => c[1] === "signup_verified").length,
+      1
+    );
+  });
+
+  it("I: refresh after verification does not fire again", async () => {
     const { consumeSignupVerifiedPendingAndTrack } = await import(
       "@/lib/signup-funnel-analytics"
     );
     cookies = `${GA4_SIGNUP_VERIFIED_PENDING_COOKIE}=1`;
     assert.equal(consumeSignupVerifiedPendingAndTrack(), true);
-    // Simulate refresh re-setting a stale cookie somehow — once-key still blocks.
     cookies = `${GA4_SIGNUP_VERIFIED_PENDING_COOKIE}=1`;
     assert.equal(consumeSignupVerifiedPendingAndTrack(), false);
     assert.equal(
@@ -208,7 +264,7 @@ describe("signup_verified consume + dedupe", () => {
     assert.equal(gtagCalls.length, 0);
   });
 
-  it("G: onboarding_start remains independent of signup_verified", () => {
+  it("onboarding_start remains independent of signup_verified", () => {
     trackGa4EventOnce("onboarding_start", "onboarding_start", {
       onboarding_step: "plan",
     });
@@ -222,7 +278,7 @@ describe("signup_verified consume + dedupe", () => {
     assert.equal(gtagCalls.some((c) => c[1] === "signup_verified"), false);
   });
 
-  it("I+J: sign_up and email_verification_required definitions unchanged", async () => {
+  it("J: sign_up and email_verification_required definitions unchanged", async () => {
     const { trackSignupSuccess } = await import("@/lib/signup-funnel-analytics");
     trackSignupSuccess({ requiresEmailVerification: true });
     const names = gtagCalls.map((c) => c[1]);
@@ -234,19 +290,40 @@ describe("signup_verified consume + dedupe", () => {
   });
 });
 
-describe("auth callback wiring for signup_verified marker", () => {
+describe("auth callback + confirm-signup template wiring", () => {
   it("callback applies analytics cookies without changing recovery redirects", () => {
     const source = readFileSync(
       join(process.cwd(), "src/app/auth/callback/route.ts"),
       "utf8"
     );
     assert.match(source, /applySignupVerifiedAnalyticsCookies/);
-    assert.match(source, /decideSignupVerifiedAnalyticsMarker|GA4_SIGNUP_VERIFIED_PENDING_COOKIE/);
+    assert.match(source, /GA4_SIGNUP_VERIFIED_PENDING_COOKIE/);
     assert.match(source, /type === "recovery"/);
     assert.match(source, /\/update-password/);
-    // Auth destinations unchanged
     assert.match(source, /\/dashboard\?confirmed=true/);
-    assert.match(source, /emailRedirectTo|nextPath === "\/update-password"/);
+  });
+
+  it("confirm-signup email template carries authoritative type=email + token_hash", () => {
+    const template = readFileSync(
+      join(process.cwd(), "emails/supabase-auth/confirm-signup.html"),
+      "utf8"
+    );
+    assert.match(template, /token_hash=\{\{ \.TokenHash \}\}/);
+    assert.match(template, /type=email/);
+    assert.doesNotMatch(template, /\{\{ \.ConfirmationURL \}\}/);
+  });
+
+  it("magic-link and recovery templates use non-signup types", () => {
+    const magic = readFileSync(
+      join(process.cwd(), "emails/supabase-auth/magic-link.html"),
+      "utf8"
+    );
+    const reset = readFileSync(
+      join(process.cwd(), "emails/supabase-auth/reset-password.html"),
+      "utf8"
+    );
+    assert.match(magic, /type=magiclink/);
+    assert.match(reset, /type=recovery/);
   });
 
   it("app shell mounts SignupVerifiedPendingBridge", () => {
@@ -270,7 +347,6 @@ describe("auth callback wiring for signup_verified marker", () => {
       join(process.cwd(), "src/lib/ga4-signup-verified-marker.ts"),
       "utf8"
     );
-    // Cookie assignments always use the literal "1", never emails/ids/tokens.
     assert.match(source, /GA4_EMAIL_VERIFY_PENDING_COOKIE,\s*\n\s*"1"/);
     assert.doesNotMatch(source, /cookies\.set\([^)]*email/i);
     assert.doesNotMatch(source, /@/);

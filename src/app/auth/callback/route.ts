@@ -96,8 +96,9 @@ export async function GET(request: NextRequest) {
         console.error("[auth/callback] partner attribution", err);
       }
 
-      // Analytics only: schedule signup_verified for NEW-ACCOUNT email confirm
-      // (PKCE often lands on /login via emailRedirectTo and never keeps ?confirmed=true).
+      // Analytics only: schedule signup_verified when this callback is a NEW-ACCOUNT
+      // email confirmation. JobProof confirm-signup emails use token_hash+type=email
+      // (cross-device safe). PKCE/code without type falls back to jp_ga4_ev_pending.
       const redirect = NextResponse.redirect(new URL(redirectPath, request.url));
       return applySignupVerifiedAnalyticsCookies(redirect, request, {
         authSucceeded: true,
