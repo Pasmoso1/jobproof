@@ -125,6 +125,10 @@ export async function middleware(request: NextRequest) {
     if (needsPlanSelection(profile)) {
       const url = request.nextUrl.clone();
       url.pathname = BETA_PLAN_ONBOARDING_PATH;
+      // Preserve confirmation flash for UI (analytics uses a separate cookie marker).
+      if (request.nextUrl.searchParams.get("confirmed") === "true") {
+        url.searchParams.set("confirmed", "true");
+      }
       return Response.redirect(url);
     }
     if (isProfileIncomplete(profile, user.email ?? "")) {

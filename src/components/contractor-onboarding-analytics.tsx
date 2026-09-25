@@ -8,23 +8,43 @@ import {
 } from "@/lib/ga4";
 import { readFirstTouchClient } from "@/lib/attribution-first-touch";
 import { readPartnerRefClient } from "@/lib/partners/partner-ref-cookie";
+import { consumeSignupVerifiedPendingAndTrack } from "@/lib/signup-funnel-analytics";
 
 /**
- * Fires signup_verified once when a newly created contractor lands after
- * email confirmation (?confirmed=true). Safe on dashboard or onboarding.
+ * Consumes auth-callback signup_verified pending marker (preferred),
+ * and still accepts legacy ?confirmed=true as a secondary signal.
+ *
+ * Preferred path: auth/callback sets jp_ga4_sv_pending → this fires once.
  */
-export function SignupVerifiedTracker({ confirmed }: { confirmed: boolean }) {
+export function SignupVerifiedTracker({ confirmed = false }: { confirmed?: boolean }) {
   useEffect(() => {
+    if (consumeSignupVerifiedPendingAndTrack()) return;
+    // Legacy fallback: destination still has confirmed=true (e.g. older emails).
     if (!confirmed) return;
     trackGa4EventOnce(
       "signup_verified",
       GA4_FUNNEL_EVENTS.signup_verified,
-      buildAcquisitionContext({
-        firstTouch: readFirstTouchClient(),
-        partnerReferralPresent: Boolean(readPartnerRefClient()),
-      })
+      {
+        ...buildAcquisitionContext({
+          firstTouch: readFirstTouchClient(),
+          partnerReferralPresent: Boolean(readPartnerRefClient()),
+        }),
+        method: "email",
+        verification_path: "confirmed_query",
+      }
     );
   }, [confirmed]);
+  return null;
+}
+
+/**
+ * Mount once in the authenticated app shell so signup_verified fires even when
+ * middleware strips ?confirmed=true (e.g. redirect to /onboarding/plan).
+ */
+export function SignupVerifiedPendingBridge() {
+  useEffect(() => {
+    consumeSignupVerifiedPendingAndTrack();
+  }, []);
   return null;
 }
 

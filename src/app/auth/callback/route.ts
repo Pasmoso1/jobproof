@@ -4,10 +4,50 @@ import { createClient } from "@/lib/supabase/server";
 import { decodeFirstTouchCookie, FIRST_TOUCH_COOKIE_NAME } from "@/lib/attribution-first-touch";
 import { PARTNER_REF_COOKIE_NAME } from "@/lib/partners/partner-ref-cookie";
 import { isSafeRelativeRedirect } from "@/lib/auth/safe-redirect";
+import {
+  GA4_EMAIL_VERIFY_PENDING_COOKIE,
+  GA4_SIGNUP_VERIFIED_PENDING_COOKIE,
+  clearEmailVerifyPendingCookieOptions,
+  decideSignupVerifiedAnalyticsMarker,
+  signupVerifiedPendingCookieOptions,
+} from "@/lib/ga4-signup-verified-marker";
 
 function loginErrorUrl(requestUrl: URL, kind: "auth" | "reset_link"): URL {
   const q = kind === "reset_link" ? "error=reset_link" : "error=auth";
   return new URL(`/login?${q}`, requestUrl);
+}
+
+function applySignupVerifiedAnalyticsCookies(
+  response: NextResponse,
+  request: NextRequest,
+  input: {
+    authSucceeded: boolean;
+    type: string | null | undefined;
+    nextPath: string | null | undefined;
+  }
+): NextResponse {
+  const decision = decideSignupVerifiedAnalyticsMarker({
+    authSucceeded: input.authSucceeded,
+    type: input.type,
+    nextPath: input.nextPath,
+    emailVerifyPendingCookie:
+      request.cookies.get(GA4_EMAIL_VERIFY_PENDING_COOKIE)?.value === "1",
+  });
+  if (decision.markSignupVerifiedPending) {
+    response.cookies.set(
+      GA4_SIGNUP_VERIFIED_PENDING_COOKIE,
+      "1",
+      signupVerifiedPendingCookieOptions()
+    );
+  }
+  if (decision.clearEmailVerifyPending) {
+    response.cookies.set(
+      GA4_EMAIL_VERIFY_PENDING_COOKIE,
+      "",
+      clearEmailVerifyPendingCookieOptions()
+    );
+  }
+  return response;
 }
 
 export async function GET(request: NextRequest) {
@@ -56,7 +96,14 @@ export async function GET(request: NextRequest) {
         console.error("[auth/callback] partner attribution", err);
       }
 
-      return NextResponse.redirect(new URL(redirectPath, request.url));
+      // Analytics only: schedule signup_verified for NEW-ACCOUNT email confirm
+      // (PKCE often lands on /login via emailRedirectTo and never keeps ?confirmed=true).
+      const redirect = NextResponse.redirect(new URL(redirectPath, request.url));
+      return applySignupVerifiedAnalyticsCookies(redirect, request, {
+        authSucceeded: true,
+        type,
+        nextPath,
+      });
     }
 
     return NextResponse.redirect(loginErrorUrl(requestUrl, wasResetFlow ? "reset_link" : "auth"));
@@ -198,7 +245,14 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      return NextResponse.redirect(new URL("/dashboard?confirmed=true", request.url));
+      const confirmedRedirect = NextResponse.redirect(
+        new URL("/dashboard?confirmed=true", request.url)
+      );
+      return applySignupVerifiedAnalyticsCookies(confirmedRedirect, request, {
+        authSucceeded: true,
+        type,
+        nextPath: "/dashboard",
+      });
     }
 
     const redirectUrl =

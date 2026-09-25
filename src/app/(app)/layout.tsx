@@ -7,6 +7,7 @@ import { getNewQuoteRequestCount } from "@/lib/quote-requests/response-alerts";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
 import { getFeedbackMailtoHref } from "@/lib/onboarding-feedback";
+import { SignupVerifiedPendingBridge } from "@/components/contractor-onboarding-analytics";
 
 export default async function AppLayout({
   children,
@@ -76,6 +77,7 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen bg-zinc-50">
+      <SignupVerifiedPendingBridge />
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Link href="/dashboard" className="flex items-center gap-2">
