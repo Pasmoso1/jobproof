@@ -26,6 +26,7 @@ import {
 import { BillingActionButtons, StripeConnectActionButtons } from "./billing-actions-client";
 import { refreshStripeConnectStatus, syncSubscriptionAfterStripeReturn } from "./actions";
 import { StripeBillingAddressRetryButton } from "./stripe-billing-address-retry";
+import { Ga4PurchaseAfterCheckoutTracker } from "@/components/ga4-purchase-after-checkout-tracker";
 import {
   formatBillingAddressForDisplay,
   STRIPE_TAX_ADDRESS_FUTURE_INVOICES_NOTE,
@@ -297,6 +298,10 @@ export default async function BillingSettingsPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <Ga4PurchaseAfterCheckoutTracker
+        checkoutSuccess={checkoutSuccess}
+        checkoutSessionId={checkoutSessionId}
+      />
       <div>
         <Link href="/dashboard" className="text-sm font-medium text-zinc-600 hover:text-zinc-900">
           ← Back to dashboard

@@ -29,7 +29,12 @@ export type SignupErrorCategory =
   | "server_error"
   | "unknown";
 
-type Ga4ParamValue = string | number | boolean | null | undefined;
+type Ga4Scalar = string | number | boolean;
+type Ga4ParamValue =
+  | Ga4Scalar
+  | null
+  | undefined
+  | ReadonlyArray<Record<string, Ga4Scalar | null | undefined>>;
 export type Ga4EventParams = Record<string, Ga4ParamValue>;
 
 const PII_PARAM_KEYS = new Set([
@@ -65,11 +70,26 @@ function isBrowser(): boolean {
   return typeof window !== "undefined";
 }
 
-/** Strip PII and empty values from event payloads. */
+function sanitizeEcommerceItem(
+  item: Record<string, Ga4Scalar | null | undefined>
+): Record<string, Ga4Scalar> | null {
+  const out: Record<string, Ga4Scalar> = {};
+  for (const [key, value] of Object.entries(item)) {
+    if (value == null || value === "") continue;
+    const normalizedKey = key.trim().toLowerCase();
+    if (PII_PARAM_KEYS.has(normalizedKey)) continue;
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      out[key] = value;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/** Strip PII and empty values from event payloads (supports ecommerce `items`). */
 export function sanitizeGa4Params(
   params?: Ga4EventParams | null
-): Record<string, string | number | boolean> {
-  const out: Record<string, string | number | boolean> = {};
+): Record<string, Ga4Scalar | Record<string, Ga4Scalar>[]> {
+  const out: Record<string, Ga4Scalar | Record<string, Ga4Scalar>[]> = {};
   if (!params) return out;
   for (const [key, value] of Object.entries(params)) {
     if (value == null || value === "") continue;
@@ -81,6 +101,16 @@ export function sanitizeGa4Params(
       typeof value === "boolean"
     ) {
       out[key] = value;
+      continue;
+    }
+    if (Array.isArray(value) && normalizedKey === "items") {
+      const items: Record<string, Ga4Scalar>[] = [];
+      for (const entry of value) {
+        if (!entry || typeof entry !== "object") continue;
+        const cleaned = sanitizeEcommerceItem(entry);
+        if (cleaned) items.push(cleaned);
+      }
+      if (items.length > 0) out[key] = items;
     }
   }
   return out;

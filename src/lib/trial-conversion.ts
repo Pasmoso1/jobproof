@@ -13,6 +13,21 @@ type ConversionProfile = {
 };
 
 /**
+ * Same first-paid gate used by product analytics and GA4 purchase.
+ * New status must be paid-like; previous must not already be paid-like.
+ */
+export function isFirstPaidSubscriptionTransition(
+  previousStatus: string | null | undefined,
+  newStatus: string | null | undefined
+): boolean {
+  const prev = String(previousStatus ?? "").trim().toLowerCase();
+  const next = String(newStatus ?? "").trim().toLowerCase();
+  if (!["active", "trialing"].includes(next)) return false;
+  if (["active", "trialing", "past_due"].includes(prev)) return false;
+  return true;
+}
+
+/**
  * Fires subscription_started + trial_converted when moving from a JobProof-managed
  * trial (or expired trial) into a paid Stripe subscription.
  */
@@ -23,12 +38,11 @@ export function trackTrialConversionAnalytics(input: {
   subscribedPlan: BillingPlanTier | string | null | undefined;
   source: string;
 }): void {
-  const prev = input.previousStatus.trim().toLowerCase();
-  const next = input.newStatus.trim().toLowerCase();
-  if (!["active", "trialing"].includes(next)) return;
-  // Already paid — avoid duplicate events from checkout + subscription.created race.
-  if (["active", "trialing", "past_due"].includes(prev)) return;
+  if (!isFirstPaidSubscriptionTransition(input.previousStatus, input.newStatus)) {
+    return;
+  }
 
+  const prev = input.previousStatus.trim().toLowerCase();
   const cameFromManagedTrial = ["pending_trial", "trial", "expired"].includes(prev);
   if (!cameFromManagedTrial) {
     trackProductEventSafe({

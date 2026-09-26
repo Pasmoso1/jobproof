@@ -13,6 +13,7 @@ import {
   syncCurrentStripeSubscription,
   upgradeSubscriptionToProfessional,
 } from "./actions";
+import { trackBeginCheckout } from "@/lib/ga4-billing";
 
 function formatActionError(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -72,6 +73,12 @@ export function BillingActionButtons({
         router.refresh();
         return;
       }
+      trackBeginCheckout({
+        planTier: result.planTier,
+        pricingVersion: result.pricingVersion,
+        currency: result.currency,
+        valueCad: result.valueCad,
+      });
       window.location.href = result.url;
     } catch (e) {
       setError(formatActionError(e));

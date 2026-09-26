@@ -55,6 +55,23 @@ const STANDARD: Record<BillingPlanTier, string> = {
   professional: "$59 CAD/month",
 };
 
+/** Pre-tax monthly list price in CAD (matches display lines; not tax-inclusive). */
+export function getPlanListPriceCad(
+  planTier: BillingPlanTier,
+  pricingVersion: BillingPricingVersion
+): number {
+  const map: Record<BillingPricingVersion, Record<BillingPlanTier, number>> = {
+    founder: { essential: 29, professional: 49 },
+    standard: { essential: 39, professional: 59 },
+  };
+  return map[pricingVersion][planTier];
+}
+
+/** Non-PII GA4 / display plan name. */
+export function getPlanGa4ItemName(planTier: BillingPlanTier): string {
+  return planTier === "professional" ? "Professional" : "Essential";
+}
+
 const APPLICABLE_TAXES_SUFFIX = " + applicable taxes";
 
 /** Short display used in buttons: "$39 CAD/mo + tax" style. */

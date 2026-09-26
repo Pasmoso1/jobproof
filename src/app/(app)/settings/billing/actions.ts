@@ -27,6 +27,7 @@ import {
 } from "@/lib/subscription-access";
 import {
   parseBillingPlanTier,
+  getPlanListPriceCad,
   planUpdatedProfessionalTrialingMessage,
   professionalTrialingBillingBannerMessage,
 } from "@/lib/billing-plan-display";
@@ -54,6 +55,12 @@ import {
 import {
   resolveTrialEndsAtForStripeSync,
 } from "@/lib/trial-conversion";
+import {
+  evaluateGa4PurchaseEligibility,
+  normalizeCheckoutSessionSubscriptionId,
+  resolveGa4PurchasePlanFromSession,
+  resolveGa4PurchaseValueCad,
+} from "@/lib/ga4-purchase-eligibility";
 
 const SUBSCRIPTION_STATUSES_BLOCKING_NEW_CHECKOUT = new Set([
   "trialing",
@@ -89,7 +96,15 @@ export type BillingPortalSessionResult =
   | { success: false; error: string };
 
 export type SubscriptionCheckoutSessionResult =
-  | { success: true; url: string }
+  | {
+      success: true;
+      url: string;
+      checkoutSessionId: string;
+      planTier: BillingPlanTier;
+      pricingVersion: BillingPricingVersion;
+      currency: "CAD";
+      valueCad: number;
+    }
   | { success: false; error: string };
 
 export type SubscriptionCheckoutReturnTo = "billing" | "onboarding";
@@ -308,7 +323,15 @@ export async function createSubscriptionCheckoutSession(params: {
       },
     });
 
-    return { success: true, url: session.url };
+    return {
+      success: true,
+      url: session.url,
+      checkoutSessionId: session.id,
+      planTier: params.planTier,
+      pricingVersion,
+      currency: "CAD",
+      valueCad: getPlanListPriceCad(params.planTier, pricingVersion),
+    };
   } catch (err) {
     if (isStripeCustomerMissingError(err)) {
       await clearStaleJobProofStripeBilling(supabase, profile.id);
@@ -1222,5 +1245,125 @@ export async function syncSubscriptionAfterStripeReturn(input: {
     })
     .eq("id", profile.id)
     .eq("user_id", user.id);
+}
+
+export type ConfirmGa4PurchaseAfterCheckoutResult =
+  | {
+      eligible: true;
+      transactionId: string;
+      currency: "CAD";
+      valueCad: number;
+      planTier: BillingPlanTier;
+      pricingVersion: BillingPricingVersion;
+      reason: string;
+    }
+  | { eligible: false; reason: string };
+
+/**
+ * Server confirmation for GA4 purchase after Stripe Checkout return.
+ * Verifies the Checkout session + synced subscription; does not send GA4 itself.
+ */
+export async function confirmGa4PurchaseAfterCheckout(input: {
+  checkoutSessionId?: string | null;
+}): Promise<ConfirmGa4PurchaseAfterCheckoutResult> {
+  const sessionId = input.checkoutSessionId?.trim() || "";
+  if (!sessionId) {
+    return { eligible: false, reason: "missing_session_id" };
+  }
+
+  const { supabase, user, profile } = await requireContractorProfile();
+  const previousStatus = String(profile.subscription_status ?? "");
+  const customerId = (profile.stripe_customer_id as string | null)?.trim() || null;
+  if (!customerId) {
+    return { eligible: false, reason: "missing_stripe_customer" };
+  }
+
+  const stripe = getStripe();
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["subscription", "line_items.data.price"],
+    });
+  } catch {
+    return { eligible: false, reason: "session_retrieve_failed" };
+  }
+
+  const sessionCustomerOk = String(session.customer ?? "") === customerId;
+  const sessionProfileOk =
+    String(session.metadata?.profile_id ?? "") === String(profile.id);
+
+  // Sync profile from this return (same path as billing page).
+  await syncSubscriptionAfterStripeReturn({ checkoutSessionId: sessionId });
+
+  const { data: refreshed } = await supabase
+    .from("profiles")
+    .select("subscription_status, plan_tier, pricing_version, stripe_subscription_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const newStatus = String(
+    refreshed?.subscription_status ?? profile.subscription_status ?? ""
+  );
+  const profileSubId = String(refreshed?.stripe_subscription_id ?? "").trim();
+  const checkoutSubId = normalizeCheckoutSessionSubscriptionId(session.subscription);
+
+  const decision = evaluateGa4PurchaseEligibility({
+    authSucceeded: true,
+    checkoutSessionId: sessionId,
+    sessionMode: session.mode,
+    paymentStatus: session.payment_status,
+    sessionStatus: session.status,
+    sessionCustomerMatchesProfile: sessionCustomerOk,
+    sessionProfileMetadataMatches: sessionProfileOk,
+    sessionCreatedUnix: session.created ?? null,
+    previousSubscriptionStatus: previousStatus,
+    newSubscriptionStatus: newStatus,
+    checkoutSessionSubscriptionId: checkoutSubId,
+    profileStripeSubscriptionId: profileSubId || null,
+  });
+
+  if (!decision.eligible) {
+    return { eligible: false, reason: decision.reason };
+  }
+
+  const priceId =
+    typeof session.line_items?.data?.[0]?.price === "object"
+      ? session.line_items.data[0].price?.id ?? null
+      : null;
+  const fromPrice = priceId ? getPlanFromStripePriceId(priceId) : null;
+  const plan = resolveGa4PurchasePlanFromSession({
+    metadataPlanTier: session.metadata?.plan_tier,
+    metadataPricingVersion: session.metadata?.pricing_version,
+    pricePlanTier: fromPrice?.planTier ?? null,
+    pricePricingVersion: fromPrice?.pricingVersion ?? null,
+    profilePlanTier: refreshed?.plan_tier ?? profile.plan_tier,
+    profilePricingVersion: refreshed?.pricing_version ?? profile.pricing_version,
+  });
+  if (!plan) {
+    return { eligible: false, reason: "plan_unresolved" };
+  }
+
+  const listPrice = getPlanListPriceCad(plan.planTier, plan.pricingVersion);
+  const valueCad = resolveGa4PurchaseValueCad({
+    amountSubtotalCents: session.amount_subtotal ?? null,
+    amountTotalCents: session.amount_total ?? null,
+    listPriceCad: listPrice,
+  });
+
+  const currencyRaw = String(session.currency ?? "cad").toUpperCase();
+  if (currencyRaw && currencyRaw !== "CAD") {
+    // JobProof subscription prices are CAD-only; refuse unexpected currency.
+    return { eligible: false, reason: "unexpected_currency" };
+  }
+
+  return {
+    eligible: true,
+    transactionId: sessionId,
+    currency: "CAD",
+    valueCad,
+    planTier: plan.planTier,
+    pricingVersion: plan.pricingVersion,
+    reason: decision.reason,
+  };
 }
 
