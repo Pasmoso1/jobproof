@@ -10,7 +10,6 @@ import {
 import {
   billingUiTierFromProfile,
   betaTesterBillingBannerMessage,
-  formatSubscriptionStatusLabel,
   getPlanDisplayLines,
   getPlanDisplayLinesForProfile,
   getUpgradeProfessionalButtonLabel,
@@ -24,7 +23,18 @@ import {
   syncStripeSubscriptionToProfile,
 } from "@/lib/stripe-subscription-profile-sync";
 import { BillingActionButtons, StripeConnectActionButtons } from "./billing-actions-client";
-import { refreshStripeConnectStatus, syncSubscriptionAfterStripeReturn } from "./actions";
+import {
+  refreshStripeConnectStatus,
+  syncSubscriptionAfterStripeReturn,
+  type SyncSubscriptionAfterStripeReturnResult,
+} from "./actions";
+import { CheckoutConfirmingRefresh } from "./checkout-confirming-refresh";
+import {
+  buildSubscribedSummary,
+  resolveCheckoutReturnState,
+  shouldShowManagedTrialPanel,
+  shouldShowManagedTrialSubscribeCtas,
+} from "@/lib/billing-page-state";
 import { StripeBillingAddressRetryButton } from "./stripe-billing-address-retry";
 import { Ga4PurchaseAfterCheckoutTracker } from "@/components/ga4-purchase-after-checkout-tracker";
 import {
@@ -55,16 +65,6 @@ function firstSearchParam(v: string | string[] | undefined): string {
   if (v == null) return "";
   const raw = Array.isArray(v) ? v[0] : v;
   return trimOrEmpty(raw);
-}
-
-function isBillingProfileComplete(p: {
-  plan_tier?: string | null;
-  pricing_version?: string | null;
-  subscription_status?: string | null;
-}): boolean {
-  const tier = parseBillingPlanTier(trimOrEmpty(p.plan_tier));
-  const pricing = parseBillingPricingVersion(trimOrEmpty(p.pricing_version));
-  return Boolean(tier && pricing && trimOrEmpty(p.subscription_status));
 }
 
 function hasActiveJobProofSubscriptionForBillingUi(p: {
@@ -114,13 +114,14 @@ export default async function BillingSettingsPage({
   const checkoutState = firstSearchParam(sp.checkout);
   const checkoutSessionId = firstSearchParam(sp.session_id);
   const portalReturn = firstSearchParam(sp.portal) === "return";
+  let checkoutSyncResult: SyncSubscriptionAfterStripeReturnResult | null = null;
   if (checkoutState === "success") {
     try {
-      await syncSubscriptionAfterStripeReturn({
+      checkoutSyncResult = await syncSubscriptionAfterStripeReturn({
         checkoutSessionId: checkoutSessionId || null,
       });
     } catch {
-      /* Stripe or network errors — page still renders with DB state. */
+      checkoutSyncResult = { ok: false, reason: "sync_threw", pending: false };
     }
     const { data: refreshed } = await supabase
       .from("profiles")
@@ -165,7 +166,7 @@ export default async function BillingSettingsPage({
     shouldAutoSyncStripeSubscriptionOnBillingLoad(profile)
   ) {
     try {
-      const syncResult = await syncStripeSubscriptionToProfile(supabase, user, profile);
+      const syncResult = await syncStripeSubscriptionToProfile(supabase, user, profile, "page_load");
       if (!syncResult.ok) {
         console.error("[billing] auto sync Stripe subscription failed", syncResult);
       }
@@ -183,8 +184,13 @@ export default async function BillingSettingsPage({
   const access = getSubscriptionAccess(profile);
   const isBetaTester = isBetaTesterProfile(profile);
   const checkoutSuccess = checkoutState === "success";
-  const billingComplete = isBillingProfileComplete(profile);
-  const webhookPending = checkoutSuccess && !billingComplete;
+  const checkoutReturnState = resolveCheckoutReturnState({
+    checkoutSuccess,
+    profile,
+    syncOutcome: checkoutSyncResult,
+  });
+  const checkoutReturnPending =
+    checkoutReturnState === "confirming" || checkoutReturnState === "sync_failed";
   const subscriptionStatus = trimOrEmpty(profile.subscription_status).toLowerCase();
   const isPastDue = subscriptionStatus === "past_due";
   const isTrialing = ["trial", "trialing"].includes(subscriptionStatus);
@@ -258,25 +264,37 @@ export default async function BillingSettingsPage({
   let currentPlanCell: string;
   if (planLines) {
     currentPlanCell = planLines.planLine;
-  } else if (checkoutSuccess && !billingComplete) {
+  } else if (checkoutReturnPending) {
     currentPlanCell = "Confirming your plan…";
   } else {
     currentPlanCell = "Not selected";
   }
 
   const statusCell =
-    checkoutSuccess && !billingComplete
+    checkoutReturnState === "confirming"
       ? "Confirming with Stripe…"
-      : access.statusLabel;
+      : checkoutReturnState === "sync_failed"
+        ? "Not confirmed yet"
+        : access.statusLabel;
 
-  const showCheckoutConfirmationDetail = checkoutSuccess && billingComplete && planLines;
+  const subscribedSummary =
+    checkoutReturnState === "subscribed" ? buildSubscribedSummary(profile) : null;
 
   const managedTrialActive = isJobProofManagedTrialActive(profile);
   const managedTrialExpired = isJobProofTrialExpired(profile);
-  const showManagedTrialSubscribe =
-    !isBetaTester &&
-    !hasActiveSubscription &&
-    (managedTrialActive || managedTrialExpired || hasJobProofTrialStarted(profile));
+  const showManagedTrialPanel = shouldShowManagedTrialPanel({
+    profile,
+    checkoutReturnState,
+    isBetaTester,
+  });
+  const showManagedTrialSubscribe = shouldShowManagedTrialSubscribeCtas({
+    profile,
+    checkoutReturnState,
+    isBetaTester,
+    hasActiveSubscription,
+    managedTrialActiveOrStarted:
+      managedTrialActive || managedTrialExpired || hasJobProofTrialStarted(profile),
+  });
   const defaultCheckoutPlan = resolveTrialPlanTier(profile) ?? planTier ?? "essential";
   const trialDaysRemaining = getTrialDaysRemaining(profile);
   const trialDaysLabel = formatTrialDaysRemainingLabel(trialDaysRemaining);
@@ -312,11 +330,20 @@ export default async function BillingSettingsPage({
         </p>
       </div>
 
-      {webhookPending ? (
+      {checkoutReturnState === "confirming" ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-          <p className="font-medium">Checkout completed.</p>
+          <p className="font-medium">Confirming your subscription with Stripe…</p>
+          <CheckoutConfirmingRefresh />
+        </div>
+      ) : null}
+
+      {checkoutReturnState === "sync_failed" ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-medium">We couldn&apos;t confirm your subscription yet</p>
           <p className="mt-1">
-            We’re confirming your subscription with Stripe. This may take a moment.
+            If you completed checkout, your payment was handled by Stripe. Select Refresh billing
+            status below to try again, or contact support if your subscription still isn&apos;t
+            showing.
           </p>
         </div>
       ) : null}
@@ -353,29 +380,37 @@ export default async function BillingSettingsPage({
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-medium">Downgrade scheduled</p>
           <p className="mt-1">
-            Your Professional plan stays active until {formatBillingDateOrDash(profile.pending_plan_effective_at)}. You
-            will move to Essential on that date.
+            Your Pro plan stays active until {formatBillingDateOrDash(profile.pending_plan_effective_at)}. You
+            will move to Solo on that date.
           </p>
         </div>
       ) : null}
 
-      {showCheckoutConfirmationDetail ? (
+      {subscribedSummary ? (
         <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900">
           <p className="font-medium">You’re subscribed</p>
           <ul className="mt-2 list-inside list-disc space-y-1">
+            {subscribedSummary.planLine ? (
+              <li>
+                <span className="font-medium">Plan:</span> {subscribedSummary.planLine}
+              </li>
+            ) : null}
             <li>
-              <span className="font-medium">Plan:</span> {planLines.planLine}
+              <span className="font-medium">Status:</span> {subscribedSummary.statusLabel}
             </li>
-            <li>
-              <span className="font-medium">Status:</span>{" "}
-              {formatSubscriptionStatusLabel(trimOrEmpty(profile.subscription_status))}
-            </li>
-            <li>
-              <span className="font-medium">Trial ends:</span> {formatBillingDateOrDash(profile.trial_ends_at)}
-            </li>
-            <li>
-              <span className="font-medium">After trial:</span> {planLines.afterTrialLine}
-            </li>
+            {subscribedSummary.isStripeTrialing ? (
+              <li>
+                <span className="font-medium">Trial ends:</span>{" "}
+                {formatBillingDateOrDash(profile.trial_ends_at)}
+              </li>
+            ) : (
+              <li>
+                <span className="font-medium">Next billing date:</span>{" "}
+                {subscribedSummary.nextBillingDateIso
+                  ? formatBillingDateOrDash(subscribedSummary.nextBillingDateIso)
+                  : "Not available yet"}
+              </li>
+            )}
           </ul>
         </div>
       ) : null}
@@ -412,7 +447,7 @@ export default async function BillingSettingsPage({
       {isTrialing &&
         hasActiveSubscription &&
         hasPlanTier &&
-        !(checkoutSuccess && billingComplete) &&
+        !subscribedSummary &&
         !hasScheduledCancellation && (
           <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
             {planTier === "professional" ? (
@@ -427,7 +462,7 @@ export default async function BillingSettingsPage({
             )}
           </div>
         )}
-      {managedTrialActive && !hasActiveSubscription ? (
+      {showManagedTrialPanel ? (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
           <p className="font-medium">
             {trialDaysLabel ?? "Your free trial is active"}
@@ -477,7 +512,7 @@ export default async function BillingSettingsPage({
           </div>
           <div>
             <dt className="text-zinc-500">
-              {hasActiveSubscription ? "Status" : "Trial status"}
+              {hasActiveSubscription || checkoutReturnPending ? "Status" : "Trial status"}
             </dt>
             <dd className="font-medium text-zinc-900">
               {isBetaTester ? "Beta tester (free access)" : statusCell}
@@ -485,12 +520,12 @@ export default async function BillingSettingsPage({
           </div>
           {hasActiveSubscription ? (
             <div>
-              <dt className="text-zinc-500">Renewal date</dt>
+              <dt className="text-zinc-500">Next billing date</dt>
               <dd className="font-medium text-zinc-900">
                 {formatBillingDateOrDash(profile.subscription_current_period_end)}
               </dd>
             </div>
-          ) : (
+          ) : checkoutReturnPending ? null : (
             <>
               <div>
                 <dt className="text-zinc-500">Trial plan</dt>
@@ -555,7 +590,7 @@ export default async function BillingSettingsPage({
         </dl>
         {!isBetaTester ? (
           <p className="mt-3 text-xs text-zinc-600">
-            {hasActiveSubscription
+            {hasActiveSubscription || checkoutReturnPending
               ? "Stripe will send receipts and billing emails to your account email. Use Manage subscription to update payment methods or view invoices."
               : "No credit card is required during your free trial. Subscribe anytime from this page. Stripe Checkout will show applicable taxes before payment."}
           </p>
@@ -579,6 +614,7 @@ export default async function BillingSettingsPage({
             subscriptionIsTrialing={isTrialing && hasActiveSubscription}
             defaultCheckoutPlan={defaultCheckoutPlan}
             showManagedTrialSubscribe={showManagedTrialSubscribe}
+            checkoutReturnPending={checkoutReturnPending}
           />
         </div>
       </section>

@@ -7,7 +7,7 @@ import {
   sendTrialDay12Email,
   sendTrialEndedEmail,
 } from "@/lib/trial-emails";
-import { getTrialDaysRemaining } from "@/lib/trial-lifecycle";
+import { getTrialDaysRemaining, planTrialReminderActions } from "@/lib/trial-lifecycle";
 
 export type TrialReminderAutomationRunResult = {
   profilesScanned: number;
@@ -19,13 +19,6 @@ export type TrialReminderAutomationRunResult = {
   skipped: number;
   failed: number;
 };
-
-function hoursSince(iso: string | null | undefined, now: Date): number | null {
-  if (!iso) return null;
-  const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return null;
-  return (now.getTime() - t) / (60 * 60 * 1000);
-}
 
 /**
  * Sends day 3/7/12/ended trial emails and marks expired trials.
@@ -82,9 +75,8 @@ export async function runTrialReminderAutomation(): Promise<TrialReminderAutomat
   for (const profile of profiles ?? []) {
     out.profilesScanned += 1;
 
-    const subId = String(profile.stripe_subscription_id ?? "").trim();
-    const status = String(profile.subscription_status ?? "").trim().toLowerCase();
-    if (subId && ["active", "trialing", "past_due"].includes(status)) {
+    const actions = planTrialReminderActions(profile, now);
+    if (actions.skipPaid) {
       out.skipped += 1;
       continue;
     }
@@ -99,14 +91,9 @@ export async function runTrialReminderAutomation(): Promise<TrialReminderAutomat
     const planTier =
       parseBillingPlanTier(String(profile.trial_plan_tier ?? "")) ??
       parseBillingPlanTier(String(profile.plan_tier ?? ""));
-    const hours = hoursSince(profile.trial_started_at, now);
     const daysRemaining = getTrialDaysRemaining(profile, now);
-    const trialEnded =
-      status === "expired" ||
-      (Boolean(profile.trial_ends_at) &&
-        new Date(String(profile.trial_ends_at)).getTime() <= now.getTime());
 
-    if (trialEnded && status !== "expired" && !subId) {
+    if (actions.markExpired) {
       const { error: expErr } = await db
         .from("profiles")
         .update({ subscription_status: "expired" })
@@ -135,7 +122,7 @@ export async function runTrialReminderAutomation(): Promise<TrialReminderAutomat
     }
 
     try {
-      if (hours != null && hours >= 72 && !profile.trial_email_day3_sent_at && !trialEnded) {
+      if (actions.sendDay3) {
         await sendTrialDay3Email({
           profileId: String(profile.id),
           userEmail: email,
@@ -152,7 +139,7 @@ export async function runTrialReminderAutomation(): Promise<TrialReminderAutomat
         out.day3Sent += 1;
       }
 
-      if (hours != null && hours >= 168 && !profile.trial_email_day7_sent_at && !trialEnded) {
+      if (actions.sendDay7) {
         await sendTrialDay7Email({
           profileId: String(profile.id),
           userEmail: email,
@@ -169,7 +156,7 @@ export async function runTrialReminderAutomation(): Promise<TrialReminderAutomat
         out.day7Sent += 1;
       }
 
-      if (hours != null && hours >= 288 && !profile.trial_email_day12_sent_at && !trialEnded) {
+      if (actions.sendDay12) {
         await sendTrialDay12Email({
           profileId: String(profile.id),
           userEmail: email,
@@ -186,7 +173,7 @@ export async function runTrialReminderAutomation(): Promise<TrialReminderAutomat
         out.day12Sent += 1;
       }
 
-      if (trialEnded && !profile.trial_email_ended_sent_at && !subId) {
+      if (actions.sendEnded) {
         await sendTrialEndedEmail({
           profileId: String(profile.id),
           userEmail: email,

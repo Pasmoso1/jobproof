@@ -26,7 +26,6 @@ import {
   isSubscriptionTimestampInFuture,
 } from "@/lib/subscription-access";
 import {
-  parseBillingPlanTier,
   getPlanListPriceCad,
   planUpdatedProfessionalTrialingMessage,
   professionalTrialingBillingBannerMessage,
@@ -46,15 +45,13 @@ import {
   scheduleEssentialDowngradeAtPeriodEnd,
 } from "@/lib/stripe-subscription-downgrade";
 import {
+  linkProfileStripeSubscription,
   pricingFromMetadata,
   subscriptionPeriodEndUnix,
   syncStripeSubscriptionToProfile,
   tierFromMetadata,
   unixToIso,
 } from "@/lib/stripe-subscription-profile-sync";
-import {
-  resolveTrialEndsAtForStripeSync,
-} from "@/lib/trial-conversion";
 import {
   evaluateGa4PurchaseEligibility,
   normalizeCheckoutSessionSubscriptionId,
@@ -399,7 +396,7 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
   if (tierFromMetadata(profile.plan_tier) !== "essential") {
     return {
       success: false,
-      error: "Upgrade is only available when you’re on the Essential plan.",
+      error: "Upgrade is only available when you’re on the Solo plan.",
     };
   }
 
@@ -471,7 +468,7 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
         ? professionalTrialingBillingBannerMessage(
             currentPlan.pricingVersion ?? pricingVersion
           )
-        : "Your subscription is already on the Professional plan.",
+        : "Your subscription is already on the Pro plan.",
       trialPreserved: trialing,
     };
   }
@@ -479,7 +476,7 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
   if (currentPlan?.planTier !== "essential") {
     return {
       success: false,
-      error: "Your Stripe subscription doesn’t match Essential. Use Manage billing to make changes.",
+      error: "Your Stripe subscription doesn’t match Solo. Use Manage billing to make changes.",
     };
   }
 
@@ -545,7 +542,7 @@ export async function upgradeSubscriptionToProfessional(): Promise<UpgradeSubscr
     const cohort = plan?.pricingVersion ?? metaPricing ?? pricingVersion;
     const message = isTrialing
       ? planUpdatedProfessionalTrialingMessage(cohort)
-      : "Plan updated to Professional. Prorated changes may apply for the rest of this billing period.";
+      : "Plan updated to Pro. Prorated changes may apply for the rest of this billing period.";
 
     const originalTrialEnd = sub.trial_end ?? null;
     const trialPreserved =
@@ -590,7 +587,7 @@ export async function downgradeSubscriptionToEssential(): Promise<DowngradeSubsc
   if (tierFromMetadata(profile.plan_tier) !== "professional") {
     return {
       success: false,
-      error: "Downgrade is only available when you’re on the Professional plan.",
+      error: "Downgrade is only available when you’re on the Pro plan.",
     };
   }
 
@@ -604,7 +601,7 @@ export async function downgradeSubscriptionToEssential(): Promise<DowngradeSubsc
   if (profile.pending_plan_tier === "essential") {
     return {
       success: false,
-      error: "A downgrade to Essential is already scheduled for your account.",
+      error: "A downgrade to Solo is already scheduled for your account.",
     };
   }
 
@@ -667,14 +664,14 @@ export async function downgradeSubscriptionToEssential(): Promise<DowngradeSubsc
     return {
       success: true,
       scheduled: false,
-      message: "Your subscription is already on the Essential plan.",
+      message: "Your subscription is already on the Solo plan.",
     };
   }
 
   if (currentPlan?.planTier !== "professional") {
     return {
       success: false,
-      error: "Your Stripe subscription doesn’t match Professional. Use Manage billing to make changes.",
+      error: "Your Stripe subscription doesn’t match Pro. Use Manage billing to make changes.",
     };
   }
 
@@ -760,7 +757,7 @@ export async function downgradeSubscriptionToEssential(): Promise<DowngradeSubsc
       return {
         success: true,
         scheduled: false,
-        message: "Plan changed to Essential. Your trial end date is unchanged.",
+        message: "Plan changed to Solo. Your trial end date is unchanged.",
       };
     }
 
@@ -803,7 +800,7 @@ export async function downgradeSubscriptionToEssential(): Promise<DowngradeSubsc
       success: true,
       scheduled: true,
       message:
-        "Downgrade scheduled. Your Professional plan stays active until your current billing period ends.",
+        "Downgrade scheduled. Your Pro plan stays active until your current billing period ends.",
     };
   } catch (err) {
     if (err instanceof Stripe.errors.StripeInvalidRequestError) {
@@ -1133,7 +1130,23 @@ export async function syncCurrentStripeSubscription(): Promise<SyncCurrentStripe
     case "no_subscription_id":
       return {
         success: false,
-        error: "No Stripe subscription is linked to this account yet.",
+        error: "We couldn't find an active JobProof subscription for this account in Stripe.",
+      };
+    case "no_stripe_customer":
+      return {
+        success: false,
+        error: "No Stripe billing account is linked to this account yet.",
+      };
+    case "ambiguous_subscriptions":
+      return {
+        success: false,
+        error:
+          "We found more than one subscription for this account, so we didn't change anything. Please contact support.",
+      };
+    case "pending":
+      return {
+        success: false,
+        error: "Stripe is still confirming your payment. Please try again in a moment.",
       };
     case "customer_mismatch":
       return { success: false, error: "Subscription does not match your Stripe customer." };
@@ -1146,105 +1159,47 @@ export async function syncCurrentStripeSubscription(): Promise<SyncCurrentStripe
     case "stripe_retryable":
       return { success: false, error: "Could not reach Stripe. Please try again in a moment." };
     case "database":
-      return { success: false, error: result.message };
+      return {
+        success: false,
+        error: "We couldn't save your billing status. Please try again or contact support.",
+      };
     default:
       return { success: false, error: "Something went wrong. Please try again." };
   }
 }
 
+export type SyncSubscriptionAfterStripeReturnResult =
+  | { ok: true; subscriptionStatus: string }
+  | { ok: false; reason: string; pending: boolean };
+
 /**
- * After returning from Stripe Checkout, pull the latest subscription into `profiles`
- * so the billing page is accurate even if the webhook is slightly delayed.
+ * After returning from Stripe Checkout, link the Checkout subscription to `profiles`
+ * so the billing page is accurate even if the webhook is delayed or missing.
+ * Falls back to customer-based recovery for the profile's own Stripe customer.
  */
 export async function syncSubscriptionAfterStripeReturn(input: {
   checkoutSessionId?: string | null;
-}): Promise<void> {
+}): Promise<SyncSubscriptionAfterStripeReturnResult> {
   const { supabase, user, profile } = await requireContractorProfile();
-  const customerId = (profile.stripe_customer_id as string | null)?.trim() || null;
-  if (!customerId) return;
-
-  const stripe = getStripe();
-  const profileIdStr = String(profile.id);
-  let sub: Stripe.Subscription | null = null;
-  const sessionId = input.checkoutSessionId?.trim() || null;
-
-  if (sessionId) {
-    try {
-      const session = await stripe.checkout.sessions.retrieve(sessionId, {
-        expand: ["subscription"],
-      });
-      if (session.mode !== "subscription") return;
-      if (String(session.customer ?? "") !== customerId) return;
-      if (String(session.metadata?.profile_id ?? "") !== profileIdStr) return;
-      const subRes = session.subscription;
-      if (subRes && typeof subRes === "object") {
-        sub = subRes as Stripe.Subscription;
-      } else if (typeof subRes === "string" && subRes) {
-        sub = await stripe.subscriptions.retrieve(subRes);
-      }
-    } catch {
-      /* Invalid session id, wrong customer, or Stripe error — try fallbacks below. */
-    }
+  try {
+    const result = await linkProfileStripeSubscription({
+      supabase,
+      user,
+      profile,
+      source: "checkout_return",
+      checkoutSessionId: input.checkoutSessionId ?? null,
+    });
+    if (result.ok) return { ok: true, subscriptionStatus: result.subscriptionStatus };
+    return { ok: false, reason: result.reason, pending: result.pending };
+  } catch (err) {
+    console.error("[billing-sync]", JSON.stringify({
+      event: "checkout_return_sync_threw",
+      source: "checkout_return",
+      profile_id: String(profile.id),
+      error_name: err instanceof Error ? err.name : "unknown",
+    }));
+    return { ok: false, reason: "sync_threw", pending: false };
   }
-
-  if (!sub) {
-    const existingSubId = (profile.stripe_subscription_id as string | null)?.trim() || null;
-    if (existingSubId) {
-      try {
-        const r = await stripe.subscriptions.retrieve(existingSubId);
-        if (String(r.customer) === customerId) sub = r;
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
-  if (!sub) {
-    try {
-      const list = await stripe.subscriptions.list({
-        customer: customerId,
-        status: "all",
-        limit: 25,
-      });
-      const candidates = list.data.filter(
-        (s) =>
-          String(s.metadata?.profile_id ?? "") === profileIdStr ||
-          Boolean(s.items.data[0]?.price?.id && getPlanFromStripePriceId(s.items.data[0].price.id))
-      );
-      sub = candidates.sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0] ?? null;
-    } catch {
-      return;
-    }
-  }
-
-  if (!sub || String(sub.customer) !== customerId) return;
-
-  const priceId = sub.items.data[0]?.price?.id ?? null;
-  const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
-  const metaTier = tierFromMetadata(sub.metadata?.plan_tier);
-  const metaPricing = pricingFromMetadata(sub.metadata?.pricing_version);
-  const resolvedTier =
-    plan?.planTier ?? metaTier ?? parseBillingPlanTier(String(profile.plan_tier ?? "")) ?? null;
-
-  await supabase
-    .from("profiles")
-    .update({
-      stripe_customer_id: customerId,
-      stripe_subscription_id: sub.id,
-      stripe_price_id: priceId,
-      plan_tier: resolvedTier,
-      pricing_version: plan?.pricingVersion ?? metaPricing ?? profile.pricing_version ?? null,
-      subscription_status: sub.status,
-      subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
-      trial_ends_at: resolveTrialEndsAtForStripeSync(
-        sub.trial_end ?? null,
-        profile.trial_ends_at as string | null | undefined
-      ),
-      ...profileLimitColumnsForTier(resolvedTier ?? "essential"),
-      ...subscriptionCancellationDbFields(sub),
-    })
-    .eq("id", profile.id)
-    .eq("user_id", user.id);
 }
 
 export type ConfirmGa4PurchaseAfterCheckoutResult =

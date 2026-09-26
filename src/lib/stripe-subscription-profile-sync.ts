@@ -1,4 +1,3 @@
-import Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Profile } from "@/types/database";
 import {
@@ -7,19 +6,15 @@ import {
   getPlanFromStripePriceId,
   getStripe,
 } from "@/lib/stripe";
-import { subscriptionCancellationDbFields } from "@/lib/stripe-subscription-cancellation";
-import { profileLimitColumnsForTier } from "@/lib/plan-entitlements";
-import { resolveTrialEndsAtForStripeSync } from "@/lib/trial-conversion";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  linkStripeSubscriptionForProfile,
+  type LinkSource,
+  type LinkStripeSubscriptionResult,
+  type StripeBillingApi,
+} from "@/lib/stripe-subscription-link";
 
-export function subscriptionPeriodEndUnix(sub: Stripe.Subscription): number | null {
-  const end = (sub as Stripe.Subscription & { current_period_end?: number }).current_period_end;
-  return typeof end === "number" ? end : null;
-}
-
-export function unixToIso(ts?: number | null): string | null {
-  if (!ts) return null;
-  return new Date(ts * 1000).toISOString();
-}
+export { subscriptionPeriodEndUnix, unixToIso } from "@/lib/stripe-subscription-link";
 
 export function tierFromMetadata(v: unknown): BillingPlanTier | null {
   const t = typeof v === "string" ? v.trim().toLowerCase() : "";
@@ -31,12 +26,12 @@ export function pricingFromMetadata(v: unknown): BillingPricingVersion | null {
   return t === "founder" || t === "standard" ? t : null;
 }
 
-function logStripeSync(context: string, err: { requestId?: string; code?: string; type?: string }) {
-  console.error(`[stripe] ${context}`, {
-    requestId: err.requestId ?? null,
-    code: err.code ?? null,
-    type: err.type ?? null,
-  });
+/**
+ * Trusted client for billing writes. Ownership is established from the authenticated
+ * session before this is used; every write is scoped to that profile id + user id.
+ */
+export function billingWriteClient(userClient: SupabaseClient): SupabaseClient {
+  return (createServiceRoleClient() as SupabaseClient | null) ?? userClient;
 }
 
 export type SyncStripeSubscriptionToProfileResult =
@@ -45,7 +40,10 @@ export type SyncStripeSubscriptionToProfileResult =
       ok: false;
       code:
         | "no_subscription_id"
+        | "no_stripe_customer"
         | "customer_mismatch"
+        | "ambiguous_subscriptions"
+        | "pending"
         | "stripe_invalid_request"
         | "stripe_retryable"
         | "database";
@@ -61,95 +59,78 @@ type ProfileSyncInput = Pick<
   | "plan_tier"
   | "pricing_version"
   | "trial_ends_at"
->;
+> & { subscription_status?: string | null };
+
+function toSyncResult(result: LinkStripeSubscriptionResult): SyncStripeSubscriptionToProfileResult {
+  if (result.ok) return { ok: true, newSubscriptionStatus: result.subscriptionStatus };
+  switch (result.reason) {
+    case "missing_stripe_customer":
+      return { ok: false, code: "no_stripe_customer", message: result.reason };
+    case "no_subscription_found":
+      return { ok: false, code: "no_subscription_id", message: result.reason };
+    case "ambiguous_subscriptions":
+      return { ok: false, code: "ambiguous_subscriptions", message: result.reason };
+    case "subscription_not_active_yet":
+    case "checkout_not_complete":
+      return { ok: false, code: "pending", message: result.reason };
+    case "subscription_customer_mismatch":
+    case "subscription_profile_mismatch":
+    case "checkout_customer_mismatch":
+    case "checkout_profile_mismatch":
+      return { ok: false, code: "customer_mismatch", message: result.reason };
+    case "subscription_price_unrecognized":
+      return { ok: false, code: "stripe_invalid_request", message: result.reason };
+    case "database_error":
+    case "profile_not_updated":
+      return { ok: false, code: "database", message: result.reason };
+    default:
+      return { ok: false, code: "stripe_retryable", message: result.reason };
+  }
+}
+
+/** Link/refresh the profile's Stripe subscription from Stripe (server-side only). */
+export async function linkProfileStripeSubscription(input: {
+  supabase: SupabaseClient;
+  user: { id: string };
+  profile: ProfileSyncInput;
+  source: LinkSource;
+  checkoutSessionId?: string | null;
+}): Promise<LinkStripeSubscriptionResult> {
+  return linkStripeSubscriptionForProfile({
+    stripe: getStripe() as unknown as StripeBillingApi,
+    db: billingWriteClient(input.supabase),
+    profile: {
+      id: String(input.profile.id),
+      user_id: input.profile.user_id,
+      stripe_customer_id: input.profile.stripe_customer_id,
+      stripe_subscription_id: input.profile.stripe_subscription_id,
+      plan_tier: input.profile.plan_tier,
+      pricing_version: input.profile.pricing_version,
+      trial_ends_at: input.profile.trial_ends_at,
+      subscription_status: input.profile.subscription_status ?? null,
+    },
+    userId: input.user.id,
+    planFromPriceId: getPlanFromStripePriceId,
+    source: input.source,
+    checkoutSessionId: input.checkoutSessionId ?? null,
+    clearPendingDowngradeWhenEssential: true,
+  });
+}
 
 /**
- * Retrieves the profile’s Stripe subscription and writes billing fields to `profiles`.
+ * Pulls the profile's Stripe subscription into `profiles`. Uses the linked
+ * subscription id when present; otherwise recovers the single current JobProof
+ * subscription for the profile's own Stripe customer.
  * Shared by the manual resync action and `/settings/billing` auto-sync.
  */
 export async function syncStripeSubscriptionToProfile(
   supabase: SupabaseClient,
   user: { id: string },
-  profile: ProfileSyncInput
+  profile: ProfileSyncInput,
+  source: LinkSource = "refresh"
 ): Promise<SyncStripeSubscriptionToProfileResult> {
-  const subId = (profile.stripe_subscription_id ?? "").trim() || null;
-  if (!subId) {
-    return { ok: false, code: "no_subscription_id", message: "No stripe_subscription_id on profile." };
-  }
-
-  const customerId = (profile.stripe_customer_id ?? "").trim() || null;
-  const stripe = getStripe();
-
-  let sub: Stripe.Subscription;
-  try {
-    sub = await stripe.subscriptions.retrieve(subId);
-  } catch (err) {
-    if (err instanceof Stripe.errors.StripeInvalidRequestError) {
-      logStripeSync("syncStripeSubscriptionToProfile retrieve", err);
-      return {
-        ok: false,
-        code: "stripe_invalid_request",
-        message: err.message ?? "Stripe invalid request",
-      };
-    }
-    if (err instanceof Stripe.errors.StripeError) {
-      return {
-        ok: false,
-        code: "stripe_retryable",
-        message: err.message ?? "Stripe error",
-      };
-    }
-    throw err;
-  }
-
-  const subCustomer = String(sub.customer ?? "").trim();
-  if (customerId && subCustomer !== customerId) {
-    return {
-      ok: false,
-      code: "customer_mismatch",
-      message: "Subscription customer does not match profile stripe_customer_id.",
-    };
-  }
-
-  const priceId = sub.items.data[0]?.price?.id ?? null;
-  const plan = priceId ? getPlanFromStripePriceId(priceId) : null;
-  const metaTier = tierFromMetadata(sub.metadata?.plan_tier);
-  const metaPricing = pricingFromMetadata(sub.metadata?.pricing_version);
-  const resolvedTier = plan?.planTier ?? metaTier ?? profile.plan_tier ?? null;
-
-  const clearPendingDowngrade =
-    resolvedTier === "essential"
-      ? {
-          pending_plan_tier: null,
-          pending_plan_effective_at: null,
-          stripe_subscription_schedule_id: null,
-        }
-      : {};
-
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      stripe_customer_id: subCustomer || customerId || profile.stripe_customer_id,
-      stripe_subscription_id: sub.id,
-      stripe_price_id: priceId,
-      plan_tier: resolvedTier,
-      pricing_version: plan?.pricingVersion ?? metaPricing ?? profile.pricing_version ?? null,
-      subscription_status: sub.status,
-      subscription_current_period_end: unixToIso(subscriptionPeriodEndUnix(sub)),
-      trial_ends_at: resolveTrialEndsAtForStripeSync(sub.trial_end ?? null, profile.trial_ends_at),
-      ...profileLimitColumnsForTier(
-        (resolvedTier as "essential" | "professional" | null) ?? "essential"
-      ),
-      ...subscriptionCancellationDbFields(sub),
-      ...clearPendingDowngrade,
-    })
-    .eq("id", profile.id)
-    .eq("user_id", user.id);
-
-  if (error) {
-    return { ok: false, code: "database", message: error.message };
-  }
-  return { ok: true, newSubscriptionStatus: sub.status };
+  const result = await linkProfileStripeSubscription({ supabase, user, profile, source });
+  return toSyncResult(result);
 }
 
 /**
@@ -168,17 +149,27 @@ const AUTO_SYNC_ON_BILLING_LOAD_STATUSES = new Set([
   "incomplete_expired",
 ]);
 
+/** Managed-trial states where a missed webhook could leave a paid subscription unlinked. */
+const CUSTOMER_RECOVERY_ON_BILLING_LOAD_STATUSES = new Set(["", "pending_trial", "trial", "expired"]);
+
 /**
- * Whether `/settings/billing` should pull subscription state from Stripe once per load.
- * Requires a linked subscription id and a lifecycle status where portal / webhooks may desync Supabase.
+ * Whether `/settings/billing` should pull subscription state from Stripe once per load:
+ * - a linked subscription in a lifecycle status where portal / webhooks may desync Supabase, or
+ * - a Stripe customer without a linked subscription (customer-based recovery).
  */
 export function shouldAutoSyncStripeSubscriptionOnBillingLoad(profile: {
   stripe_subscription_id?: string | null;
+  stripe_customer_id?: string | null;
   subscription_status?: string | null;
+  beta_tester?: boolean | null;
 }): boolean {
   const subId = (profile.stripe_subscription_id ?? "").trim();
-  if (!subId) return false;
   const status = (profile.subscription_status ?? "").trim().toLowerCase();
+  if (!subId) {
+    if (profile.beta_tester === true) return false;
+    if (!(profile.stripe_customer_id ?? "").trim()) return false;
+    return CUSTOMER_RECOVERY_ON_BILLING_LOAD_STATUSES.has(status);
+  }
   if (!status) return true;
   return AUTO_SYNC_ON_BILLING_LOAD_STATUSES.has(status);
 }

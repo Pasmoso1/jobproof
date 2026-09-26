@@ -16,6 +16,12 @@ import {
   resolveTrialEndsAtForStripeSync,
   trackTrialConversionAnalytics,
 } from "@/lib/trial-conversion";
+import {
+  invoiceSubscriptionId,
+  stripeIdSuffix,
+  stripeObjectId,
+  subscriptionPeriodEndUnix,
+} from "@/lib/stripe-subscription-link";
 
 function limitColumnsForPlanTier(tier: string | null | undefined) {
   const parsed = parseBillingPlanTier(String(tier ?? ""));
@@ -27,15 +33,40 @@ function toIso(ts?: number | null): string | null {
   return new Date(ts * 1000).toISOString();
 }
 
-function subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub: Stripe.Subscription): number | null {
-  const end = (sub as Stripe.Subscription & { current_period_end?: number }).current_period_end;
-  return typeof end === "number" ? end : null;
+/**
+ * Throw on a failed profile write so the route releases the idempotency row and
+ * returns 500 — Stripe then retries instead of the update being silently lost.
+ */
+function assertWebhookWrite(
+  result: { error: { message: string; code?: string } | null },
+  context: { event: Stripe.Event; operation: string; profileId?: string | null }
+): void {
+  if (!result.error) return;
+  console.error(
+    "[stripe-webhook]",
+    JSON.stringify({
+      event: "profile_write_failed",
+      stripe_event_id: context.event.id,
+      stripe_event_type: context.event.type,
+      operation: context.operation,
+      profile_id: context.profileId ?? null,
+      db_code: result.error.code ?? null,
+      db_message: result.error.message,
+    })
+  );
+  throw new Error(`Profile write failed (${context.operation}).`);
 }
 
-function subscriptionIdFromBasilInvoice(inv: Stripe.Invoice): string {
-  const root = (inv as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }).subscription;
-  if (root == null) return "";
-  return typeof root === "string" ? root : root.id;
+function logWebhookNoProfile(event: Stripe.Event, customerId: string | null): void {
+  console.warn(
+    "[stripe-webhook]",
+    JSON.stringify({
+      event: "profile_not_found",
+      stripe_event_id: event.id,
+      stripe_event_type: event.type,
+      customer: stripeIdSuffix(customerId),
+    })
+  );
 }
 
 async function findProfileByCustomerOrMetadata(input: {
@@ -128,8 +159,8 @@ export async function processStripeBillingWebhook(
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       if (session.mode === "subscription") {
-        const subId = String(session.subscription ?? "");
-        const customerId = String(session.customer ?? "");
+        const subId = stripeObjectId(session.subscription) ?? "";
+        const customerId = stripeObjectId(session.customer) ?? "";
         const profile = await findProfileByCustomerOrMetadata({
           admin,
           customerId,
@@ -147,7 +178,7 @@ export async function processStripeBillingWebhook(
           const newStatus = sub?.status ?? String(profile.subscription_status ?? "");
           const resolvedTier =
             plan?.planTier ?? session.metadata?.plan_tier ?? profile.plan_tier;
-          await admin
+          const checkoutWrite = await admin
             .from("profiles")
             .update({
               stripe_customer_id: customerId || profile.stripe_customer_id,
@@ -159,9 +190,7 @@ export async function processStripeBillingWebhook(
                 session.metadata?.pricing_version ??
                 profile.pricing_version,
               subscription_status: newStatus,
-              subscription_current_period_end: toIso(
-                sub ? subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub) : null
-              ),
+              subscription_current_period_end: toIso(subscriptionPeriodEndUnix(sub)),
               trial_ends_at: resolveTrialEndsAtForStripeSync(
                 sub?.trial_end,
                 profile.trial_ends_at as string | null | undefined
@@ -170,6 +199,11 @@ export async function processStripeBillingWebhook(
               ...(cancelPatch ?? {}),
             })
             .eq("id", profile.id);
+          assertWebhookWrite(checkoutWrite, {
+            event,
+            operation: "checkout_session_completed",
+            profileId: String(profile.id),
+          });
           trackTrialConversionAnalytics({
             profile: {
               id: String(profile.id),
@@ -212,6 +246,8 @@ export async function processStripeBillingWebhook(
               console.error("[stripe-webhook] partner subscription started", err);
             }
           }
+        } else {
+          logWebhookNoProfile(event, customerId);
         }
       } else if (session.mode === "payment") {
         const invoiceId = String(session.metadata?.invoice_id ?? "");
@@ -302,7 +338,7 @@ export async function processStripeBillingWebhook(
         const classification = classifySubscriptionChange({ profile, sub });
         const resolvedTier =
           plan?.planTier ?? sub.metadata?.plan_tier ?? profile.plan_tier;
-        await admin
+        const subscriptionWrite = await admin
           .from("profiles")
           .update({
             stripe_customer_id: customerId || profile.stripe_customer_id,
@@ -312,7 +348,7 @@ export async function processStripeBillingWebhook(
             pricing_version:
               plan?.pricingVersion ?? sub.metadata?.pricing_version ?? profile.pricing_version,
             subscription_status: sub.status,
-            subscription_current_period_end: toIso(subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub)),
+            subscription_current_period_end: toIso(subscriptionPeriodEndUnix(sub)),
             trial_ends_at: resolveTrialEndsAtForStripeSync(
               sub.trial_end,
               profile.trial_ends_at as string | null | undefined
@@ -321,6 +357,11 @@ export async function processStripeBillingWebhook(
             ...cancelPatch,
           })
           .eq("id", profile.id);
+        assertWebhookWrite(subscriptionWrite, {
+          event,
+          operation: "subscription_upsert",
+          profileId: String(profile.id),
+        });
 
         if (
           event.type === "customer.subscription.created" &&
@@ -364,6 +405,8 @@ export async function processStripeBillingWebhook(
         } catch (err) {
           console.error("[stripe-webhook] partner subscription sync", err);
         }
+      } else {
+        logWebhookNoProfile(event, customerId);
       }
       break;
     }
@@ -377,19 +420,22 @@ export async function processStripeBillingWebhook(
       });
       if (profile) {
         const oldStatus = String(profile.subscription_status ?? "");
-        await admin
+        const deleteWrite = await admin
           .from("profiles")
           .update({
             subscription_status: "canceled",
-            subscription_current_period_end: toIso(
-              subscriptionCurrentPeriodEndUnixFromBasilWebhook(sub)
-            ),
+            subscription_current_period_end: toIso(subscriptionPeriodEndUnix(sub)),
             subscription_cancel_at_period_end: false,
             subscription_cancel_at: null,
             subscription_canceled_at: toIso(sub.canceled_at ?? null),
             stripe_subscription_id: sub.id,
           })
           .eq("id", profile.id);
+        assertWebhookWrite(deleteWrite, {
+          event,
+          operation: "subscription_deleted",
+          profileId: String(profile.id),
+        });
         await insertBillingEventLog({
           profileId: String(profile.id),
           stripeCustomerId: String(sub.customer ?? "") || null,
@@ -418,7 +464,7 @@ export async function processStripeBillingWebhook(
 
     case "invoice.paid": {
       const inv = event.data.object as Stripe.Invoice;
-      const subscriptionId = subscriptionIdFromBasilInvoice(inv);
+      const subscriptionId = invoiceSubscriptionId(inv);
       if (subscriptionId) {
         const { data: profile } = await admin
           .from("profiles")
@@ -426,13 +472,18 @@ export async function processStripeBillingWebhook(
           .eq("stripe_subscription_id", subscriptionId)
           .maybeSingle();
         const prevStatus = profile ? String(profile.subscription_status ?? "") : "";
-        await admin
+        const invoicePaidWrite = await admin
           .from("profiles")
           .update({
             subscription_status: "active",
             grace_period_ends_at: null,
           })
           .eq("stripe_subscription_id", subscriptionId);
+        assertWebhookWrite(invoicePaidWrite, {
+          event,
+          operation: "invoice_paid",
+          profileId: profile ? String(profile.id) : null,
+        });
         if (profile) {
           await insertBillingEventLog({
             profileId: String(profile.id),
@@ -488,7 +539,7 @@ export async function processStripeBillingWebhook(
 
     case "invoice.payment_failed": {
       const inv = event.data.object as Stripe.Invoice;
-      const subscriptionId = subscriptionIdFromBasilInvoice(inv);
+      const subscriptionId = invoiceSubscriptionId(inv);
       if (subscriptionId) {
         const { data: profile } = await admin
           .from("profiles")
@@ -500,13 +551,18 @@ export async function processStripeBillingWebhook(
           const grace =
             profile.grace_period_ends_at ??
             new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-          await admin
+          const paymentFailedWrite = await admin
             .from("profiles")
             .update({
               subscription_status: "past_due",
               grace_period_ends_at: grace,
             })
             .eq("id", profile.id);
+          assertWebhookWrite(paymentFailedWrite, {
+            event,
+            operation: "invoice_payment_failed",
+            profileId: String(profile.id),
+          });
           await insertBillingEventLog({
             profileId: String(profile.id),
             stripeCustomerId: profile.stripe_customer_id ?? null,
@@ -556,7 +612,7 @@ export async function processStripeBillingWebhook(
         profileId = String(profile?.id ?? "");
       }
       if (profileId) {
-        await admin
+        const connectWrite = await admin
           .from("profiles")
           .update({
             stripe_connect_account_id: account.id,
@@ -567,6 +623,7 @@ export async function processStripeBillingWebhook(
               (account.charges_enabled && account.payouts_enabled) || account.details_submitted,
           })
           .eq("id", profileId);
+        assertWebhookWrite(connectWrite, { event, operation: "connect_account_updated", profileId });
       }
       break;
     }

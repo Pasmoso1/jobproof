@@ -34,6 +34,7 @@ export function BillingActionButtons({
   subscriptionIsTrialing,
   defaultCheckoutPlan = "essential",
   showManagedTrialSubscribe = false,
+  checkoutReturnPending = false,
 }: {
   isBetaTester?: boolean;
   billingUiTier: BillingUiTier;
@@ -48,6 +49,8 @@ export function BillingActionButtons({
   defaultCheckoutPlan?: BillingPlanTier;
   /** True when JobProof-managed trial (or expired) should subscribe via Stripe with no Stripe trial. */
   showManagedTrialSubscribe?: boolean;
+  /** Returned from Checkout but the subscription is not linked yet — offer Refresh, not Subscribe. */
+  checkoutReturnPending?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -188,6 +191,31 @@ export function BillingActionButtons({
 
   const disableAll = busy !== null;
 
+  if (!hasActiveSubscription && checkoutReturnPending) {
+    return (
+      <div className="space-y-3">
+        {error && (
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+        {successMessage && (
+          <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">
+            {successMessage}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => void goResync()}
+          disabled={disableAll}
+          className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
+        >
+          {busy === "resync" ? "Refreshing…" : "Refresh billing status"}
+        </button>
+      </div>
+    );
+  }
+
   if (!hasActiveSubscription) {
     const preferred = defaultCheckoutPlan === "professional" ? "professional" : "essential";
     const soloPrimary = preferred === "essential";
@@ -282,7 +310,7 @@ export function BillingActionButtons({
       )}
       {billingUiTier === "essential" && !hasScheduledCancellation ? (
         <p className="text-sm text-zinc-600">
-          Need team features? Upgrade to Professional anytime.
+          Need team features? Upgrade to Pro anytime.
         </p>
       ) : null}
       {billingUiTier === "professional" && !hasScheduledCancellation && !hasPendingEssentialDowngrade ? (
@@ -292,7 +320,7 @@ export function BillingActionButtons({
       ) : null}
       {hasPendingEssentialDowngrade ? (
         <p className="text-xs text-zinc-500">
-          Your downgrade to Essential is scheduled. Professional stays active until your current
+          Your downgrade to Solo is scheduled. Pro stays active until your current
           billing period ends.
         </p>
       ) : null}
@@ -309,7 +337,7 @@ export function BillingActionButtons({
             disabled
             className="cursor-not-allowed rounded-lg border border-zinc-200 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-500"
           >
-            Current plan (Essential)
+            Current plan (Solo)
           </button>
         ) : null}
         {showProfessionalCurrent ? (
@@ -318,7 +346,7 @@ export function BillingActionButtons({
             disabled
             className="cursor-not-allowed rounded-lg border border-zinc-200 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-500"
           >
-            Current plan (Professional)
+            Current plan (Pro)
           </button>
         ) : null}
         {billingUiTier === "essential" && !hideUpgrade ? (
@@ -346,7 +374,7 @@ export function BillingActionButtons({
               ? subscriptionIsTrialing
                 ? "Downgrading…"
                 : "Scheduling…"
-              : "Downgrade to Essential"}
+              : "Downgrade to Solo"}
           </button>
         ) : null}
         <button
@@ -365,7 +393,7 @@ export function BillingActionButtons({
               disabled={disableAll}
               className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
             >
-              {busy === "essential" ? "Opening..." : "Choose Essential — $29 CAD/mo + applicable taxes"}
+              {busy === "essential" ? "Opening..." : "Choose Solo — $29 CAD/mo + applicable taxes"}
             </button>
             <button
               type="button"
@@ -373,7 +401,7 @@ export function BillingActionButtons({
               disabled={disableAll}
               className="rounded-lg bg-[#2436BB] px-4 py-2 text-sm font-medium text-white hover:bg-[#1c2a96] disabled:opacity-60"
             >
-              {busy === "professional" ? "Opening..." : "Choose Professional — $49 CAD/mo + applicable taxes"}
+              {busy === "professional" ? "Opening..." : "Choose Pro — $49 CAD/mo + applicable taxes"}
             </button>
           </>
         ) : null}
@@ -404,7 +432,7 @@ export function BillingActionButtons({
         Founder pricing is locked in for early subscribers.
       </p>
       <p className="text-xs text-zinc-500">
-        Essential — $39 CAD/month + applicable taxes regular · Professional — $59 CAD/month +
+        Solo — $39 CAD/month + applicable taxes regular · Pro — $59 CAD/month +
         applicable taxes regular
       </p>
     </div>

@@ -37,7 +37,7 @@ export function billingUiTierFromProfile(p: {
 
 export function getUpgradeProfessionalButtonLabel(pricingVersion: BillingPricingVersion): string {
   const { afterTrialLine } = getPlanDisplayLines("professional", pricingVersion);
-  return `Upgrade to Professional — ${afterTrialLine}`;
+  return `Upgrade to ${TIER_NAME.professional} — ${afterTrialLine}`;
 }
 
 export type PlanDisplay = {
@@ -94,25 +94,31 @@ export function getPublicPlanPriceLine(
   return `${base}${APPLICABLE_TAXES_SUFFIX}`;
 }
 
+/** Customer-facing plan names. Stored identifiers stay `essential` / `professional`. */
 const TIER_NAME: Record<BillingPlanTier, string> = {
-  essential: "Essential",
-  professional: "Professional",
+  essential: "Solo",
+  professional: "Pro",
 };
 
-/** After upgrading to Professional during trial — no immediate charge implied. */
+export function getBillingPlanName(planTier: BillingPlanTier): string {
+  return TIER_NAME[planTier];
+}
+
+/** After upgrading to Pro during trial — no immediate charge implied. */
 export function planUpdatedProfessionalTrialingMessage(
   pricingVersion: BillingPricingVersion
 ): string {
   const { afterTrialLine } = getPlanDisplayLines("professional", pricingVersion);
-  return `Plan updated to Professional. Your card will be charged ${afterTrialLine} after your trial ends.`;
+  return `Plan updated to ${TIER_NAME.professional}. Your card will be charged ${afterTrialLine} after your trial ends.`;
 }
 
-/** Persistent notice on billing when Professional + trialing. */
+/** Persistent notice on billing when Pro + trialing. */
 export function professionalTrialingBillingBannerMessage(
   pricingVersion: BillingPricingVersion
 ): string {
   const { afterTrialLine } = getPlanDisplayLines("professional", pricingVersion);
-  const label = pricingVersion === "founder" ? "Professional Founder" : "Professional";
+  const label =
+    pricingVersion === "founder" ? `${TIER_NAME.professional} Founder` : TIER_NAME.professional;
   return `You're on ${label}. Your card will be charged ${afterTrialLine} after your trial ends.`;
 }
 
@@ -151,7 +157,7 @@ export function betaTesterBillingBannerMessage(p: {
   plan_tier?: string | null;
 }): string {
   const tier = parseBillingPlanTier(String(p.beta_plan_tier ?? p.plan_tier ?? ""));
-  const label = tier === "professional" ? "Professional" : tier === "essential" ? "Essential" : "selected";
+  const label = tier ? TIER_NAME[tier] : "selected";
   return `Thank you for helping test JobProof. You currently have free beta access to the ${label} plan.`;
 }
 

@@ -99,6 +99,22 @@ export function formatTrialDaysRemainingLabel(daysRemaining: number | null): str
   return `${daysRemaining} days remaining`;
 }
 
+/** Stripe statuses where a linked paid subscription controls access instead of the managed trial. */
+const PAID_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due"]);
+
+/**
+ * True once a Stripe subscription is linked and paid/payable. From then on the
+ * historical managed-trial fields no longer control access, reminders, or CTAs.
+ */
+export function hasLinkedPaidSubscription(
+  profile: Pick<TrialLifecycleProfile, "stripe_subscription_id" | "subscription_status"> | null | undefined
+): boolean {
+  const subId = String(profile?.stripe_subscription_id ?? "").trim();
+  if (!subId) return false;
+  const st = String(profile?.subscription_status ?? "").trim().toLowerCase();
+  return PAID_SUBSCRIPTION_STATUSES.has(st);
+}
+
 export function isJobProofManagedTrialActive(
   profile: TrialLifecycleProfile | null | undefined,
   now: Date = new Date()
@@ -119,11 +135,8 @@ export function isJobProofTrialExpired(
   now: Date = new Date()
 ): boolean {
   if (profile?.beta_tester === true) return false;
+  if (hasLinkedPaidSubscription(profile)) return false;
   const subId = String(profile?.stripe_subscription_id ?? "").trim();
-  if (subId) {
-    const st = String(profile?.subscription_status ?? "").trim().toLowerCase();
-    if (["active", "trialing", "past_due"].includes(st)) return false;
-  }
   const status = String(profile?.subscription_status ?? "").trim().toLowerCase();
   if (status === "expired") return true;
   if (!hasJobProofTrialStarted(profile)) return false;
@@ -144,6 +157,57 @@ export function needsTrialExpiredIntro(
   if (profile.beta_tester === true) return false;
   if (!isJobProofTrialExpired(profile)) return false;
   return !String(profile.trial_expired_screen_seen_at ?? "").trim();
+}
+
+export type TrialReminderProfile = TrialLifecycleProfile & {
+  trial_email_day3_sent_at?: string | null;
+  trial_email_day7_sent_at?: string | null;
+  trial_email_day12_sent_at?: string | null;
+  trial_email_ended_sent_at?: string | null;
+};
+
+export type TrialReminderPlan = {
+  /** Linked paid subscription — managed-trial automation does not apply. */
+  skipPaid: boolean;
+  markExpired: boolean;
+  sendDay3: boolean;
+  sendDay7: boolean;
+  sendDay12: boolean;
+  sendEnded: boolean;
+};
+
+/** Which managed-trial reminder / expiry actions apply to a profile right now. */
+export function planTrialReminderActions(
+  profile: TrialReminderProfile,
+  now: Date = new Date()
+): TrialReminderPlan {
+  const none: TrialReminderPlan = {
+    skipPaid: false,
+    markExpired: false,
+    sendDay3: false,
+    sendDay7: false,
+    sendDay12: false,
+    sendEnded: false,
+  };
+  if (hasLinkedPaidSubscription(profile)) return { ...none, skipPaid: true };
+
+  const subId = String(profile.stripe_subscription_id ?? "").trim();
+  const status = String(profile.subscription_status ?? "").trim().toLowerCase();
+  const startedMs = new Date(String(profile.trial_started_at ?? "")).getTime();
+  const hours = Number.isFinite(startedMs) ? (now.getTime() - startedMs) / (60 * 60 * 1000) : null;
+  const trialEnded =
+    status === "expired" ||
+    (Boolean(profile.trial_ends_at) &&
+      new Date(String(profile.trial_ends_at)).getTime() <= now.getTime());
+
+  return {
+    skipPaid: false,
+    markExpired: trialEnded && status !== "expired" && !subId,
+    sendDay3: hours != null && hours >= 72 && !profile.trial_email_day3_sent_at && !trialEnded,
+    sendDay7: hours != null && hours >= 168 && !profile.trial_email_day7_sent_at && !trialEnded,
+    sendDay12: hours != null && hours >= 288 && !profile.trial_email_day12_sent_at && !trialEnded,
+    sendEnded: trialEnded && !profile.trial_email_ended_sent_at && !subId,
+  };
 }
 
 /** Profile columns to write when starting the managed trial. */

@@ -4,6 +4,7 @@ import {
   formatTrialDaysRemainingLabel,
   getTrialDaysRemaining,
   hasJobProofTrialStarted,
+  hasLinkedPaidSubscription,
   hasSelectedTrialPlan,
   isJobProofManagedTrialActive,
   isJobProofTrialExpired,
@@ -19,10 +20,7 @@ export function TrialStatusBanner({
   accountEmail: string;
 }) {
   if (!profile || profile.beta_tester === true) return null;
-  if (String(profile.stripe_subscription_id ?? "").trim()) {
-    const st = String(profile.subscription_status ?? "").trim().toLowerCase();
-    if (["active", "trialing", "past_due"].includes(st)) return null;
-  }
+  if (hasLinkedPaidSubscription(profile)) return null;
 
   if (!hasSelectedTrialPlan(profile) || !isOnboardingCompleteForTrial(profile, accountEmail)) {
     return (
