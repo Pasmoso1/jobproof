@@ -6,6 +6,7 @@ import {
   pricingProfileLabel,
 } from "@/lib/quote-requests/constants";
 import { suggestQuoteSlugFromBusinessName } from "@/lib/quote-requests/slug";
+import { buildPublicQuoteUrl } from "@/lib/quote-link-share";
 import { normalizeAdditionalTrades } from "@/lib/quote-requests/trade";
 import { ContractorTradesServicesFields } from "@/components/contractor/contractor-trades-services-fields";
 import { updateQuoteRequestSettings } from "./actions";
@@ -87,9 +88,7 @@ export function QuoteRequestSettingsForm({
     }
   }
 
-  const publicUrl = quoteSlug.trim()
-    ? `${appOrigin.replace(/\/$/, "")}/quote/${quoteSlug.trim().toLowerCase()}`
-    : null;
+  const publicUrl = buildPublicQuoteUrl(appOrigin, quoteSlug);
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6 rounded-xl border border-zinc-200 bg-white p-5">

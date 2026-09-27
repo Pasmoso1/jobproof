@@ -39,6 +39,9 @@ import { QuoteRequestDashboardAlerts } from "@/components/quote-request-response
 import { trackContractorMilestoneSafe } from "@/lib/contractor-milestones";
 import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
 import { syncSubscriptionAfterStripeReturn } from "@/app/(app)/settings/billing/actions";
+import { GetMoreWorkCard } from "@/components/dashboard/get-more-work-card";
+import { buildPublicQuoteUrl } from "@/lib/quote-link-share";
+import { resolveAppUrl } from "@/lib/stripe";
 
 function formatStorage(bytes: number): string {
   return formatStorageBytes(bytes);
@@ -117,6 +120,7 @@ export default async function DashboardPage({
   ]);
 
   const hasNoJobs = jobs.length === 0;
+  const quoteUrl = buildPublicQuoteUrl(resolveAppUrl(), profile?.quote_slug);
   const showOnboardingProgress =
     !hasNoJobs && profile?.id && !isOnboardingProgressComplete(onboardingProgress);
 
@@ -183,6 +187,12 @@ export default async function DashboardPage({
           {access.freeBetaHelperCopy}
         </div>
       ) : null}
+
+      <GetMoreWorkCard
+        quoteUrl={quoteUrl}
+        businessName={profile?.business_name ? String(profile.business_name) : null}
+        variant={hasNoJobs ? "prominent" : "compact"}
+      />
 
       {hasNoJobs ? <DashboardEmptyOnboarding /> : null}
 

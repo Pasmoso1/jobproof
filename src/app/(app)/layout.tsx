@@ -8,6 +8,8 @@ import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
 import { getFeedbackMailtoHref } from "@/lib/onboarding-feedback";
 import { SignupVerifiedPendingBridge } from "@/components/contractor-onboarding-analytics";
+import { AppMobileNav } from "@/components/app-mobile-nav";
+import { getAppNavLinks } from "@/lib/app-nav";
 
 export default async function AppLayout({
   children,
@@ -75,74 +77,49 @@ export default async function AppLayout({
     }
   }
 
+  const navLinks = getAppNavLinks({ showPartnerPortal });
+  const feedbackHref = getFeedbackMailtoHref();
+
   return (
     <div className="min-h-screen bg-zinc-50">
       <SignupVerifiedPendingBridge />
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link href="/dashboard" className="flex items-center gap-2">
+      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex min-h-14 max-w-6xl items-center justify-between gap-3 px-4 py-2 sm:px-6">
+          <Link href="/dashboard" className="flex shrink-0 items-center gap-2">
             <JobProofLogo className="h-8 w-auto" />
           </Link>
-          <nav className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/collections"
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
-            >
-              Collections
-            </Link>
-            <Link
-              href="/estimates"
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
-            >
-              Estimates
-            </Link>
-            <QuoteRequestsNavLink newCount={newQuoteRequestCount} />
-            <Link
-              href="/jobs/create"
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
-            >
-              Create Job
-            </Link>
-            <Link
-              href="/settings/business"
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
-            >
-              Settings
-            </Link>
-            <Link
-              href="/settings/billing"
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
-            >
-              Billing
-            </Link>
-            <Link
-              href="/support"
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
-            >
-              Support
-            </Link>
-            {showPartnerPortal ? (
-              <Link
-                href="/partner"
-                className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
-              >
-                Partner Portal
-              </Link>
-            ) : null}
+          <nav
+            aria-label="Main"
+            className="hidden flex-wrap items-center justify-end gap-x-4 gap-y-2 lg:flex"
+          >
+            {navLinks.map((link) =>
+              link.key === "quote-requests" ? (
+                <QuoteRequestsNavLink key={link.key} newCount={newQuoteRequestCount} />
+              ) : (
+                <Link
+                  key={link.key}
+                  href={link.href}
+                  className="text-sm font-medium text-zinc-700 hover:text-zinc-900"
+                >
+                  {link.label}
+                </Link>
+              )
+            )}
             <a
-              href={getFeedbackMailtoHref()}
+              href={feedbackHref}
               className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
             >
               Send feedback
             </a>
             <LogoutButton />
           </nav>
+          <div className="lg:hidden">
+            <AppMobileNav
+              showPartnerPortal={showPartnerPortal}
+              newQuoteRequestCount={newQuoteRequestCount}
+              feedbackHref={feedbackHref}
+            />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
