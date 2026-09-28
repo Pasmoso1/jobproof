@@ -37,6 +37,7 @@ import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
 import { normalizeCanadianProvince } from "@/lib/canada/provinces";
 import { normalizeCanadianPostalCode } from "@/lib/canada/postal-code";
 import { normalizeCanadianPhoneForStorage } from "@/lib/canada/phone";
+import { ensureQuoteSlugForProfile } from "@/lib/quote-requests/slug-allocation";
 import {
   formatDateEastern,
   formatLocalDateStringEastern,
@@ -211,7 +212,7 @@ export async function updateProfileBusinessInfo(formData: FormData) {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, quote_primary_trade, quote_additional_trades, plan_tier, trial_plan_tier, beta_tester, beta_plan_tier, stripe_subscription_id, stripe_customer_id, subscription_status, trial_started_at, trial_ends_at, trial_email_welcome_sent_at, trial_email_started_sent_at, business_name, phone, address_line_1, city, province, postal_code"
+      "id, quote_slug, quote_primary_trade, quote_additional_trades, plan_tier, trial_plan_tier, beta_tester, beta_plan_tier, stripe_subscription_id, stripe_customer_id, subscription_status, trial_started_at, trial_ends_at, trial_email_welcome_sent_at, trial_email_started_sent_at, business_name, phone, address_line_1, city, province, postal_code"
     )
     .eq("user_id", user.id)
     .single();
@@ -451,6 +452,15 @@ export async function updateProfileBusinessInfo(formData: FormData) {
     );
   } catch (err) {
     console.error("[updateProfileBusinessInfo] trial start", err);
+  }
+
+  if (!profile.quote_slug) {
+    await ensureQuoteSlugForProfile(supabase, {
+      profileId: String(profile.id),
+      currentSlug: profile.quote_slug,
+      businessName,
+    });
+    revalidatePath("/settings/quote-requests");
   }
 
   revalidatePath("/settings/business");

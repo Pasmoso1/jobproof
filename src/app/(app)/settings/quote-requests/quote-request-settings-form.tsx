@@ -105,8 +105,12 @@ export function QuoteRequestSettingsForm({
 
       <div>
         <label className="block text-sm font-medium text-zinc-800">
-          Quote page URL
-          <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+          Your quote request link
+          <span className="mt-0.5 block text-xs font-normal text-zinc-600">
+            Share this link with customers so they can tell you about the work they need and
+            request a quote.
+          </span>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
             <div className="flex min-w-0 flex-1 items-center rounded-lg border border-zinc-300 bg-white">
               <span className="shrink-0 pl-3 text-sm text-zinc-500">/quote/</span>
               <input
@@ -131,11 +135,17 @@ export function QuoteRequestSettingsForm({
           <p className="mt-1 text-xs text-red-600">{fieldErrors.quoteSlug}</p>
         ) : null}
         {publicUrl ? (
-          <p className="mt-2 text-xs text-zinc-600">
-            Public link:{" "}
+          <p className="mt-2 break-all text-xs text-zinc-600">
+            Your link:{" "}
             <a href={publicUrl} className="font-medium text-[#2436BB] hover:underline" target="_blank" rel="noreferrer">
               {publicUrl}
             </a>
+          </p>
+        ) : null}
+        {profile?.quote_slug ? (
+          <p className="mt-1 text-xs text-zinc-500">
+            You can customize the end of your link. Links you&apos;ve already shared stop working if
+            you change it.
           </p>
         ) : null}
       </div>

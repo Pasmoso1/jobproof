@@ -75,8 +75,8 @@ export async function updateQuoteRequestSettings(
     if (taken?.id) {
       return {
         success: false,
-        error: "This quote page URL is already taken. Choose a different one.",
-        fieldErrors: { quoteSlug: "This URL is already in use." },
+        error: "This quote request link is already taken. Choose a different one.",
+        fieldErrors: { quoteSlug: "This link is already in use." },
       };
     }
   } else if (!profile.quote_slug) {
@@ -90,8 +90,8 @@ export async function updateQuoteRequestSettings(
     if (taken?.id) {
       return {
         success: false,
-        error: "This quote page URL is already taken. Choose a different one.",
-        fieldErrors: { quoteSlug: "This URL is already in use." },
+        error: "This quote request link is already taken. Choose a different one.",
+        fieldErrors: { quoteSlug: "This link is already in use." },
       };
     }
   }
@@ -117,8 +117,8 @@ export async function updateQuoteRequestSettings(
     if (error.code === "23505") {
       return {
         success: false,
-        error: "This quote page URL is already taken.",
-        fieldErrors: { quoteSlug: "This URL is already in use." },
+        error: "This quote request link is already taken.",
+        fieldErrors: { quoteSlug: "This link is already in use." },
       };
     }
     return { success: false, error: "Could not save settings. Please try again." };

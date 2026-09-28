@@ -41,6 +41,10 @@ import { PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
 import { syncSubscriptionAfterStripeReturn } from "@/app/(app)/settings/billing/actions";
 import { GetMoreWorkCard } from "@/components/dashboard/get-more-work-card";
 import { buildPublicQuoteUrl } from "@/lib/quote-link-share";
+import {
+  ensureQuoteSlugForProfile,
+  quoteSlugFromEnsureResult,
+} from "@/lib/quote-requests/slug-allocation";
 import { resolveAppUrl } from "@/lib/stripe";
 
 function formatStorage(bytes: number): string {
@@ -120,7 +124,17 @@ export default async function DashboardPage({
   ]);
 
   const hasNoJobs = jobs.length === 0;
-  const quoteUrl = buildPublicQuoteUrl(resolveAppUrl(), profile?.quote_slug);
+  const quoteSlug =
+    profile?.id && !profile.quote_slug
+      ? quoteSlugFromEnsureResult(
+          await ensureQuoteSlugForProfile(supabase, {
+            profileId: String(profile.id),
+            currentSlug: profile.quote_slug,
+            businessName: profile.business_name,
+          })
+        )
+      : (profile?.quote_slug ?? null);
+  const quoteUrl = buildPublicQuoteUrl(resolveAppUrl(), quoteSlug);
   const showOnboardingProgress =
     !hasNoJobs && profile?.id && !isOnboardingProgressComplete(onboardingProgress);
 

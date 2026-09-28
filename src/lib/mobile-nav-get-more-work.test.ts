@@ -187,10 +187,8 @@ describe("F. send quote link uses the contractor URL", () => {
   });
 
   it("dashboard derives the URL from the profile slug and app origin", () => {
-    assert.match(
-      dashboardSource,
-      /buildPublicQuoteUrl\(resolveAppUrl\(\), profile\?\.quote_slug\)/
-    );
+    assert.match(dashboardSource, /buildPublicQuoteUrl\(resolveAppUrl\(\), quoteSlug\)/);
+    assert.match(dashboardSource, /: \(profile\?\.quote_slug \?\? null\)/);
     assert.match(settingsFormSource, /buildPublicQuoteUrl\(appOrigin, quoteSlug\)/);
   });
 

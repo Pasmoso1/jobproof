@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPlanEntitlements } from "@/lib/plan-entitlements";
 import { resolveAppUrl } from "@/lib/stripe";
+import {
+  ensureQuoteSlugForProfile,
+  quoteSlugFromEnsureResult,
+} from "@/lib/quote-requests/slug-allocation";
 import { QuoteRequestSettingsForm } from "./quote-request-settings-form";
 
 export const dynamic = "force-dynamic";
@@ -14,13 +18,27 @@ export default async function QuoteRequestSettingsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/settings/quote-requests");
 
-  const { data: profile } = await supabase
+  const { data: loadedProfile } = await supabase
     .from("profiles")
     .select(
-      "quote_slug, business_name, phone, quote_logo_url, quote_pricing_profile, quote_primary_trade, quote_primary_trade_other, quote_additional_trades, contractor_extra_capabilities, plan_tier, beta_tester, beta_plan_tier"
+      "id, quote_slug, business_name, phone, quote_logo_url, quote_pricing_profile, quote_primary_trade, quote_primary_trade_other, quote_additional_trades, contractor_extra_capabilities, plan_tier, beta_tester, beta_plan_tier"
     )
     .eq("user_id", user.id)
     .single();
+
+  const profile =
+    loadedProfile?.id && !loadedProfile.quote_slug
+      ? {
+          ...loadedProfile,
+          quote_slug: quoteSlugFromEnsureResult(
+            await ensureQuoteSlugForProfile(supabase, {
+              profileId: String(loadedProfile.id),
+              currentSlug: loadedProfile.quote_slug,
+              businessName: loadedProfile.business_name,
+            })
+          ),
+        }
+      : loadedProfile;
 
   const appOrigin = resolveAppUrl();
   const entitlements = getPlanEntitlements(profile);
