@@ -436,7 +436,7 @@ export async function updateProfileBusinessInfo(formData: FormData) {
       tradeUpdates.quote_primary_trade !== undefined
         ? tradeUpdates.quote_primary_trade
         : profile.quote_primary_trade;
-    await maybeStartManagedTrial(
+    const trialStarted = await maybeStartManagedTrial(
       supabase,
       {
         ...profile,
@@ -450,6 +450,13 @@ export async function updateProfileBusinessInfo(formData: FormData) {
       },
       accountEmail
     );
+    if (trialStarted) {
+      const { markTrialStartedAnalyticsPending } = await import(
+        "@/lib/ga4-trial-started-server"
+      );
+      const { resolveTrialPlanTier } = await import("@/lib/trial-lifecycle");
+      await markTrialStartedAnalyticsPending(resolveTrialPlanTier(profile));
+    }
   } catch (err) {
     console.error("[updateProfileBusinessInfo] trial start", err);
   }

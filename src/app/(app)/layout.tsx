@@ -7,7 +7,10 @@ import { getNewQuoteRequestCount } from "@/lib/quote-requests/response-alerts";
 import { redirect } from "next/navigation";
 import { LogoutButton } from "./logout-button";
 import { getFeedbackMailtoHref } from "@/lib/onboarding-feedback";
-import { SignupVerifiedPendingBridge } from "@/components/contractor-onboarding-analytics";
+import {
+  SignupVerifiedPendingBridge,
+  TrialStartedPendingBridge,
+} from "@/components/contractor-onboarding-analytics";
 import { AppMobileNav } from "@/components/app-mobile-nav";
 import { getAppNavLinks } from "@/lib/app-nav";
 
@@ -83,6 +86,7 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen bg-zinc-50">
       <SignupVerifiedPendingBridge />
+      <TrialStartedPendingBridge />
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex min-h-14 max-w-6xl items-center justify-between gap-3 px-4 py-2 sm:px-6">
           <Link href="/dashboard" className="flex shrink-0 items-center gap-2">

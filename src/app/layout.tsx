@@ -19,7 +19,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "JobProof",
-  description: "From first inquiry to signed quote. JobProof helps contractors manage quoting in one place.",
+  description:
+    "JobProof helps Canadian contractors turn customer inquiries into professional quotes, win more jobs, and keep every job organized.",
 };
 
 export default function RootLayout({

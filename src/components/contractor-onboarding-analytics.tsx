@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import {
   GA4_FUNNEL_EVENTS,
   buildAcquisitionContext,
@@ -8,7 +9,10 @@ import {
 } from "@/lib/ga4";
 import { readFirstTouchClient } from "@/lib/attribution-first-touch";
 import { readPartnerRefClient } from "@/lib/partners/partner-ref-cookie";
-import { consumeSignupVerifiedPendingAndTrack } from "@/lib/signup-funnel-analytics";
+import {
+  consumeSignupVerifiedPendingAndTrack,
+  consumeTrialStartedPendingAndTrack,
+} from "@/lib/signup-funnel-analytics";
 
 /**
  * Consumes auth-callback signup_verified pending marker (preferred),
@@ -45,6 +49,19 @@ export function SignupVerifiedPendingBridge() {
   useEffect(() => {
     consumeSignupVerifiedPendingAndTrack();
   }, []);
+  return null;
+}
+
+/**
+ * The app layout stays mounted across client navigations, so re-check on every
+ * pathname change: the marker is set by the onboarding server action right
+ * before router.push("/dashboard").
+ */
+export function TrialStartedPendingBridge() {
+  const pathname = usePathname();
+  useEffect(() => {
+    consumeTrialStartedPendingAndTrack();
+  }, [pathname]);
   return null;
 }
 

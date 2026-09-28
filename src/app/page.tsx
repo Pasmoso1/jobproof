@@ -4,7 +4,10 @@ import { JobProofLogo } from "@/components/jobproof-logo";
 import {
   ContractorAcquisitionCtaLink,
   ContractorLandingViewTracker,
+  SampleQuoteCtaLink,
 } from "@/components/contractor-funnel-trackers";
+import { LandingIcon, type LandingIconName } from "@/components/landing/landing-icon";
+import { ProductJourneyPreviews } from "@/components/landing/product-previews";
 import { getPublicPlanPriceLine } from "@/lib/billing-plan-display";
 import {
   formatActiveJobLimit,
@@ -15,11 +18,12 @@ import {
   formatStorageAllowance,
   PLAN_ENTITLEMENTS,
 } from "@/lib/plan-entitlements";
+import { SAMPLE_QUOTE_PATH } from "@/lib/sample-quote";
 
 export const metadata: Metadata = {
-  title: "JobProof — From first inquiry to signed quote",
+  title: "JobProof | Quoting Software That Helps Canadian Contractors Win More Jobs",
   description:
-    "JobProof helps contractors go from the first customer message to a signed quote—organized, professional, and all in one place.",
+    "Turn customer inquiries into professional quotes and win more of the jobs you quote. Quoting and job management for Canadian contractors. Try it free for 14 days.",
 };
 
 const SOLO_PRICE_LINE = getPublicPlanPriceLine("essential", "standard");
@@ -79,31 +83,152 @@ const COMPARISON_ROWS: Array<{
   { feature: "Future Pro Business Features", solo: "—", pro: "✓" },
 ];
 
-function TrialCta({
-  centered = false,
-  label = "Start Your 14-Day Free Trial",
-  ctaLocation = "hero",
-}: {
-  centered?: boolean;
-  label?: string;
-  ctaLocation?: string;
-}) {
-  return (
-    <div className={centered ? "flex flex-col items-center" : undefined}>
-      <ContractorAcquisitionCtaLink
-        href="/signup"
-        ctaText={label}
-        ctaLocation={ctaLocation}
-        className="inline-flex w-full items-center justify-center rounded-xl bg-[#2436BB] px-8 py-4 text-base font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
-      >
-        {label}
-      </ContractorAcquisitionCtaLink>
-      <p className={`mt-3 max-w-sm text-sm leading-relaxed text-zinc-500 ${centered ? "text-center" : ""}`}>
-        No credit card required. Cancel anytime during your trial.
-      </p>
-    </div>
-  );
-}
+const TRIAL_NOTE = "No credit card required. Cancel anytime during your trial.";
+
+const BRAND_PROMISE: Array<{ icon: LandingIconName; label: string }> = [
+  { icon: "trophy", label: "Win More Jobs." },
+  { icon: "receipt", label: "Get Paid." },
+  { icon: "shield", label: "Stay Protected." },
+];
+
+const BEFORE_AFTER = [
+  {
+    before: "Requests pile up in texts, calls and email until you find a free minute.",
+    after: "Every request lands in one place with the details you need to reply.",
+  },
+  {
+    before: "You show up to the site visit missing half the details.",
+    after: "Customer photos, follow-up answers and a Project Brief before you arrive.",
+  },
+  {
+    before: "A price typed into a text message, or a basic PDF.",
+    after: "A professional proposal customers can open, review and accept online.",
+  },
+  {
+    before: "No easy way to see which quotes are still waiting on an answer.",
+    after: "See where every quote stands and who needs a follow-up.",
+  },
+  {
+    before: "A verbal \"yeah, go ahead\" with nothing to show for it.",
+    after: "Customer-approved quotes, digital contracts and change orders.",
+  },
+  {
+    before: "Photos, notes and paperwork scattered across your phone.",
+    after: "One organized record for every job, from the first message onward.",
+  },
+] as const;
+
+const OUTCOMES: Array<{ icon: LandingIconName; title: string; body: string }> = [
+  {
+    icon: "trophy",
+    title: "Win more jobs",
+    body: "Give customers more reasons to choose you over the next quote.",
+  },
+  {
+    icon: "message",
+    title: "Respond more professionally",
+    body: "Reply with the job details in front of you, not buried in your texts.",
+  },
+  {
+    icon: "document",
+    title: "Make quoting easier",
+    body: "Your notes, photos and customer answers are already there when you build the quote.",
+  },
+  {
+    icon: "clock",
+    title: "Follow up consistently",
+    body: "See which requests need a response and which quotes are still waiting.",
+  },
+  {
+    icon: "users",
+    title: "Give customers a better experience",
+    body: "A quote they can open on their phone, ask about and accept online.",
+  },
+];
+
+const WORKFLOW_STEPS: Array<{ icon: LandingIconName; title: string; body: string }> = [
+  {
+    icon: "inbox",
+    title: "Customer requests a quote",
+    body: "They share what they need, where the job is, and photos.",
+  },
+  {
+    icon: "clipboard",
+    title: "JobProof collects the information",
+    body: "Smart follow-up questions fill in the details you'd normally chase.",
+  },
+  {
+    icon: "home",
+    title: "Prepare for the site visit",
+    body: "A Project Brief and checklist show what to look at and measure.",
+  },
+  {
+    icon: "document",
+    title: "Build the quote",
+    body: "Turn your site notes into a clear proposal you review before sending.",
+  },
+  {
+    icon: "send",
+    title: "Customer receives a professional proposal",
+    body: "They open it on any phone or computer. No PDF lost in email.",
+  },
+  {
+    icon: "pen",
+    title: "Customer approves",
+    body: "They accept online, and you can send a digital contract to sign.",
+  },
+  {
+    icon: "checkCircle",
+    title: "Start the job with a clear record",
+    body: "What was agreed is saved with the job, ready when you need it.",
+  },
+];
+
+const CUSTOMER_ACTIONS = [
+  "Review the scope and price",
+  "Ask a question",
+  "Request changes",
+  "Accept online",
+] as const;
+
+const AFTER_WIN_CARDS: Array<{ icon: LandingIconName; title: string; body: string }> = [
+  {
+    icon: "pen",
+    title: "Digital contracts",
+    body: "Contracts customers can read and sign on a phone or computer, saved with the job.",
+  },
+  {
+    icon: "swap",
+    title: "Customer-approved change orders",
+    body: "When the work changes, the customer reviews and approves the change before extra work starts.",
+  },
+  {
+    icon: "receipt",
+    title: "Invoices and reminders",
+    body: "Send invoices customers can view online, with payment reminders you can automate.",
+  },
+  {
+    icon: "camera",
+    title: "Site visit records",
+    body: "Notes, photos and voice notes from the visit stay with the job, not lost on your phone.",
+  },
+  {
+    icon: "message",
+    title: "Customer questions and approvals",
+    body: "Questions, change requests and approvals stay attached to the quote and the job.",
+  },
+  {
+    icon: "folder",
+    title: "One organized job history",
+    body: "Photos, paperwork and key steps in one place, easy to find when you need them.",
+  },
+];
+
+const primaryCtaClassName =
+  "inline-flex w-full items-center justify-center rounded-xl bg-[#2436BB] px-8 py-4 text-base font-semibold text-white shadow-sm transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto";
+
+const secondaryCtaClassName =
+  "inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-6 py-3.5 text-base font-semibold text-[#2436BB] transition-colors hover:bg-[#2436BB]/5 focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto";
 
 function PlanFeatureList({ items }: { items: readonly string[] }) {
   return (
@@ -140,162 +265,15 @@ function SectionHeading({
         {title}
       </h2>
       {lead ? (
-        <p className="mt-4 text-lg leading-relaxed text-zinc-600 sm:text-xl">{lead}</p>
+        <p className="mt-4 text-base leading-relaxed text-zinc-600 sm:text-xl">{lead}</p>
       ) : null}
     </div>
   );
 }
 
-const WHY_OUTCOMES = [
-  {
-    title: "Win more jobs",
-    body: "When every lead is written down and followed up, fewer good jobs fall through the cracks.",
-  },
-  {
-    title: "Save hours every week",
-    body: "Stop digging through texts, emails, and camera rolls. Photos, notes, and customer answers stay with the quote.",
-  },
-  {
-    title: "Look more professional",
-    body: "Send clear proposals that make customers feel confident they hired the right contractor.",
-  },
-  {
-    title: "Keep every quote organized",
-    body: "One place for each customer—from the first message to the yes—instead of notes and apps everywhere.",
-  },
-  {
-    title: "Never lose important information",
-    body: "Photos, site visit notes, and customer answers stay with the job, not lost on your phone.",
-  },
-  {
-    title: "Keep jobs moving",
-    body: "See where each quote stands so nothing sits between the site visit and the signed yes.",
-  },
-] as const;
-
-const WORKFLOW_STEPS = [
-  {
-    title: "Customer requests a quote",
-    body: "A new request comes in with the basics—who they are, what they need, and where the work is.",
-  },
-  {
-    title: "Collect the right information",
-    body: "Follow-up questions and customer photos help you understand the job before you show up.",
-  },
-  {
-    title: "Prepare for the site visit",
-    body: "Walk in knowing what to look for, what to measure, and what still needs checking.",
-  },
-  {
-    title: "Build a professional quote",
-    body: "Turn your site notes and job details into a clear proposal you can review before you send it.",
-  },
-  {
-    title: "Send a proposal customers can review online",
-    body: "Customers get a clean quote they can open on any phone or computer—no PDF lost in email.",
-  },
-  {
-    title: "Customer signs",
-    body: "They can accept online when they're ready, so you're not waiting on a callback to know where you stand.",
-  },
-  {
-    title: "Ready to start the job",
-    body: "Once they accept, you can move ahead with a clear record of what was agreed.",
-  },
-] as const;
-
-const ORGANIZED_ITEMS = [
-  {
-    title: "Customer information",
-    body: "Names, phone numbers, and addresses in one place—not copied between apps.",
-  },
-  {
-    title: "Photos",
-    body: "Customer photos and your site photos stay with the quote request.",
-  },
-  {
-    title: "Site visit notes",
-    body: "Write down what you saw on site while it's still fresh.",
-  },
-  {
-    title: "Voice notes",
-    body: "Talk through what you notice during the walk-through instead of trying to remember later.",
-  },
-  {
-    title: "Quote preparation",
-    body: "Put the proposal together and tidy it up before it goes out.",
-  },
-  {
-    title: "Professional proposals",
-    body: "Show what's included, the price, and the terms in a way customers can actually follow.",
-  },
-  {
-    title: "Customer questions and approvals",
-    body: "Questions, change requests, and the final yes—all tied to the same quote.",
-  },
-  {
-    title: "Project history",
-    body: "A clear record of what happened and when, from the first message onward.",
-  },
-] as const;
-
-const PROTECTION_CARDS = [
-  {
-    title: "Customer-approved change orders",
-    body: "When the work changes, send a clear change order the customer can review and approve before any extra work starts—so you're both on the same page.",
-  },
-  {
-    title: "Digital contracts",
-    body: "Contracts can be read and signed on a phone or computer, then stay with the job so you always know what was agreed.",
-  },
-  {
-    title: "All your job details in one place",
-    body: "Keep photos, notes, approvals, and key job details together in one place—easy to find when you need them later.",
-  },
-  {
-    title: "Site visit records",
-    body: "Take notes, photos, and voice recordings during the visit so important details don't get lost on the drive home.",
-  },
-  {
-    title: "Customer questions and approvals",
-    body: "Keep customer questions, change requests, and approvals with the job—where you can find them when you need them.",
-  },
-  {
-    title: "Organized project timeline",
-    body: "Every key step—from the first message through the signed quote—stays in one place so you can see how the job moved forward.",
-  },
-] as const;
-
-const SWITCH_COMPARISON = [
-  {
-    before: "Customer details buried in text threads and half-finished notes.",
-    after: "One customer record for every inquiry and quote.",
-  },
-  {
-    before: "Scratch paper and memory after a site visit.",
-    after: "Clear site visit notes, photos, and voice recordings.",
-  },
-  {
-    before: "Verbal \"yeah, go ahead\" with nothing to show for it.",
-    after: "Change orders customers review and approve online.",
-  },
-  {
-    before: "A basic quote emailed as a PDF—or typed into a message.",
-    after: "Professional proposals customers can open, review, and accept.",
-  },
-  {
-    before: "Scrolling through camera rolls looking for the right photo.",
-    after: "Photos and files kept with the job history.",
-  },
-  {
-    before: "Juggling notebooks, texts, email, and a few other apps.",
-    after: "One place from first inquiry to signed quote.",
-  },
-] as const;
-
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white font-sans text-zinc-900">
+    <div className="min-h-screen overflow-x-clip bg-white font-sans text-zinc-900">
       <ContractorLandingViewTracker />
       <header className="border-b border-zinc-200 bg-white px-6 py-4 sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
@@ -322,91 +300,247 @@ export default function Home() {
       </header>
 
       <main>
-        {/* Hero */}
-        <section className="border-b border-zinc-200 bg-gradient-to-b from-zinc-50 to-white px-6 py-16 sm:px-8 sm:py-24">
+        {/* 1. Hero: win more jobs */}
+        <section className="border-b border-zinc-200 bg-gradient-to-b from-zinc-50 to-white px-6 py-10 sm:px-8 sm:py-20">
           <div className="mx-auto max-w-4xl text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#2436BB]">
-              Built for contractors
+              Built for Canadian contractors
             </p>
             <h1 className="mt-4 text-4xl font-bold tracking-tight text-zinc-950 sm:text-5xl lg:text-6xl lg:leading-[1.08]">
-              From first inquiry to signed quote.
+              Win more of the jobs you quote.
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-zinc-600 sm:text-xl">
-              You know how it goes. A customer texts about a job. You reply from the truck. By the
-              time you sit down to write the quote, you&apos;re digging through messages trying to
-              remember what they said. The photos are somewhere in your camera roll. Details get
-              lost.
+            <p className="mx-auto mt-5 max-w-2xl text-lg font-medium leading-relaxed text-zinc-800 sm:text-2xl">
+              Turn customer inquiries into professional quotes—and professional quotes into paying
+              jobs.
             </p>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-zinc-500">
-              JobProof keeps every request in one place—from that first message to a signed
-              quote—so you look more professional, stay organized, and win more of the work you
-              quote.
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-zinc-600 sm:text-lg">
+              JobProof gives you one place to capture customer requests, prepare professional
+              quotes, follow up, get approval, and keep the job organized from the first message
+              onward.
             </p>
-            <div className="mt-10">
-              <TrialCta centered ctaLocation="hero" />
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
+              <ContractorAcquisitionCtaLink
+                href="/signup"
+                ctaText="Start Your 14-Day Free Trial"
+                ctaLocation="hero"
+                className={primaryCtaClassName}
+              >
+                Start Your 14-Day Free Trial
+              </ContractorAcquisitionCtaLink>
+              <p className="text-sm leading-relaxed text-zinc-500 sm:hidden">{TRIAL_NOTE}</p>
+              <SampleQuoteCtaLink
+                href={SAMPLE_QUOTE_PATH}
+                ctaText="See a Sample Quote"
+                ctaLocation="hero"
+                className={secondaryCtaClassName}
+              >
+                See a Sample Quote <span aria-hidden>→</span>
+              </SampleQuoteCtaLink>
+            </div>
+            <p className="mt-3 hidden text-sm leading-relaxed text-zinc-500 sm:block">
+              {TRIAL_NOTE}
+            </p>
+            <ul
+              aria-label="The JobProof promise"
+              className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-semibold text-zinc-800 sm:text-base"
+            >
+              {BRAND_PROMISE.map((item) => (
+                <li key={item.label} className="flex items-center gap-1.5">
+                  <LandingIcon name={item.icon} className="h-5 w-5 text-[#2436BB]" />
+                  {item.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* 2. The contractor problem: why good leads get lost */}
+        <section className="border-b border-zinc-200 px-6 py-14 sm:px-8 sm:py-20">
+          <div className="mx-auto max-w-5xl">
+            <SectionHeading
+              eyebrow="Why jobs slip away"
+              title="Good jobs get lost between the first message and the quote."
+              lead="A customer texts about a job. You reply from the truck. By the time you sit down to write the quote, the details are buried in messages, the photos are somewhere in your camera roll, and the customer is still waiting."
+            />
+            <div className="mt-10 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm sm:mt-12">
+              <div className="grid grid-cols-2 border-b border-zinc-200 bg-zinc-50">
+                <div className="border-r border-zinc-200 px-4 py-4 sm:px-6">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 sm:text-base sm:normal-case sm:tracking-normal">
+                    Before JobProof
+                  </h3>
+                </div>
+                <div className="px-4 py-4 sm:px-6">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[#2436BB] sm:text-base sm:normal-case sm:tracking-normal">
+                    With JobProof
+                  </h3>
+                </div>
+              </div>
+              <ul className="divide-y divide-zinc-100">
+                {BEFORE_AFTER.map((row) => (
+                  <li key={row.before} className="grid grid-cols-2">
+                    <p className="border-r border-zinc-100 px-4 py-4 text-sm leading-6 text-zinc-600 sm:px-6 sm:text-[15px]">
+                      {row.before}
+                    </p>
+                    <p className="px-4 py-4 text-sm leading-6 font-medium text-zinc-900 sm:px-6 sm:text-[15px]">
+                      {row.after}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>
 
-        {/* Section 1 — Why contractors choose JobProof */}
-        <section className="border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20">
+        {/* 3. Product demonstration */}
+        <section
+          id="see-it"
+          className="border-b border-zinc-200 bg-zinc-50/60 px-6 py-14 sm:px-8 sm:py-20"
+        >
           <div className="mx-auto max-w-6xl">
             <SectionHeading
-              title="Why contractors choose JobProof"
-              lead="You didn't start this business to chase paperwork. JobProof helps you run quotes the way you already work—just without the mess."
+              eyebrow="See it in action"
+              title="Show customers you're ready for the job."
+              lead="A professional quote does more than show a price. It shows customers they're dealing with an organized, professional contractor."
             />
-            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {WHY_OUTCOMES.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
-                >
-                  <h3 className="text-lg font-semibold text-zinc-950">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-zinc-600 sm:text-[15px]">
-                    {item.body}
-                  </p>
-                </div>
-              ))}
+            <div className="mt-10 sm:mt-12">
+              <ProductJourneyPreviews />
+            </div>
+
+            <div className="mt-14">
+              <h3 className="text-center text-lg font-semibold text-zinc-950 sm:text-xl">
+                What that means for your business
+              </h3>
+              <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {OUTCOMES.map((item) => (
+                  <li
+                    key={item.title}
+                    className="flex gap-3 rounded-xl border border-zinc-200 bg-white p-4 lg:flex-col"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#2436BB]/10 text-[#2436BB]">
+                      <LandingIcon name={item.icon} />
+                    </span>
+                    <div>
+                      <p className="font-semibold text-zinc-950">{item.title}</p>
+                      <p className="mt-1 text-sm leading-6 text-zinc-600">{item.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mt-10 flex justify-center">
+              <SampleQuoteCtaLink
+                href={SAMPLE_QUOTE_PATH}
+                ctaText="See a Sample Quote"
+                ctaLocation="product_demo"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#2436BB]/30 bg-white px-6 py-3.5 text-base font-semibold text-[#2436BB] transition-colors hover:bg-[#2436BB]/5 focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
+              >
+                See a Sample Quote <span aria-hidden>→</span>
+              </SampleQuoteCtaLink>
             </div>
           </div>
         </section>
 
-        {/* Section 2 — How JobProof Works */}
-        <section className="border-b border-zinc-200 bg-zinc-50/60 px-6 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-3xl">
+        {/* 4. How JobProof works */}
+        <section className="border-b border-zinc-200 px-6 py-14 sm:px-8 sm:py-20">
+          <div className="mx-auto max-w-6xl">
             <SectionHeading
               eyebrow="How it works"
               title="How JobProof Works"
-              lead="No complicated setup. Just a clear path that matches how jobs actually start."
+              lead="Built for how you actually work: on your phone, at the job site, from the first message to the signed yes."
             />
-            <ol className="mt-12 space-y-0">
+            <ol className="mt-10 grid gap-3 sm:mt-12 sm:grid-cols-2 lg:grid-cols-4">
               {WORKFLOW_STEPS.map((step, index) => (
-                <li key={step.title}>
-                  <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-5 sm:px-6">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-[#2436BB]">
-                      Step {index + 1}
-                    </p>
-                    <h3 className="mt-1 text-lg font-semibold text-zinc-950">{step.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-zinc-600 sm:text-[15px]">
-                      {step.body}
-                    </p>
+                <li
+                  key={step.title}
+                  className="flex gap-4 rounded-xl border border-zinc-200 bg-white p-4 sm:p-5"
+                >
+                  <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#2436BB]/10 text-[#2436BB]">
+                    <LandingIcon name={step.icon} />
+                    <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#2436BB] text-[11px] font-bold text-white">
+                      {index + 1}
+                    </span>
+                  </span>
+                  <div>
+                    <h3 className="font-semibold leading-snug text-zinc-950">{step.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-zinc-600">{step.body}</p>
                   </div>
-                  {index < WORKFLOW_STEPS.length - 1 ? (
-                    <p
-                      className="py-3 text-center text-2xl font-light text-zinc-300"
-                      aria-hidden
-                    >
-                      ↓
-                    </p>
-                  ) : null}
                 </li>
               ))}
             </ol>
           </div>
         </section>
 
-        {/* Pricing */}
-        <section id="pricing" className="border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20">
+        {/* 5. Customer-facing experience / sample quote */}
+        <section className="border-b border-zinc-200 bg-zinc-50/60 px-6 py-14 sm:px-8 sm:py-20">
+          <div className="mx-auto max-w-3xl">
+            <SectionHeading
+              eyebrow="Your customer's experience"
+              title="A quote your customers can say yes to."
+              lead="How you send a quote says a lot about how you'll run the job. Customers get a clean proposal they can open on their phone or computer, without a messy email thread or a PDF lost in their downloads."
+            />
+            <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {CUSTOMER_ACTIONS.map((item) => (
+                <li
+                  key={item}
+                  className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm font-medium text-zinc-800"
+                >
+                  <LandingIcon name="checkCircle" className="h-4 w-4 shrink-0 text-[#2436BB]" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-10 rounded-2xl border border-zinc-200 bg-white p-6 text-center shadow-sm sm:p-8">
+              <p className="text-lg font-semibold text-zinc-950">See exactly what your customers see.</p>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-zinc-600 sm:text-base">
+                Open a sample quote, try the Accept button, and see the experience from your
+                customer&apos;s side. It&apos;s a demo, so nothing is sent.
+              </p>
+              <SampleQuoteCtaLink
+                href={SAMPLE_QUOTE_PATH}
+                ctaText="See a Sample Quote"
+                ctaLocation="customer_experience"
+                className="mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#2436BB]/30 bg-white px-6 py-3.5 text-base font-semibold text-[#2436BB] transition-colors hover:bg-[#2436BB]/5 focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
+              >
+                See a Sample Quote <span aria-hidden>→</span>
+              </SampleQuoteCtaLink>
+            </div>
+          </div>
+        </section>
+
+        {/* 6. After you win: get paid, stay protected */}
+        <section className="border-b border-zinc-200 px-6 py-14 sm:px-8 sm:py-20">
+          <div className="mx-auto max-w-6xl">
+            <SectionHeading
+              eyebrow="After you win the job"
+              title="Get paid and stay protected."
+              lead="Winning the job is the start. JobProof keeps the work organized as it moves ahead, so you have a clear record of what was agreed, changed and approved."
+            />
+            <div className="mt-10 grid gap-4 sm:mt-12 sm:grid-cols-2 lg:grid-cols-3">
+              {AFTER_WIN_CARDS.map((item) => (
+                <div
+                  key={item.title}
+                  className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#2436BB]/10 text-[#2436BB]">
+                    <LandingIcon name={item.icon} />
+                  </span>
+                  <div>
+                    <h3 className="font-semibold text-zinc-950 sm:text-lg">{item.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-zinc-600 sm:text-[15px]">{item.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mx-auto mt-10 max-w-2xl text-center text-base leading-relaxed text-zinc-600">
+              If questions or disputes come up later, you already have a clear record of what was
+              requested, approved and documented, without digging through old messages.
+            </p>
+          </div>
+        </section>
+
+        {/* 7. Pricing */}
+        <section id="pricing" className="border-b border-zinc-200 bg-zinc-50/60 px-6 py-14 sm:px-8 sm:py-20">
           <div className="mx-auto max-w-6xl">
             <SectionHeading
               title="Simple, Transparent Pricing"
@@ -442,7 +576,7 @@ export default function Home() {
               <div className="relative flex flex-col rounded-2xl border-2 border-[#2436BB] bg-[#2436BB]/5 p-6 shadow-md sm:p-8">
                 <div>
                   <p className="mb-3 inline-flex items-center rounded-full bg-[#2436BB] px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-                    ⭐ Most Popular
+                    ⭐ Recommended
                   </p>
                   <h3 className="text-2xl font-bold text-zinc-950">Pro</h3>
                   <p className="mt-2 text-3xl font-bold tracking-tight text-zinc-950">
@@ -470,23 +604,31 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="mt-12">
-              <h3 className="text-center text-lg font-semibold text-zinc-950">Compare plans</h3>
-              <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-zinc-600">
-                Solo keeps you organized. Pro helps you stay organized as you take on more work—and
-                get early access to new tools for your business.
-              </p>
-              <div className="mt-6 -mx-2 overflow-x-auto px-2 sm:mx-0 sm:px-0">
-                <table className="min-w-[560px] w-full border-collapse text-left text-sm">
+            <details className="group mt-10 rounded-2xl border border-zinc-200 bg-white">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-base font-semibold text-zinc-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2436BB] sm:px-6 [&::-webkit-details-marker]:hidden">
+                Compare plans
+                <span
+                  aria-hidden
+                  className="text-xl font-light text-zinc-400 transition-transform group-open:rotate-45"
+                >
+                  +
+                </span>
+              </summary>
+              <div className="border-t border-zinc-200 px-3 pb-4 sm:px-6">
+                <p className="mx-auto mt-4 max-w-2xl px-2 text-center text-sm text-zinc-600">
+                  Solo keeps you organized. Pro helps you stay organized as you take on more work—and
+                  get early access to new tools for your business.
+                </p>
+                <table className="mt-4 w-full border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b border-zinc-200">
-                      <th scope="col" className="py-3 pr-4 font-semibold text-zinc-950">
+                      <th scope="col" className="py-3 pr-2 font-semibold text-zinc-950 sm:pr-4">
                         Feature
                       </th>
-                      <th scope="col" className="px-4 py-3 text-center font-semibold text-zinc-950">
+                      <th scope="col" className="px-2 py-3 text-center font-semibold text-zinc-950 sm:px-4">
                         Solo
                       </th>
-                      <th scope="col" className="py-3 pl-4 text-center font-semibold text-[#2436BB]">
+                      <th scope="col" className="py-3 pl-2 text-center font-semibold text-[#2436BB] sm:pl-4">
                         Pro
                       </th>
                     </tr>
@@ -494,9 +636,11 @@ export default function Home() {
                   <tbody className="divide-y divide-zinc-100">
                     {COMPARISON_ROWS.map((row) => (
                       <tr key={row.feature}>
-                        <td className="py-3.5 pr-4 font-medium text-zinc-800">{row.feature}</td>
-                        <td className="px-4 py-3.5 text-center text-zinc-600">{row.solo}</td>
-                        <td className="py-3.5 pl-4 text-center font-medium text-zinc-800">
+                        <th scope="row" className="py-3 pr-2 font-medium text-zinc-800 sm:py-3.5 sm:pr-4">
+                          {row.feature}
+                        </th>
+                        <td className="px-2 py-3 text-center text-zinc-600 sm:px-4 sm:py-3.5">{row.solo}</td>
+                        <td className="py-3 pl-2 text-center font-medium text-zinc-800 sm:py-3.5 sm:pl-4">
                           {row.pro}
                         </td>
                       </tr>
@@ -504,218 +648,24 @@ export default function Home() {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </details>
           </div>
         </section>
 
-        {/* Section 3 — Everything organized before work begins */}
-        <section className="border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-6xl">
-            <SectionHeading
-              title="Everything organized before work begins"
-              lead="Most quoting problems start before the job does—missing details, forgotten photos, unclear work. JobProof keeps it together so you're not juggling five different tools."
-            />
-            <div className="mt-12 grid gap-5 sm:grid-cols-2">
-              {ORGANIZED_ITEMS.map((item) => (
-                <div key={item.title} className="flex gap-4">
-                  <span
-                    className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#2436BB]/10 text-sm font-bold text-[#2436BB]"
-                    aria-hidden
-                  >
-                    ✓
-                  </span>
-                  <div>
-                    <h3 className="font-semibold text-zinc-950">{item.title}</h3>
-                    <p className="mt-1 text-sm leading-6 text-zinc-600 sm:text-[15px]">
-                      {item.body}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="mx-auto mt-12 max-w-2xl text-center text-base leading-relaxed text-zinc-600">
-              You shouldn&apos;t need a notebook, a photo album, a spreadsheet, and three apps just to
-              send one quote. JobProof puts it in one place so you can focus on the work—not the
-              paperwork.
-            </p>
-          </div>
-        </section>
-
-        {/* Section 4 — Designed for contractors */}
-        <section className="border-b border-zinc-200 bg-zinc-50/60 px-6 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-3xl">
-            <SectionHeading title="Built for the way contractors actually work" />
-            <div className="mt-10 space-y-5 text-base leading-relaxed text-zinc-600 sm:text-lg sm:leading-8">
-              <p>
-                JobProof wasn&apos;t built as generic office software with a contractor sticker on it.
-                It was built around how jobs really start—the site visit, the follow-up questions,
-                the back-and-forth with the customer, and the moment they say yes.
-              </p>
-              <p>
-                You work on your phone at the job site. You need answers fast. You don&apos;t have time
-                for complicated tools that only make sense at a desk. JobProof fits how you
-                actually run your business.
-              </p>
-              <p>
-                Whether you work alone, with a small crew, or you&apos;re growing, the path is the same:
-                catch the request, get ready, send a professional quote, and get to the job.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Section 5 — Customer experience */}
-        <section className="border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-6xl">
-            <SectionHeading
-              title="A better experience for your customers"
-              lead="How you send a quote says a lot about how you'll run the job. JobProof helps you look established and easy to work with."
-            />
-            <div className="mx-auto mt-12 max-w-3xl">
-              <p className="text-center text-base leading-relaxed text-zinc-600 sm:text-lg">
-                Customers get a clean, professional proposal they can open on their phone or
-                computer. They can review what&apos;s included and the price, ask a question, request a
-                change, or accept when they&apos;re ready—without a messy email thread or a PDF lost in
-                their downloads.
-              </p>
-              <ul className="mt-10 grid gap-4 sm:grid-cols-2">
-                {[
-                  "Review the quote clearly",
-                  "Ask questions",
-                  "Request changes",
-                  "Accept online",
-                ].map((item) => (
-                  <li
-                    key={item}
-                    className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-800 sm:text-base"
-                  >
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-10 text-center text-base leading-relaxed text-zinc-600">
-                When customers trust what they&apos;re reading, they say yes faster—and you spend less
-                time going back and forth on basics you already covered.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Stay protected — natural documentation */}
-        <section className="border-b border-zinc-200 bg-zinc-50/60 px-6 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-6xl">
-            <SectionHeading
-              title="Stay Protected Every Step of the Way"
-              lead="As you use JobProof, you naturally build a clear record—so you and your customers stay on the same page from the first conversation through the work."
-            />
-            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {PROTECTION_CARDS.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"
-                >
-                  <h3 className="text-lg font-semibold text-zinc-950">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-zinc-600 sm:text-[15px]">
-                    {item.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <p className="mx-auto mt-12 max-w-2xl text-center text-base leading-relaxed text-zinc-600">
-              When questions come up later, you already have a clear record of what was requested,
-              approved, and documented—without digging through old messages or trying to
-              remember every detail.
-            </p>
-          </div>
-        </section>
-
-        {/* Section 6 — Stay organized when it matters */}
-        <section className="border-b border-zinc-200 px-6 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-3xl">
-            <SectionHeading
-              title="Stay organized when it matters"
-              lead="Getting the quote out is just the start. JobProof also helps you keep a clear record as the work moves ahead."
-            />
-            <div className="mt-10 space-y-5 text-base leading-relaxed text-zinc-600 sm:text-lg sm:leading-8">
-              <p>
-                When customer approvals, photos, paperwork, change orders, and job history live in
-                one place, you have what you need if questions come up later—not a scramble to
-                piece together what was agreed.
-              </p>
-              <p>
-                That&apos;s just how a solid business runs: nothing important gets lost, and you can
-                move ahead with confidence.
-              </p>
-            </div>
-            <ul className="mt-8 flex flex-wrap justify-center gap-3">
-              {[
-                "Customer approvals",
-                "Photos",
-                "Paperwork",
-                "Change orders",
-                "Job history",
-              ].map((tag) => (
-                <li
-                  key={tag}
-                  className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700"
-                >
-                  {tag}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        {/* Why contractors switch */}
-        <section className="border-b border-zinc-200 bg-zinc-50/40 px-6 py-16 sm:px-8 sm:py-20">
-          <div className="mx-auto max-w-5xl">
-            <SectionHeading
-              title="Why contractors switch to JobProof"
-              lead="Most contractors know the left column by heart. The right column is how quoting feels when everything lives in one place."
-            />
-            <div className="mt-12 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-              <div className="grid grid-cols-2 border-b border-zinc-200 bg-zinc-50">
-                <div className="border-r border-zinc-200 px-4 py-4 sm:px-6">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 sm:text-base sm:normal-case sm:tracking-normal">
-                    Before JobProof
-                  </h3>
-                </div>
-                <div className="px-4 py-4 sm:px-6">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-[#2436BB] sm:text-base sm:normal-case sm:tracking-normal">
-                    With JobProof
-                  </h3>
-                </div>
-              </div>
-              <ul className="divide-y divide-zinc-100">
-                {SWITCH_COMPARISON.map((row) => (
-                  <li key={row.before} className="grid grid-cols-2">
-                    <p className="border-r border-zinc-100 px-4 py-4 text-sm leading-6 text-zinc-600 sm:px-6 sm:text-[15px]">
-                      {row.before}
-                    </p>
-                    <p className="px-4 py-4 text-sm leading-6 font-medium text-zinc-900 sm:px-6 sm:text-[15px]">
-                      {row.after}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* Final CTA */}
+        {/* 8. Final CTA */}
         <section className="bg-zinc-950 px-6 py-16 sm:px-8 sm:py-24">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
-              Ready to spend less time chasing details and more time winning work?
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-zinc-400 sm:text-sm sm:tracking-[0.14em]">
+              Win More Jobs. Get Paid. Stay Protected.
+            </p>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
+              Ready to win more of the work you quote?
             </h2>
             <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-zinc-300">
-              Start your free 14-day trial today.
+              Try JobProof on your next few quotes and see how it fits your business before you pay
+              anything.
             </p>
-            <p className="mx-auto mt-2 text-base text-zinc-400">No credit card required.</p>
-            <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-zinc-400">
-              Look professional from the very first customer message.
-            </p>
-            <div className="mt-10 flex flex-col items-center">
+            <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
               <ContractorAcquisitionCtaLink
                 href="/signup"
                 ctaText="Start Your Free Trial"
@@ -724,7 +674,16 @@ export default function Home() {
               >
                 Start Your Free Trial
               </ContractorAcquisitionCtaLink>
+              <SampleQuoteCtaLink
+                href={SAMPLE_QUOTE_PATH}
+                ctaText="See a Sample Quote"
+                ctaLocation="final_cta"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-zinc-950 sm:w-auto"
+              >
+                See a Sample Quote <span aria-hidden>→</span>
+              </SampleQuoteCtaLink>
             </div>
+            <p className="mx-auto mt-4 text-base text-zinc-400">14 days free. No credit card required.</p>
           </div>
         </section>
       </main>
@@ -736,6 +695,14 @@ export default function Home() {
             <a href="#pricing" className="font-medium text-zinc-600 hover:text-zinc-900">
               Pricing
             </a>
+            <SampleQuoteCtaLink
+              href={SAMPLE_QUOTE_PATH}
+              ctaText="Sample quote"
+              ctaLocation="footer"
+              className="font-medium text-zinc-600 hover:text-zinc-900"
+            >
+              Sample quote
+            </SampleQuoteCtaLink>
             <Link href="/support" className="font-medium text-zinc-600 hover:text-zinc-900">
               Support
             </Link>

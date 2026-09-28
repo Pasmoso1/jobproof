@@ -227,12 +227,15 @@ describe("signup funnel analytics wiring", () => {
         "email_verification_required",
         "onboarding_complete",
         "onboarding_start",
+        "sample_quote_cta_click",
+        "sample_quote_view",
         "sign_up",
         "signup_error",
         "signup_start",
         "signup_submit",
         "signup_verified",
         "signup_view",
+        "trial_started",
       ].sort()
     );
     assert.equal("contractor_activated" in GA4_FUNNEL_EVENTS, false);

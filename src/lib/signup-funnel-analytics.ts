@@ -17,6 +17,10 @@ import {
   hasSignupVerifiedPendingClient,
   markEmailVerificationPendingClient,
 } from "@/lib/ga4-signup-verified-marker";
+import {
+  clearTrialStartedPendingClient,
+  readTrialStartedPendingClient,
+} from "@/lib/ga4-trial-started-marker";
 
 export function getSignupAcquisitionParams() {
   return buildAcquisitionContext({
@@ -78,6 +82,30 @@ export function consumeSignupVerifiedPendingAndTrack(): boolean {
       verification_path: "email_confirm",
     }
   );
+}
+
+/**
+ * Fire trial_started once when a server action left jp_ga4_ts_pending, which is
+ * only set after the managed 14-day trial was actually activated.
+ */
+export function consumeTrialStartedPendingAndTrack(): boolean {
+  const marker = readTrialStartedPendingClient();
+  if (!marker) return false;
+  clearTrialStartedPendingClient();
+  const planTier = marker === "1" ? undefined : marker;
+  const fired = trackGa4EventOnce("trial_started", GA4_FUNNEL_EVENTS.trial_started, {
+    ...getSignupAcquisitionParams(),
+    plan_tier: planTier,
+    trial_length_days: 14,
+  });
+  if (fired) {
+    try {
+      trackMetaEvent("StartTrial", { content_name: "contractor_trial", currency: "CAD", value: 0 });
+    } catch {
+      /* ignore */
+    }
+  }
+  return fired;
 }
 
 /**

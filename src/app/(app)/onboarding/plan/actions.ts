@@ -6,6 +6,7 @@ import { parseBillingPlanTier } from "@/lib/billing-plan-display";
 import type { BillingPlanTier } from "@/lib/stripe";
 import { isBetaTesterProfile, needsPlanSelection } from "@/lib/beta-tester";
 import { saveSelectedTrialPlan } from "@/lib/start-managed-trial";
+import { markTrialStartedAnalyticsPending } from "@/lib/ga4-trial-started-server";
 import { isOnboardingCompleteForTrial } from "@/lib/trial-lifecycle";
 
 export type SelectOnboardingPlanResult =
@@ -54,6 +55,9 @@ export async function selectOnboardingPlan(
   );
   if (!result.ok) {
     return { success: false, error: result.error };
+  }
+  if (result.trialStarted) {
+    await markTrialStartedAnalyticsPending(tier);
   }
 
   const { data: refreshed } = await supabase

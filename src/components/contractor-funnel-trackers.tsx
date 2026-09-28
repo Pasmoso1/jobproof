@@ -31,6 +31,50 @@ export function ContractorLandingViewTracker() {
   return null;
 }
 
+/** Fires once per tab session when the public sample quote is viewed. */
+export function SampleQuoteViewTracker() {
+  useEffect(() => {
+    trackGa4EventOnce(
+      "sample_quote_view",
+      GA4_FUNNEL_EVENTS.sample_quote_view,
+      acquisitionParams()
+    );
+  }, []);
+  return null;
+}
+
+/** "See a Sample Quote" links. Not a trial CTA, so it never fires contractor_cta_click. */
+export function SampleQuoteCtaLink({
+  href,
+  ctaText,
+  ctaLocation,
+  className,
+  children,
+}: {
+  href: string;
+  ctaText: string;
+  ctaLocation: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={className}
+      onClick={() => {
+        trackGa4Event(GA4_FUNNEL_EVENTS.sample_quote_cta_click, {
+          ...acquisitionParams(),
+          cta_text: ctaText,
+          cta_location: ctaLocation,
+          destination: href,
+        });
+      }}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export function ContractorAcquisitionCtaLink({
   href = "/signup",
   ctaText,

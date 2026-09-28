@@ -15,7 +15,25 @@ export const GA4_FUNNEL_EVENTS = {
   signup_verified: "signup_verified",
   onboarding_start: "onboarding_start",
   onboarding_complete: "onboarding_complete",
+  sample_quote_view: "sample_quote_view",
+  sample_quote_cta_click: "sample_quote_cta_click",
+  trial_started: "trial_started",
 } as const;
+
+/**
+ * Marketing funnel stages mapped to the GA4 event actually sent. Stages that
+ * predate this funnel keep their original event names so GA4 history and any
+ * configured key events keep working.
+ */
+export const CONTRACTOR_CONVERSION_FUNNEL = [
+  { stage: "landing_page_view", event: GA4_FUNNEL_EVENTS.contractor_landing_view },
+  { stage: "sample_quote_view", event: GA4_FUNNEL_EVENTS.sample_quote_view },
+  { stage: "sample_quote_cta_click", event: GA4_FUNNEL_EVENTS.sample_quote_cta_click },
+  { stage: "trial_cta_click", event: GA4_FUNNEL_EVENTS.contractor_cta_click },
+  { stage: "signup_started", event: GA4_FUNNEL_EVENTS.signup_start },
+  { stage: "signup_completed", event: GA4_FUNNEL_EVENTS.sign_up },
+  { stage: "trial_started", event: GA4_FUNNEL_EVENTS.trial_started },
+] as const;
 
 export type Ga4FunnelEventName =
   (typeof GA4_FUNNEL_EVENTS)[keyof typeof GA4_FUNNEL_EVENTS];
