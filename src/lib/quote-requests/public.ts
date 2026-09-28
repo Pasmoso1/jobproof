@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 import { getEffectiveQuoteTrade } from "@/lib/quote-requests/trade";
+import { isPublicQuotePageReady } from "@/lib/quote-requests/readiness";
 
 export type PublicQuoteContractor = {
   id: string;
@@ -13,6 +14,8 @@ export type PublicQuoteContractor = {
   plan_tier: string | null;
   beta_tester: boolean;
   beta_plan_tier: string | null;
+  /** False until the contractor has completed the business setup required to take requests. */
+  quote_ready: boolean;
 };
 
 export async function getContractorByQuoteSlug(
@@ -27,7 +30,7 @@ export async function getContractorByQuoteSlug(
   const { data } = await admin
     .from("profiles")
     .select(
-      "id, quote_slug, business_name, phone, quote_logo_url, quote_primary_trade, quote_primary_trade_other, plan_tier, beta_tester, beta_plan_tier"
+      "id, quote_slug, business_name, phone, address_line_1, city, province, postal_code, quote_logo_url, quote_primary_trade, quote_primary_trade_other, plan_tier, beta_tester, beta_plan_tier"
     )
     .ilike("quote_slug", normalized)
     .maybeSingle();
@@ -47,5 +50,6 @@ export async function getContractorByQuoteSlug(
     plan_tier: data.plan_tier != null ? String(data.plan_tier) : null,
     beta_tester: data.beta_tester === true,
     beta_plan_tier: data.beta_plan_tier != null ? String(data.beta_plan_tier) : null,
+    quote_ready: isPublicQuotePageReady(data),
   };
 }

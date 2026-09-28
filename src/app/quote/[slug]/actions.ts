@@ -56,7 +56,7 @@ export async function createQuotePhotoUploadUrl(
   meta: { fileName: string; mimeType: string; byteSize: number }
 ): Promise<CreateQuotePhotoUploadUrlResult> {
   const contractor = await getContractorByQuoteSlug(slug);
-  if (!contractor) {
+  if (!contractor || !contractor.quote_ready) {
     return { success: false, error: "This quote page is not available." };
   }
   if (!isQuoteUploadSessionId(uploadSessionId)) {
@@ -141,7 +141,7 @@ export async function submitPublicQuoteRequest(
   input: SubmitPublicQuoteRequestInput
 ): Promise<SubmitQuoteRequestResult> {
   const contractor = await getContractorByQuoteSlug(slug);
-  if (!contractor) {
+  if (!contractor || !contractor.quote_ready) {
     return { success: false, error: "This quote page is not available." };
   }
 

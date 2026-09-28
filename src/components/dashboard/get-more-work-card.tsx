@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import {
+  COMPLETE_BUSINESS_PROFILE_PATH,
   QUOTE_REQUEST_SETTINGS_PATH,
+  buildQuoteLinkIntro,
   buildQuoteLinkMessage,
   buildSmsHref,
   normalizeCustomerMobileNumber,
@@ -44,10 +46,12 @@ export function GetMoreWorkCard({
   quoteUrl,
   businessName,
   variant,
+  profileReady,
 }: {
   quoteUrl: string | null;
   businessName: string | null;
   variant: "prominent" | "compact";
+  profileReady: boolean;
 }) {
   const compact = variant === "compact";
   const headingId = useId();
@@ -84,7 +88,11 @@ export function GetMoreWorkCard({
     if (!quoteUrl) return;
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: "Request a quote", text: message, url: quoteUrl });
+        await navigator.share({
+          title: "Request a quote",
+          text: buildQuoteLinkIntro(businessName),
+          url: quoteUrl,
+        });
         setStatus("");
         return;
       } catch (err) {
@@ -114,10 +122,18 @@ export function GetMoreWorkCard({
         Get your next job
       </h2>
       <p className={`mt-2 max-w-xl text-zinc-600 ${compact ? "text-sm" : "text-sm sm:text-base"}`}>
-        Give customers an easy way to tell you what they need and request a quote.
+        {profileReady
+          ? "Give customers an easy way to tell you what they need and request a quote."
+          : "Complete your business profile so customers can tell you what they need and request a quote."}
       </p>
 
-      {quoteUrl ? (
+      {!profileReady ? (
+        <div className={compact ? "mt-4" : "mt-4 sm:mt-6"}>
+          <Link href={COMPLETE_BUSINESS_PROFILE_PATH} className={primaryButtonClassName}>
+            Complete your profile
+          </Link>
+        </div>
+      ) : quoteUrl ? (
         <>
           <form
             onSubmit={handleSend}

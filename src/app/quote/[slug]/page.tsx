@@ -13,6 +13,24 @@ export default async function PublicQuotePage({
   const contractor = await getContractorByQuoteSlug(slug);
   if (!contractor) notFound();
 
+  if (!contractor.quote_ready) {
+    return (
+      <div className="min-h-screen bg-zinc-50 py-8 sm:py-12">
+        <div className="mx-auto max-w-xl px-4">
+          <div className="rounded-xl border border-zinc-200 bg-white p-6 text-center shadow-sm sm:p-8">
+            <h1 className="text-xl font-bold text-zinc-900">
+              Online quote requests aren&apos;t available yet
+            </h1>
+            <p className="mt-2 text-sm text-zinc-600">
+              This contractor is still setting up their quote request page. Please check back soon
+              or contact them directly.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50 py-8 sm:py-12">
       <div className="mx-auto max-w-xl px-4">

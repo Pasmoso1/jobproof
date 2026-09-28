@@ -196,20 +196,20 @@ describe("F. send quote link uses the contractor URL", () => {
     const message = buildQuoteLinkMessage({ businessName: "Acme Painting", quoteUrl: QUOTE_URL });
     assert.equal(
       message,
-      `Hi, it's Acme Painting. Tell us what you need and request a quote here: ${QUOTE_URL}`
+      `Hi, it's Acme Painting. Need a quote? Tell us about the work you need here:\n\n${QUOTE_URL}`
     );
     assert.ok(message.length <= 160);
     assert.equal(
       buildQuoteLinkMessage({ businessName: "  ", quoteUrl: QUOTE_URL }),
-      `Hi! Tell us what you need and request a quote here: ${QUOTE_URL}`
+      `Hi! Need a quote? Tell us about the work you need here:\n\n${QUOTE_URL}`
     );
-    const href = buildSmsHref("4165550123", message);
-    assert.ok(href.startsWith("sms:4165550123?&body="));
+    const href = buildSmsHref("+14165550123", message);
+    assert.ok(href.startsWith("sms:+14165550123?body="));
     assert.equal(decodeURIComponent(href.split("body=")[1]!), message);
   });
 
   it("validates the customer mobile number client-side", () => {
-    assert.equal(normalizeCustomerMobileNumber("(416) 555-0123"), "4165550123");
+    assert.equal(normalizeCustomerMobileNumber("(416) 555-0123"), "+14165550123");
     assert.equal(normalizeCustomerMobileNumber("+1 416.555.0123"), "+14165550123");
     assert.equal(normalizeCustomerMobileNumber("555-0123"), null);
     assert.equal(normalizeCustomerMobileNumber("call me"), null);
@@ -241,7 +241,10 @@ describe("H. QR code uses the contractor URL", () => {
 
 describe("I. share uses the contractor URL", () => {
   it("shares the quote URL and falls back to copy", () => {
-    assert.match(cardSource, /navigator\.share\(\{ title: "Request a quote", text: message, url: quoteUrl \}\)/);
+    assert.match(
+      cardSource,
+      /navigator\.share\(\{\s*title: "Request a quote",\s*text: buildQuoteLinkIntro\(businessName\),\s*url: quoteUrl,\s*\}\)/
+    );
     assert.match(cardSource, /link was copied instead/);
   });
 

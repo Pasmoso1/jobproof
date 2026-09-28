@@ -45,6 +45,7 @@ import {
   ensureQuoteSlugForProfile,
   quoteSlugFromEnsureResult,
 } from "@/lib/quote-requests/slug-allocation";
+import { isQuoteSharingReady } from "@/lib/quote-requests/readiness";
 import { resolveAppUrl } from "@/lib/stripe";
 
 function formatStorage(bytes: number): string {
@@ -135,6 +136,7 @@ export default async function DashboardPage({
         )
       : (profile?.quote_slug ?? null);
   const quoteUrl = buildPublicQuoteUrl(resolveAppUrl(), quoteSlug);
+  const quoteSharingReady = isQuoteSharingReady(profile, user?.email ?? "");
   const showOnboardingProgress =
     !hasNoJobs && profile?.id && !isOnboardingProgressComplete(onboardingProgress);
 
@@ -206,6 +208,7 @@ export default async function DashboardPage({
         quoteUrl={quoteUrl}
         businessName={profile?.business_name ? String(profile.business_name) : null}
         variant={hasNoJobs ? "prominent" : "compact"}
+        profileReady={quoteSharingReady}
       />
 
       {hasNoJobs ? <DashboardEmptyOnboarding /> : null}
