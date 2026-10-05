@@ -30,6 +30,7 @@ export const CONTRACTOR_CONVERSION_FUNNEL = [
   { stage: "sample_quote_view", event: GA4_FUNNEL_EVENTS.sample_quote_view },
   { stage: "sample_quote_cta_click", event: GA4_FUNNEL_EVENTS.sample_quote_cta_click },
   { stage: "trial_cta_click", event: GA4_FUNNEL_EVENTS.contractor_cta_click },
+  { stage: "signup_page_view", event: GA4_FUNNEL_EVENTS.signup_view },
   { stage: "signup_started", event: GA4_FUNNEL_EVENTS.signup_start },
   { stage: "signup_completed", event: GA4_FUNNEL_EVENTS.sign_up },
   { stage: "trial_started", event: GA4_FUNNEL_EVENTS.trial_started },

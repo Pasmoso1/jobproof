@@ -346,6 +346,7 @@ describe("conversion funnel analytics", () => {
         "sample_quote_view",
         "sample_quote_cta_click",
         "trial_cta_click",
+        "signup_page_view",
         "signup_started",
         "signup_completed",
         "trial_started",
@@ -357,6 +358,7 @@ describe("conversion funnel analytics", () => {
     assert.equal(new Set(events).size, events.length);
     assert.equal("landing_page_view" in GA4_FUNNEL_EVENTS, false);
     assert.equal("trial_cta_click" in GA4_FUNNEL_EVENTS, false);
+    assert.equal("signup_page_view" in GA4_FUNNEL_EVENTS, false);
     assert.equal("signup_completed" in GA4_FUNNEL_EVENTS, false);
   });
 

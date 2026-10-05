@@ -3,13 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { JobProofLogo } from "@/components/jobproof-logo";
+import { LandingIcon } from "@/components/landing/landing-icon";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import {
-  HEARD_ABOUT_SOURCE_OPTIONS,
-  captureFirstTouchIfMissing,
-  persistHeardAboutSourceClient,
-} from "@/lib/attribution-first-touch";
+import { captureFirstTouchIfMissing } from "@/lib/attribution-first-touch";
 import {
   normalizeStoredPartnerRef,
   readPartnerRefClient,
@@ -28,6 +25,12 @@ type PostSubmitView =
   | "new_user_check_email"
   | "existing_neutral"
   | "existing_explicit_unconfirmed";
+
+const TRIAL_REASSURANCE = [
+  "14 days free",
+  "No credit card required",
+  "Cancel anytime during your trial",
+] as const;
 
 function logSignupDebug(label: string, payload: Record<string, unknown>) {
   if (process.env.NODE_ENV === "development") {
@@ -70,7 +73,6 @@ export default function SignupPage() {
   const [postSubmitView, setPostSubmitView] = useState<PostSubmitView>(null);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
-  const [heardAboutSource, setHeardAboutSource] = useState("");
   const [hasPartnerReferralContext, setHasPartnerReferralContext] = useState(false);
   const router = useRouter();
 
@@ -164,7 +166,6 @@ export default function SignupPage() {
     captureFirstTouchIfMissing(
       `${window.location.pathname}${window.location.search || ""}`
     );
-    persistHeardAboutSourceClient(heardAboutSource);
 
     const supabase = createClient();
     const { data, error: signUpError } = await supabase.auth.signUp({
@@ -458,16 +459,33 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4">
+    <div className="flex min-h-screen flex-col items-center bg-zinc-50 px-4 py-6 sm:justify-center sm:py-12">
       <div className="w-full max-w-sm">
-        <Link href="/" className="mb-8 block text-center">
+        <Link href="/" className="mb-5 block text-center sm:mb-8">
           <JobProofLogo className="mx-auto h-10 w-auto" />
         </Link>
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-semibold text-zinc-900">Create account</h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Sign up to start protecting your jobs.
+        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
+            Start your 14-day free trial
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+            Create your JobProof account and start turning more inquiries into
+            paying jobs.
           </p>
+          <ul
+            aria-label="Free trial details"
+            className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-sm font-medium text-zinc-700"
+          >
+            {TRIAL_REASSURANCE.map((item) => (
+              <li key={item} className="flex items-center gap-1.5">
+                <LandingIcon
+                  name="checkCircle"
+                  className="h-4 w-4 shrink-0 text-[#2436BB]"
+                />
+                {item}
+              </li>
+            ))}
+          </ul>
           {hasPartnerReferralContext ? (
             <div className="mt-4 rounded-xl border border-[#2436BB]/20 bg-[#2436BB]/5 p-4">
               <p className="text-sm font-semibold text-[#2436BB]">
@@ -483,9 +501,12 @@ export default function SignupPage() {
             </div>
           ) : null}
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
             {error && (
-              <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+              <p
+                className="break-words rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+                role="alert"
+              >
                 {error}
               </p>
             )}
@@ -514,32 +535,6 @@ export default function SignupPage() {
 
             <div>
               <label
-                htmlFor="heardAboutSource"
-                className="block text-sm font-medium text-zinc-700"
-              >
-                How did you hear about JobProof?{" "}
-                <span className="text-zinc-400">(optional)</span>
-              </label>
-              <select
-                id="heardAboutSource"
-                value={heardAboutSource}
-                onChange={(e) => {
-                  markSignupStarted();
-                  setHeardAboutSource(e.target.value);
-                }}
-                className="mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-              >
-                <option value="">Select one</option>
-                {HEARD_ABOUT_SOURCE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label
                 htmlFor="password"
                 className="block text-sm font-medium text-zinc-700"
               >
@@ -559,12 +554,12 @@ export default function SignupPage() {
                   }}
                   placeholder="••••••••"
                   autoComplete="new-password"
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 pr-10 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 pr-11 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-2.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
@@ -602,12 +597,12 @@ export default function SignupPage() {
                   }}
                   placeholder="••••••••"
                   autoComplete="new-password"
-                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 pr-10 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+                  className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 pr-11 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-2.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
@@ -632,9 +627,9 @@ export default function SignupPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-[#2436BB] px-4 py-3 font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
+              className="w-full rounded-lg bg-[#2436BB] px-4 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {loading ? "Creating account..." : "Create account"}
+              {loading ? "Creating account..." : "Start My Free Trial"}
             </button>
           </form>
 
