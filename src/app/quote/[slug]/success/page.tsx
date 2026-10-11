@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContractorByQuoteSlug } from "@/lib/quote-requests/public";
+import {
+  buildQuoteRequestReceipts,
+  parseSubmittedPhotoCount,
+} from "@/lib/quote-requests/success-confirmation";
 import { QuoteFollowUpFlow } from "./quote-follow-up-flow";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +14,11 @@ export default async function QuoteRequestSuccessPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ rid?: string; ft?: string }>;
+  searchParams: Promise<{ rid?: string; ft?: string; photos?: string }>;
 }) {
   const { slug } = await params;
-  const { rid, ft } = await searchParams;
+  const { rid, ft, photos } = await searchParams;
+  const receipts = buildQuoteRequestReceipts(parseSubmittedPhotoCount(photos));
   const contractor = await getContractorByQuoteSlug(slug);
   if (!contractor) notFound();
 
@@ -28,24 +33,14 @@ export default async function QuoteRequestSuccessPage({
           <h1 className="text-2xl font-bold text-zinc-900">Thank you. Your project has been submitted.</h1>
 
           <ul className="mt-6 space-y-2 text-sm text-zinc-700">
-            <li className="flex items-center gap-2">
-              <span className="text-emerald-600" aria-hidden="true">
-                ✓
-              </span>
-              Photos received.
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-emerald-600" aria-hidden="true">
-                ✓
-              </span>
-              Project details received.
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-emerald-600" aria-hidden="true">
-                ✓
-              </span>
-              Contact information received.
-            </li>
+            {receipts.map((receipt) => (
+              <li key={receipt} className="flex items-center gap-2">
+                <span className="text-emerald-600" aria-hidden="true">
+                  ✓
+                </span>
+                {receipt}
+              </li>
+            ))}
           </ul>
 
           <p className="mt-6 text-sm text-zinc-600">

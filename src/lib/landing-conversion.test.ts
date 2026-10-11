@@ -8,6 +8,7 @@ import Home, { metadata as homeMetadata } from "@/app/page";
 import SampleQuotePage, { metadata as sampleMetadata } from "@/app/sample-quote/page";
 import {
   ContractorAcquisitionCtaLink,
+  ContractorSectionCtaLink,
   SampleQuoteCtaLink,
 } from "@/components/contractor-funnel-trackers";
 import {
@@ -85,25 +86,31 @@ function removeBrowserMocks() {
   delete (globalThis as { document?: unknown }).document;
 }
 
+const HERO_END_MARKER = "Sound familiar?";
+
 describe("landing hero", () => {
-  it("leads with winning more jobs instead of the old headline", () => {
-    assert.match(homeHtml, /<h1[^>]*>Win more of the jobs you quote\.<\/h1>/);
-    assert.doesNotMatch(homeHtml, /From first inquiry to signed quote/);
+  it("leads with saving time by collecting quote details upfront", () => {
+    assert.match(homeHtml, /<h1[^>]*>Spend less time chasing quote details\.<\/h1>/);
+    assert.doesNotMatch(homeHtml, /Win more of the jobs you quote\./);
+    assert.match(homeHtml, /Let customers tell you what they need before you call them back\./);
     assert.match(
       homeHtml,
-      /Turn customer inquiries into professional quotes—and professional quotes into paying\s+jobs\./
+      /Send customers your JobProof quote-request link or add it to your website\.\s+They\s+provide the job details, photos and answers you need—so you can review the\s+opportunity before you call, visit or quote\./
     );
-    assert.match(homeHtml, /JobProof gives you one place to capture customer requests/);
+    const hero = homeHtml.slice(0, homeHtml.indexOf(HERO_END_MARKER));
+    assert.match(hero, /Respond faster\. Quote sooner\. Win more jobs\./);
+    assert.match(hero, />Built for Canadian contractors</);
   });
 
   it("keeps the primary trial CTA dominant with the no-card note directly under it", () => {
-    const heroEnd = homeHtml.indexOf("Why jobs slip away");
+    const heroEnd = homeHtml.indexOf(HERO_END_MARKER);
     const hero = anchors(homeHtml).filter((a) => a.index < heroEnd);
     const primary = hero.find((a) => a.text === "Start Your 14-Day Free Trial");
-    const secondary = hero.find((a) => a.text.startsWith("See a Sample Quote"));
+    const secondary = hero.find((a) => a.text.startsWith("See How It Works"));
     assert.ok(primary && secondary);
     assert.equal(primary.href, "/signup");
-    assert.equal(secondary.href, SAMPLE_QUOTE_PATH);
+    assert.equal(secondary.href, "#how-it-works");
+    assert.match(homeHtml, /<section id="how-it-works"/);
     assert.ok(hasClassToken(primary.className, "bg-[#2436BB]"));
     assert.ok(!hasClassToken(secondary.className, "bg-[#2436BB]"));
     assert.ok(!hasClassToken(secondary.className, "border"));
@@ -114,7 +121,7 @@ describe("landing hero", () => {
   });
 
   it("shows the brand promise near the hero and in the final CTA", () => {
-    const heroEnd = homeHtml.indexOf("Why jobs slip away");
+    const heroEnd = homeHtml.indexOf(HERO_END_MARKER);
     const hero = homeHtml.slice(0, heroEnd);
     for (const part of ["Win More Jobs.", "Get Paid.", "Stay Protected."]) {
       assert.ok(hero.includes(part), part);
@@ -124,16 +131,17 @@ describe("landing hero", () => {
 });
 
 describe("landing narrative and sections", () => {
-  it("follows problem → demo → how it works → customer experience → protection → pricing → final CTA", () => {
+  it("follows hero → problem → workflow → benefits → quote → after the win → pricing → final CTA", () => {
     const order = [
-      "Win more of the jobs you quote.",
-      "Good jobs get lost between the first message and the quote.",
-      "Show customers you&#x27;re ready for the job.",
-      "How JobProof Works",
-      "A quote your customers can say yes to.",
+      "Spend less time chasing quote details.",
+      "You&#x27;re busy doing the work. JobProof helps handle the questions.",
+      "Send one link. Let the customer provide the details.",
+      "Know the job before you call the customer.",
+      "Less chasing. Faster quotes. More work won.",
+      "You already have the information. Now turn it into a professional quote.",
       "Get paid and stay protected.",
       "Simple, Transparent Pricing",
-      "Ready to win more of the work you quote?",
+      "Spend less time chasing quote details. Spend more time on the work.",
     ];
     const positions = order.map((text) => {
       const at = homeHtml.indexOf(text);
@@ -158,28 +166,69 @@ describe("landing narrative and sections", () => {
     );
   });
 
-  it("shows the four-step product journey before pricing", () => {
-    const pricingAt = homeHtml.indexOf('id="pricing"');
-    for (const step of ["Customer request", "JobProof", "Professional quote", "Customer approval"]) {
-      const at = homeHtml.indexOf(`${step}</span>`);
-      assert.ok(at > 0 && at < pricingAt, step);
-    }
-    assert.match(homeHtml, /aria-hidden="true" class="pointer-events-none select-none/);
-    assert.match(homeHtml, /<figcaption/);
+  it("shows the six-step workflow once, in order, near the top", () => {
+    const steps = [
+      ...homeHtml.matchAll(/<h3 class="font-semibold leading-snug text-zinc-950">([^<]+)<\/h3>/g),
+    ].map((m) => m[1].replace(/&amp;/g, "&"));
+    assert.deepEqual(steps, [
+      "Customer contacts you",
+      "Send your JobProof link",
+      "Customer adds details + photos",
+      "Review the opportunity",
+      "Build & send the quote",
+      "Customer approves",
+    ]);
+    assert.doesNotMatch(homeHtml, /How JobProof Works|See it in action|What that means for your business/);
   });
 
-  it("lists the primary outcomes and keeps the seven-step workflow", () => {
-    for (const outcome of [
-      "Win more jobs",
-      "Respond more professionally",
-      "Make quoting easier",
-      "Follow up consistently",
-      "Give customers a better experience",
-    ]) {
-      assert.ok(homeHtml.includes(outcome), outcome);
+  it("shows the request and brief before the benefits, and the quote screens in the quote section", () => {
+    const benefitsAt = homeHtml.indexOf("Less chasing. Faster quotes. More work won.");
+    const quoteAt = homeHtml.indexOf("Now turn it into a professional quote.");
+    const pricingAt = homeHtml.indexOf('id="pricing"');
+    for (const label of ["New quote request", "Project Brief"]) {
+      const at = homeHtml.indexOf(`${label}</span>`);
+      assert.ok(at > 0 && at < benefitsAt, label);
     }
-    const steps = homeHtml.match(/<h3 class="font-semibold leading-snug text-zinc-950">/g) ?? [];
-    assert.equal(steps.length, 7);
+    for (const label of ["Customer proposal", "Customer view"]) {
+      const at = homeHtml.indexOf(`${label}</span>`);
+      assert.ok(at > quoteAt && at < pricingAt, label);
+    }
+    assert.equal((homeHtml.match(/<figcaption/g) ?? []).length, 4);
+    assert.match(homeHtml, /aria-hidden="true" class="pointer-events-none select-none/);
+  });
+
+  it("lists outcome-focused benefits, including opportunity review", () => {
+    for (const benefit of [
+      "Save time",
+      "Know the job before you call",
+      "Respond faster",
+      "Quote sooner",
+      "Focus on the right opportunities",
+      "Win more work",
+    ]) {
+      assert.ok(homeHtml.includes(`>${benefit}</h3>`), benefit);
+    }
+  });
+
+  it("keeps the after-the-win story: contracts, change orders, invoices, records", () => {
+    const after = homeHtml.slice(homeHtml.indexOf("Get paid and stay protected."));
+    assert.match(after, /Winning the job is only the beginning\./);
+    for (const card of [
+      "Digital contracts",
+      "Customer-approved change orders",
+      "Invoices and reminders",
+      "Site visit records",
+      "One organized job history",
+    ]) {
+      assert.ok(after.includes(`>${card}</h3>`), card);
+    }
+  });
+
+  it("does not claim automation the product does not have", () => {
+    assert.doesNotMatch(
+      homeHtml,
+      /qualif(y|ies) leads automatically|automatically qualif|lead scor|text alerts?|instant notification|automatic(ally)? follow[- ]up|follow-up reminders? to customers|embed/i
+    );
   });
 });
 
@@ -189,16 +238,26 @@ describe("landing CTAs", () => {
     const trial = all.filter((a) => /free trial/i.test(a.text));
     const sample = all.filter((a) => /sample quote/i.test(a.text));
     assert.ok(trial.length >= 5);
-    assert.ok(sample.length >= 4);
+    assert.ok(sample.length >= 3);
     for (const a of trial) assert.equal(a.href, "/signup", a.text);
     for (const a of sample) assert.equal(a.href, SAMPLE_QUOTE_PATH, a.text);
   });
 
-  it("final CTA has Start Your Free Trial, See a Sample Quote and the trial terms", () => {
-    const final = homeHtml.slice(homeHtml.indexOf("Ready to win more of the work you quote?"));
-    assert.match(final, />Start Your Free Trial</);
+  it("keeps a sample quote CTA in the quote section", () => {
+    const quote = homeHtml.slice(
+      homeHtml.indexOf("Now turn it into a professional quote."),
+      homeHtml.indexOf('id="pricing"')
+    );
+    assert.ok(anchors(quote).some((a) => a.href === SAMPLE_QUOTE_PATH && /See a Sample Quote/.test(a.text)));
+  });
+
+  it("final CTA ties back to saving time, with the trial CTA and no-card reassurance", () => {
+    const final = homeHtml.slice(
+      homeHtml.indexOf("Spend less time chasing quote details. Spend more time on the work.")
+    );
+    assert.match(final, />Start Your 14-Day Free Trial</);
     assert.match(final, /See a Sample Quote/);
-    assert.match(final, /14 days free\. No credit card required\./);
+    assert.match(final, /No credit card required\. Cancel anytime during your trial\./);
   });
 });
 
@@ -241,11 +300,13 @@ describe("mobile layout guards", () => {
 });
 
 describe("SEO metadata", () => {
-  it("reflects the win-more-jobs positioning for Canadian contractors without stuffing", () => {
+  it("reflects the quote-request positioning for Canadian contractors without stuffing", () => {
     const title = String(homeMetadata.title);
     const description = String(homeMetadata.description);
-    assert.match(title, /Win More Jobs/);
+    assert.match(title, /^JobProof \| /);
+    assert.match(title, /Quote Request/);
     assert.match(title, /Canadian Contractors/);
+    assert.match(description, /job details and photos/);
     assert.match(description, /Canadian contractors/);
     assert.ok(description.length <= 170, `description is ${description.length} chars`);
     assert.ok((description.match(/contractor/gi) ?? []).length <= 2);
@@ -387,6 +448,24 @@ describe("conversion funnel analytics", () => {
     link.props.onClick();
     assert.deepEqual(gtagCalls.map((c) => c[1]), ["contractor_cta_click"]);
     assert.equal(metaCalls.length, 0);
+  });
+
+  it("See How It Works fires contractor_section_cta_click only, never a trial CTA click", () => {
+    const link = ContractorSectionCtaLink({
+      href: "#how-it-works",
+      ctaText: "See How It Works",
+      ctaLocation: "hero",
+      children: "See How It Works",
+    }) as ReactElement<{ onClick: () => void; href: string }>;
+    assert.equal(link.props.href, "#how-it-works");
+    link.props.onClick();
+    assert.deepEqual(gtagCalls.map((c) => c[1]), ["contractor_section_cta_click"]);
+    const params = gtagCalls[0][2] as Record<string, unknown>;
+    assert.equal(params.cta_location, "hero");
+    assert.equal(params.destination, "#how-it-works");
+    assert.equal(metaCalls.length, 0);
+    const funnelEvents: string[] = CONTRACTOR_CONVERSION_FUNNEL.map((s) => s.event);
+    assert.ok(!funnelEvents.includes(GA4_FUNNEL_EVENTS.contractor_section_cta_click));
   });
 
   it("landing and sample pages never fire signup or trial conversions", () => {

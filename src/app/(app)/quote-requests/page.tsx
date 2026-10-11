@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { QuoteRequestResponseListBadge } from "@/components/quote-request-response";
 import { QuoteRequestUrgentListBadge } from "@/components/quote-request-urgency";
+import { SendQuoteRequestButton } from "@/components/send-quote-request";
 import { formatDateTimeEastern } from "@/lib/datetime-eastern";
+import { resolveQuoteRequestShareContext } from "@/lib/quote-requests/share-context";
+import { resolveAppUrl } from "@/lib/stripe";
+import { createClient } from "@/lib/supabase/server";
 import {
   quoteRequestListBucket,
   quoteRequestStatusLabel,
@@ -99,8 +103,24 @@ function Section({
   );
 }
 
+async function loadQuoteShareContext() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select(
+      "business_name, phone, address_line_1, city, province, postal_code, quote_primary_trade, quote_slug"
+    )
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return resolveQuoteRequestShareContext(profile, user.email ?? "", resolveAppUrl());
+}
+
 export default async function QuoteRequestsPage() {
-  const rows = await getQuoteRequestsList();
+  const [rows, quoteShare] = await Promise.all([getQuoteRequestsList(), loadQuoteShareContext()]);
 
   const newRows = rows.filter((r) => quoteRequestListBucket(r.status) === "new");
   const awaiting = rows.filter((r) => quoteRequestListBucket(r.status) === "awaiting");
@@ -116,12 +136,21 @@ export default async function QuoteRequestsPage() {
             Project inquiries from your public quote page, before a job is created.
           </p>
         </div>
-        <Link
-          href="/settings/quote-requests"
-          className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
-        >
-          Quote page settings
-        </Link>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {quoteShare ? (
+            <SendQuoteRequestButton
+              quoteUrl={quoteShare.quoteUrl}
+              businessName={quoteShare.businessName}
+              sourceLocation="quote_requests"
+            />
+          ) : null}
+          <Link
+            href="/settings/quote-requests"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+          >
+            Quote page settings
+          </Link>
+        </div>
       </div>
 
       <Section

@@ -18,6 +18,7 @@ function src(relativePath: string): string {
 const layoutSource = src("src/app/(app)/layout.tsx");
 const mobileNavSource = src("src/components/app-mobile-nav.tsx");
 const cardSource = src("src/components/dashboard/get-more-work-card.tsx");
+const shareSource = src("src/components/send-quote-request.tsx");
 const dashboardSource = src("src/app/(app)/dashboard/page.tsx");
 const emptyOnboardingSource = src("src/components/onboarding/dashboard-empty-onboarding.tsx");
 const settingsFormSource = src(
@@ -66,7 +67,10 @@ describe("A. desktop navigation", () => {
 describe("B. mobile does not render the desktop link row", () => {
   it("hides the desktop nav below lg and shows the menu only below lg", () => {
     assert.match(layoutSource, /className="hidden flex-wrap[^"]*lg:flex"/);
-    assert.match(layoutSource, /<div className="lg:hidden">\s*<AppMobileNav/);
+    assert.match(
+      layoutSource,
+      /<div className="flex items-center gap-2 lg:hidden">[\s\S]*?<SendQuoteRequestButton[\s\S]*?sourceLocation="mobile_global_action"[\s\S]*?<AppMobileNav/
+    );
   });
 
   it("only one component owns mobile navigation", () => {
@@ -138,12 +142,12 @@ describe("D. accessibility state", () => {
   });
 
   it("QR dialog is labelled, described and closable", () => {
-    assert.match(cardSource, /aria-labelledby=\{titleId\}/);
-    assert.match(cardSource, /aria-describedby=\{descriptionId\}/);
-    assert.match(cardSource, /aria-label="Close QR code"/);
-    assert.match(cardSource, /e\.key === "Escape"/);
-    assert.match(cardSource, /aria-live="polite"/);
-    assert.match(cardSource, /htmlFor=\{phoneInputId\}/);
+    assert.match(shareSource, /aria-labelledby=\{titleId\}/);
+    assert.match(shareSource, /aria-describedby=\{descriptionId\}/);
+    assert.match(shareSource, /aria-label="Close QR code"/);
+    assert.match(shareSource, /e\.key === "Escape"/);
+    assert.match(shareSource, /aria-live="polite"/);
+    assert.match(shareSource, /htmlFor=\{phoneInputId\}/);
   });
 });
 
@@ -158,10 +162,11 @@ describe("E. no-job state leads with Get More Work", () => {
   it("uses the approved copy and removes the old headline", () => {
     assert.match(cardSource, /Get more work/);
     assert.match(cardSource, /uppercase/);
-    assert.match(cardSource, /Get your next job/);
+    assert.match(cardSource, /\{SEND_QUOTE_REQUEST_LABEL\}/);
+    assert.match(shareSource, /SEND_QUOTE_REQUEST_LABEL = "Send Quote Request"/);
     assert.match(
-      cardSource,
-      /Give customers an easy way to tell you what they need and request a quote\./
+      shareSource,
+      /Send your customer a link so they can tell you about the job and add photos before you call back or prepare the quote\./
     );
     assert.doesNotMatch(emptyOnboardingSource, /Payment protection for contractors/);
     assert.doesNotMatch(emptyOnboardingSource, /Start protecting your first job/);
@@ -196,12 +201,12 @@ describe("F. send quote link uses the contractor URL", () => {
     const message = buildQuoteLinkMessage({ businessName: "Acme Painting", quoteUrl: QUOTE_URL });
     assert.equal(
       message,
-      `Hi, it's Acme Painting. Need a quote? Tell us about the work you need here:\n\n${QUOTE_URL}`
+      `Hi, thanks for contacting Acme Painting. Please use this link to tell us about the job and add any photos that may help:\n\n${QUOTE_URL}`
     );
-    assert.ok(message.length <= 160);
+    assert.ok(message.length <= 200);
     assert.equal(
       buildQuoteLinkMessage({ businessName: "  ", quoteUrl: QUOTE_URL }),
-      `Hi! Need a quote? Tell us about the work you need here:\n\n${QUOTE_URL}`
+      `Hi, thanks for getting in touch. Please use this link to tell us about the job and add any photos that may help:\n\n${QUOTE_URL}`
     );
     const href = buildSmsHref("+14165550123", message);
     assert.ok(href.startsWith("sms:+14165550123?body="));
@@ -217,41 +222,44 @@ describe("F. send quote link uses the contractor URL", () => {
   });
 
   it("opens the device messages app (no server-side SMS send)", () => {
-    assert.match(cardSource, /window\.location\.href = buildSmsHref\(normalized, message\)/);
-    assert.match(cardSource, /Send quote link/);
-    assert.doesNotMatch(cardSource, /twilio|sendTwilioSms|fetch\(/i);
+    assert.match(shareSource, /window\.location\.href = buildSmsHref\(normalized, message\)/);
+    assert.match(shareSource, /Send by Text/);
+    assert.doesNotMatch(shareSource, /twilio|sendTwilioSms|fetch\(/i);
+    assert.match(cardSource, /<SendQuoteRequestForm[\s\S]*?sourceLocation="dashboard"/);
   });
 });
 
 describe("G. copy link uses the contractor URL", () => {
   it("copies exactly the quote URL", () => {
-    assert.match(cardSource, /const ok = await copyText\(quoteUrl\);/);
-    assert.match(cardSource, /Copy link/);
+    assert.match(shareSource, /const ok = await copyText\(quoteUrl\);/);
+    assert.match(shareSource, /Copy Link/);
   });
 });
 
 describe("H. QR code uses the contractor URL", () => {
   it("encodes the quote URL with the existing qrcode library", () => {
-    assert.match(cardSource, /import\("qrcode"\)/);
-    assert.match(cardSource, /toDataURL\(quoteUrl,/);
-    assert.match(cardSource, /Customers can scan this code to request a quote from you\./);
-    assert.match(cardSource, /Show QR code/);
+    assert.match(shareSource, /import\("qrcode"\)/);
+    assert.match(shareSource, /toDataURL\(quoteUrl,/);
+    assert.match(shareSource, /Customers can scan this code to request a quote from you\./);
+    assert.match(shareSource, /QR Code/);
+    assert.match(shareSource, /download="jobproof-quote-qr\.png"/);
   });
 });
 
 describe("I. share uses the contractor URL", () => {
   it("shares the quote URL and falls back to copy", () => {
     assert.match(
-      cardSource,
+      shareSource,
       /navigator\.share\(\{\s*title: "Request a quote",\s*text: buildQuoteLinkIntro\(businessName\),\s*url: quoteUrl,\s*\}\)/
     );
-    assert.match(cardSource, /link was copied instead/);
+    assert.match(shareSource, /link was copied instead/);
   });
 
   it("puts no internal IDs or customer data in the URL", () => {
     const url = buildPublicQuoteUrl(ORIGIN, "acme-painting")!;
     assert.equal(new URL(url).search, "");
     assert.doesNotMatch(cardSource, /profile\.id|contractorId|user_id/);
+    assert.doesNotMatch(shareSource, /profile\.id|contractorId|user_id/);
     assert.doesNotMatch(dashboardSource, /quoteUrl=\{[^}]*profile\.id/);
   });
 
@@ -302,9 +310,12 @@ describe("N. no billing, Partner or GA4 regressions", () => {
     assert.match(layoutSource, /<TrialStatusBanner profile=\{profile\}/);
   });
 
-  it("new UI adds no GA4 events and touches no billing code", () => {
-    for (const source of [mobileNavSource, cardSource, emptyOnboardingSource]) {
+  it("nav and onboarding add no GA4 events; nothing touches billing or partner code", () => {
+    for (const source of [mobileNavSource, emptyOnboardingSource]) {
       assert.doesNotMatch(source, /gtag|trackGa4|ga4|stripe|checkout|partner-ref/i);
+    }
+    for (const source of [cardSource, shareSource]) {
+      assert.doesNotMatch(source, /gtag|trackGa4Event|fbq|stripe|checkout|partner-ref/i);
     }
   });
 });

@@ -6,7 +6,12 @@ import {
   pricingProfileLabel,
 } from "@/lib/quote-requests/constants";
 import { suggestQuoteSlugFromBusinessName } from "@/lib/quote-requests/slug";
-import { buildPublicQuoteUrl } from "@/lib/quote-link-share";
+import { QUOTE_LINK_WEBSITE_GUIDANCE, buildPublicQuoteUrl } from "@/lib/quote-link-share";
+import { copyText, secondaryButtonClassName } from "@/components/send-quote-request";
+import {
+  QUOTE_REQUEST_SHARE_EVENTS,
+  trackQuoteRequestShare,
+} from "@/lib/quote-request-share-analytics";
 import { normalizeAdditionalTrades } from "@/lib/quote-requests/trade";
 import { ContractorTradesServicesFields } from "@/components/contractor/contractor-trades-services-fields";
 import { updateQuoteRequestSettings } from "./actions";
@@ -58,6 +63,8 @@ export function QuoteRequestSettingsForm({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [savedSlug, setSavedSlug] = useState(profile?.quote_slug ?? "");
+  const [copyStatus, setCopyStatus] = useState("");
 
   function suggestSlug() {
     if (businessName.trim()) {
@@ -82,6 +89,8 @@ export function QuoteRequestSettingsForm({
       if (primaryTrade !== "Other") {
         setPrimaryTradeOther("");
       }
+      setSavedSlug(result.quoteSlug);
+      setQuoteSlug(result.quoteSlug);
       setSuccess(true);
     } finally {
       setLoading(false);
@@ -89,6 +98,18 @@ export function QuoteRequestSettingsForm({
   }
 
   const publicUrl = buildPublicQuoteUrl(appOrigin, quoteSlug);
+  const savedPublicUrl = buildPublicQuoteUrl(appOrigin, savedSlug);
+
+  async function handleCopyLink() {
+    if (!savedPublicUrl) return;
+    trackQuoteRequestShare(QUOTE_REQUEST_SHARE_EVENTS.link_copied, "settings", {
+      copy_target: "link",
+    });
+    const ok = await copyText(savedPublicUrl);
+    setCopyStatus(
+      ok ? "Quote request link copied." : `Couldn't copy automatically. Your link is ${savedPublicUrl}`
+    );
+  }
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6 rounded-xl border border-zinc-200 bg-white p-5">
@@ -147,6 +168,27 @@ export function QuoteRequestSettingsForm({
             You can customize the end of your link. Links you&apos;ve already shared stop working if
             you change it.
           </p>
+        ) : null}
+        {savedPublicUrl ? (
+          <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+            <p className="text-sm text-zinc-700">{QUOTE_LINK_WEBSITE_GUIDANCE}</p>
+            {publicUrl === savedPublicUrl ? (
+              <button
+                type="button"
+                onClick={() => void handleCopyLink()}
+                className={`${secondaryButtonClassName} mt-2 w-full sm:w-auto`}
+              >
+                Copy Quote Request Link
+              </button>
+            ) : (
+              <p className="mt-2 text-xs text-zinc-500">
+                Save your settings to copy your updated link.
+              </p>
+            )}
+            <p aria-live="polite" className="mt-1 min-h-5 break-words text-xs text-zinc-700">
+              {copyStatus}
+            </p>
+          </div>
         ) : null}
       </div>
 

@@ -13,6 +13,7 @@ import {
   validateQuotePhotoPathList,
 } from "@/lib/quote-requests/photo-upload";
 import { getContractorByQuoteSlug } from "@/lib/quote-requests/public";
+import { SUBMITTED_PHOTOS_PARAM } from "@/lib/quote-requests/success-confirmation";
 import { sendQuoteRequestReceivedEmail } from "@/lib/quote-requests/notifications";
 import { maybeGenerateProjectBrief } from "@/lib/quote-requests/project-brief/persist";
 import { triggerQuoteChecklistGeneration } from "@/lib/quote-requests/quote-checklist/persist";
@@ -332,5 +333,7 @@ export async function submitPublicQuoteRequest(
     });
   }
 
-  redirect(`/quote/${contractor.quote_slug}/success?rid=${requestId}&ft=${followUpToken}`);
+  redirect(
+    `/quote/${contractor.quote_slug}/success?rid=${requestId}&ft=${followUpToken}&${SUBMITTED_PHOTOS_PARAM}=${photoCount}`
+  );
 }

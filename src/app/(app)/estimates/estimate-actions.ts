@@ -28,6 +28,7 @@ import { generateEstimateNumber } from "@/lib/estimate-number";
 import { createCustomer } from "@/app/(app)/actions";
 import { getSubscriptionAccess, READ_ONLY_MODE_ACTION_ERROR, type ProfileSubscriptionGate } from "@/lib/subscription-access";
 import { assertActiveJobSlotAvailable } from "@/lib/active-job-limit";
+import { markQuoteRequestRespondedAfterQuoteSent } from "@/lib/quote-requests/request-lifecycle";
 
 function subscriptionWriteBlockedMessage(profile: ProfileSubscriptionGate): string | null {
   const a = getSubscriptionAccess(profile);
@@ -794,6 +795,16 @@ export async function sendEstimate(
     .from("estimates")
     .update({ status: "sent", sent_at: sentAt })
     .eq("id", estimateId);
+
+  const sourceQuoteRequestId = String(est2.quote_request_id ?? "").trim();
+  if (sourceQuoteRequestId) {
+    await markQuoteRequestRespondedAfterQuoteSent(supabase, {
+      quoteRequestId: sourceQuoteRequestId,
+      contractorId: String(profile.id),
+    });
+    revalidatePath("/quote-requests");
+    revalidatePath(`/quote-requests/${sourceQuoteRequestId}`);
+  }
 
   revalidatePath("/estimates");
   revalidatePath(`/estimates/${estimateId}`);

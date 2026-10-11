@@ -13,6 +13,12 @@ import {
 } from "@/components/contractor-onboarding-analytics";
 import { AppMobileNav } from "@/components/app-mobile-nav";
 import { getAppNavLinks } from "@/lib/app-nav";
+import { SendQuoteRequestButton } from "@/components/send-quote-request";
+import { resolveQuoteRequestShareContext } from "@/lib/quote-requests/share-context";
+import { resolveAppUrl } from "@/lib/stripe";
+
+const headerSendQuoteRequestClassName =
+  "inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-lg bg-[#2436BB] px-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2436BB] focus-visible:ring-offset-2 min-[400px]:text-sm";
 
 export default async function AppLayout({
   children,
@@ -47,7 +53,8 @@ export default async function AppLayout({
       city,
       province,
       postal_code,
-      quote_primary_trade
+      quote_primary_trade,
+      quote_slug
     `
     )
     .eq("user_id", user.id)
@@ -82,6 +89,7 @@ export default async function AppLayout({
 
   const navLinks = getAppNavLinks({ showPartnerPortal });
   const feedbackHref = getFeedbackMailtoHref();
+  const quoteShare = resolveQuoteRequestShareContext(profile, user.email ?? "", resolveAppUrl());
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -117,7 +125,15 @@ export default async function AppLayout({
             </a>
             <LogoutButton />
           </nav>
-          <div className="lg:hidden">
+          <div className="flex items-center gap-2 lg:hidden">
+            {quoteShare ? (
+              <SendQuoteRequestButton
+                quoteUrl={quoteShare.quoteUrl}
+                businessName={quoteShare.businessName}
+                sourceLocation="mobile_global_action"
+                className={headerSendQuoteRequestClassName}
+              />
+            ) : null}
             <AppMobileNav
               showPartnerPortal={showPartnerPortal}
               newQuoteRequestCount={newQuoteRequestCount}

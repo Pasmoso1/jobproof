@@ -15,11 +15,14 @@ export function buildPublicQuoteUrl(
   return `${appOrigin.trim().replace(/\/+$/, "")}/quote/${encodeURIComponent(slug)}`;
 }
 
+export const QUOTE_LINK_WEBSITE_GUIDANCE =
+  "Use this link on your website, social profiles, email signature or anywhere customers request a quote.";
+
 /** Message text before the link, used on its own when a share target receives the URL separately. */
 export function buildQuoteLinkIntro(businessName?: string | null): string {
   const business = String(businessName ?? "").replace(/\s+/g, " ").trim();
-  const greeting = business ? `Hi, it's ${business}.` : "Hi!";
-  return `${greeting} Need a quote? Tell us about the work you need here:`;
+  const opener = business ? `Hi, thanks for contacting ${business}.` : "Hi, thanks for getting in touch.";
+  return `${opener} Please use this link to tell us about the job and add any photos that may help:`;
 }
 
 /**
@@ -39,7 +42,7 @@ export function buildQuoteLinkMessage(input: {
  * with a leading "+" keep it. Returns null when the input doesn't look like a phone number.
  */
 export function normalizeCustomerMobileNumber(raw: string): string | null {
-  const trimmed = String(raw ?? "").trim();
+  const trimmed = String(raw ?? "").replace(/[\u2010-\u2015\u2212]/g, "-").trim();
   if (!trimmed) return null;
   if (/[^\d\s()+.-]/.test(trimmed)) return null;
   const hasPlus = trimmed.startsWith("+");

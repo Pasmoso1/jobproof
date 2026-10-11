@@ -28,7 +28,7 @@ function PreviewFrame({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-function RequestPreview() {
+export function RequestPreview() {
   return (
     <PreviewFrame label="New quote request">
       <div className="flex items-start justify-between gap-2">
@@ -57,7 +57,7 @@ function RequestPreview() {
   );
 }
 
-function BriefPreview() {
+export function BriefPreview() {
   return (
     <PreviewFrame label="Project Brief">
       <div>
@@ -93,7 +93,7 @@ function BriefPreview() {
   );
 }
 
-function ProposalPreview() {
+export function ProposalPreview() {
   const proposal = SAMPLE_QUOTE_PROPOSAL;
   return (
     <PreviewFrame label="Customer proposal">
@@ -124,7 +124,7 @@ function ProposalPreview() {
   );
 }
 
-function ApprovalPreview() {
+export function ApprovalPreview() {
   return (
     <PreviewFrame label="Customer view">
       <div className="space-y-2">
@@ -150,63 +150,26 @@ function ApprovalPreview() {
   );
 }
 
-const JOURNEY: Array<{
-  step: string;
+/** A titled example screen with a caption that describes it for every reader. */
+export function PreviewFigure({
+  icon,
+  title,
+  caption,
+  children,
+}: {
   icon: LandingIconName;
   title: string;
   caption: string;
-  preview: () => ReactNode;
-}> = [
-  {
-    step: "1",
-    icon: "inbox",
-    title: "Customer request",
-    caption: "Customers tell you what they need through your quote request link and can add photos.",
-    preview: RequestPreview,
-  },
-  {
-    step: "2",
-    icon: "clipboard",
-    title: "JobProof",
-    caption: "A Project Brief and checklist help you get ready before the site visit.",
-    preview: BriefPreview,
-  },
-  {
-    step: "3",
-    icon: "document",
-    title: "Professional quote",
-    caption: "Turn your notes into a clear proposal with scope, pricing and terms.",
-    preview: ProposalPreview,
-  },
-  {
-    step: "4",
-    icon: "checkCircle",
-    title: "Customer approval",
-    caption: "Customers review it on any device and accept online when they're ready.",
-    preview: ApprovalPreview,
-  },
-];
-
-export function ProductJourneyPreviews() {
+  children: ReactNode;
+}) {
   return (
-    <ol className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
-      {JOURNEY.map(({ step, icon, title, caption, preview: Preview }) => (
-        <li key={step}>
-          <figure className="flex h-full flex-col">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#2436BB] text-xs font-bold text-white">
-                {step}
-              </span>
-              <span className="flex items-center gap-1.5 text-sm font-semibold text-zinc-950">
-                <LandingIcon name={icon} className="h-4 w-4 text-[#2436BB]" />
-                {title}
-              </span>
-            </div>
-            <Preview />
-            <figcaption className="mt-3 text-sm leading-6 text-zinc-600">{caption}</figcaption>
-          </figure>
-        </li>
-      ))}
-    </ol>
+    <figure className="flex h-full flex-col">
+      <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-zinc-950">
+        <LandingIcon name={icon} className="h-4 w-4 text-[#2436BB]" />
+        {title}
+      </p>
+      {children}
+      <figcaption className="mt-3 text-sm leading-6 text-zinc-600">{caption}</figcaption>
+    </figure>
   );
 }

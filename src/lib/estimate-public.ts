@@ -10,6 +10,7 @@ import {
   type CustomerProposalSnapshot,
 } from "@/lib/public-estimate-proposal";
 import { trackProductEventSafe, PRODUCT_ANALYTICS_EVENTS } from "@/lib/product-analytics";
+import { markQuoteRequestConvertedAfterQuoteAccepted } from "@/lib/quote-requests/request-lifecycle";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -612,6 +613,14 @@ export async function acceptPublicEstimateByToken(
     eventLabel: "Customer accepted quote",
     metadata: { estimate_id: String(row.id) },
   });
+
+  const acceptedQuoteRequestId = String(row.quote_request_id ?? "").trim();
+  if (acceptedQuoteRequestId) {
+    await markQuoteRequestConvertedAfterQuoteAccepted(admin, {
+      quoteRequestId: acceptedQuoteRequestId,
+      contractorId: String(row.profile_id),
+    });
+  }
 
   trackProductEventSafe({
     profileId: String(row.profile_id),

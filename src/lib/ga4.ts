@@ -6,6 +6,7 @@
 export const GA4_FUNNEL_EVENTS = {
   contractor_landing_view: "contractor_landing_view",
   contractor_cta_click: "contractor_cta_click",
+  contractor_section_cta_click: "contractor_section_cta_click",
   signup_view: "signup_view",
   signup_start: "signup_start",
   signup_submit: "signup_submit",

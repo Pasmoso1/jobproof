@@ -10,7 +10,7 @@ import {
 } from "@/lib/plan-entitlements";
 
 export type QuoteRequestSettingsResult =
-  | { success: true }
+  | { success: true; quoteSlug: string }
   | { success: false; error: string; fieldErrors?: Record<string, string> };
 
 export async function updateQuoteRequestSettings(
@@ -126,5 +126,5 @@ export async function updateQuoteRequestSettings(
 
   revalidatePath("/settings/quote-requests");
   revalidatePath(`/quote/${quoteSlug}`);
-  return { success: true };
+  return { success: true, quoteSlug };
 }

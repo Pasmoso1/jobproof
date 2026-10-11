@@ -224,6 +224,7 @@ describe("signup funnel analytics wiring", () => {
       [
         "contractor_cta_click",
         "contractor_landing_view",
+        "contractor_section_cta_click",
         "email_verification_required",
         "onboarding_complete",
         "onboarding_start",

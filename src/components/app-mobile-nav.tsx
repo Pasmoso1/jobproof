@@ -87,7 +87,7 @@ export function AppMobileNav({
         >
           <path d="M3 5h14M3 10h14M3 15h14" />
         </svg>
-        <span>Menu</span>
+        <span className="max-[399px]:sr-only">Menu</span>
         {badgeLabel ? (
           <>
             <span

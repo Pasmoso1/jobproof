@@ -69,7 +69,7 @@ describe("1. Android-compatible SMS URI and body", () => {
     const href = buildSmsHref("+14165550123", message);
     assert.equal(
       href,
-      "sms:+14165550123?body=Hi%2C%20it's%20Green%20Construction.%20Need%20a%20quote%3F%20Tell%20us%20about%20the%20work%20you%20need%20here%3A%0A%0Ahttps%3A%2F%2Fwww.jobproof.ca%2Fquote%2Fgreen-construction-2"
+      "sms:+14165550123?body=Hi%2C%20thanks%20for%20contacting%20Green%20Construction.%20Please%20use%20this%20link%20to%20tell%20us%20about%20the%20job%20and%20add%20any%20photos%20that%20may%20help%3A%0A%0Ahttps%3A%2F%2Fwww.jobproof.ca%2Fquote%2Fgreen-construction-2"
     );
     assert.doesNotMatch(href, /\?&body=/);
     assert.doesNotMatch(href, /\+(?!1416)/, "spaces must be %20, never +");
@@ -80,8 +80,9 @@ describe("1. Android-compatible SMS URI and body", () => {
     const message = buildQuoteLinkMessage({ businessName: "Green Construction", quoteUrl: QUOTE_URL });
     assert.equal(
       message,
-      "Hi, it's Green Construction. Need a quote? Tell us about the work you need here:\n\nhttps://www.jobproof.ca/quote/green-construction-2"
+      "Hi, thanks for contacting Green Construction. Please use this link to tell us about the job and add any photos that may help:\n\nhttps://www.jobproof.ca/quote/green-construction-2"
     );
+    assert.doesNotMatch(message.split("\n")[0]!, /\bAI\b|lead|funnel|JobProof|software/i);
     assert.equal(parseSmsHref(buildSmsHref("+14165550123", message)).body, message);
   });
 });
@@ -119,7 +120,7 @@ describe("4. URL on its own line", () => {
     const message = buildQuoteLinkMessage({ businessName: "Green Construction", quoteUrl: QUOTE_URL });
     const lines = message.split("\n");
     assert.deepEqual(lines, [
-      "Hi, it's Green Construction. Need a quote? Tell us about the work you need here:",
+      "Hi, thanks for contacting Green Construction. Please use this link to tell us about the job and add any photos that may help:",
       "",
       QUOTE_URL,
     ]);
@@ -148,10 +149,12 @@ describe("5. business names with special characters", () => {
   }
 
   it("falls back to a neutral greeting without a business name", () => {
-    assert.equal(
-      buildQuoteLinkIntro(null),
-      "Hi! Need a quote? Tell us about the work you need here:"
-    );
+    for (const missing of [null, undefined, "", "   ", "\n"]) {
+      assert.equal(
+        buildQuoteLinkIntro(missing),
+        "Hi, thanks for getting in touch. Please use this link to tell us about the job and add any photos that may help:"
+      );
+    }
   });
 });
 
@@ -165,6 +168,11 @@ describe("6. Canadian/US phone formats", () => {
     ["+1 416 555 0123", "+14165550123"],
     ["+1 (212) 555-0199", "+12125550199"],
     ["+44 20 7946 0958", "+442079460958"],
+    ["  (604) 555-0199 ", "+16045550199"],
+    ["416 555 0123", "+14165550123"],
+    ["416\u00a0555\u00a00123", "+14165550123"],
+    ["416\u2013555\u20130123", "+14165550123"],
+    ["1 (902) 555-0144", "+19025550144"],
   ] as const) {
     it(`normalizes ${input}`, () => {
       assert.equal(normalizeCustomerMobileNumber(input), expected);
@@ -180,14 +188,17 @@ describe("6. Canadian/US phone formats", () => {
 });
 
 describe("7. no customer PII sent to JobProof", () => {
-  const card = src("src/components/dashboard/get-more-work-card.tsx");
+  const share = src("src/components/send-quote-request.tsx");
 
   it("the phone number only ever goes into the on-device sms: link", () => {
-    assert.match(card, /window\.location\.href = buildSmsHref\(normalized, message\)/);
-    assert.doesNotMatch(card, /fetch\(|axios|sendBeacon|XMLHttpRequest/);
-    assert.doesNotMatch(card, /from "@\/app\/|Action\(|"use server"/);
-    assert.doesNotMatch(card, /twilio|sendTwilioSms/i);
-    assert.doesNotMatch(card, /gtag|trackGa4|track[A-Z]\w*\(/);
+    assert.match(share, /window\.location\.href = buildSmsHref\(normalized, message\)/);
+    assert.doesNotMatch(share, /fetch\(|axios|sendBeacon|XMLHttpRequest/);
+    assert.doesNotMatch(share, /from "@\/app\/|Action\(|"use server"/);
+    assert.doesNotMatch(share, /twilio|sendTwilioSms/i);
+    assert.doesNotMatch(share, /gtag|trackGa4|fbq/);
+    for (const call of share.match(/trackQuoteRequestShare\([^;]*\);/g) ?? []) {
+      assert.doesNotMatch(call, /phone|normalized|businessName|quoteUrl|[(,]\s*message\b/, call);
+    }
   });
 
   it("the message and URL contain no phone number or internal IDs", () => {
@@ -242,17 +253,17 @@ describe("10. sharing controls hidden before required setup", () => {
   it("shows Complete your profile and none of the sharing tools", () => {
     const html = renderCard({ quoteUrl: QUOTE_URL, profileReady: false });
     assert.match(html, /Get more work/);
-    assert.match(html, /Get your next job/);
+    assert.match(html, /Send Quote Request/);
     assert.match(
       html,
       /Complete your business profile so customers can tell you what they need and request a quote\./
     );
     assert.match(html, new RegExp(`href="${COMPLETE_BUSINESS_PROFILE_PATH}"[^>]*>Complete your profile<`));
     for (const hidden of [
-      "Customer&#x27;s mobile number",
-      "Send quote link",
-      "Copy link",
-      "Show QR code",
+      "Customer phone number",
+      "Send by Text",
+      "Copy Link",
+      "QR Code",
       ">Share<",
       'type="tel"',
       QUOTE_URL,
@@ -286,15 +297,17 @@ describe("11. sharing controls available after required setup", () => {
   it("renders the send form, copy, QR and share", () => {
     const html = renderCard({ quoteUrl: QUOTE_URL, profileReady: true });
     for (const shown of [
-      "Customer&#x27;s mobile number",
-      "Send quote link",
-      "Copy link",
-      "Show QR code",
+      "Customer phone number",
+      "Send by Text",
+      "Copy Link",
+      "QR Code",
       ">Share<",
       'type="tel"',
+      "Use this link on your website, social profiles, email signature or anywhere customers request a quote.",
     ]) {
       assert.ok(html.includes(shown), `should render ${shown}`);
     }
+    assert.match(html, /inputmode="tel"/i);
     assert.ok(!html.includes("Complete your profile"));
     assert.ok(!html.includes("Set up your quote link"));
   });
@@ -302,24 +315,24 @@ describe("11. sharing controls available after required setup", () => {
   it("keeps the manual setup fallback when a ready profile has no link", () => {
     const html = renderCard({ quoteUrl: null, profileReady: true });
     assert.match(html, /Set up your quote link/);
-    assert.ok(!html.includes("Send quote link"));
+    assert.ok(!html.includes("Send by Text"));
   });
 });
 
 describe("copy, share and QR use the same canonical URL", () => {
-  const card = src("src/components/dashboard/get-more-work-card.tsx");
+  const share = src("src/components/send-quote-request.tsx");
 
   it("every action reads the single quoteUrl prop", () => {
-    assert.match(card, /const ok = await copyText\(quoteUrl\);/);
-    assert.match(card, /url: quoteUrl,/);
-    assert.match(card, /toDataURL\(quoteUrl,/);
-    assert.match(card, /buildQuoteLinkMessage\(\{ businessName, quoteUrl \}\)/);
+    assert.match(share, /const ok = await copyText\(quoteUrl\);/);
+    assert.match(share, /url: quoteUrl,/);
+    assert.match(share, /toDataURL\(quoteUrl,/);
+    assert.match(share, /buildQuoteLinkMessage\(\{ businessName, quoteUrl \}\)/);
     const html = renderCard({ quoteUrl: QUOTE_URL, profileReady: true });
     assert.ok(html.includes(QUOTE_URL), "QR dialog shows the same URL");
   });
 
   it("share sends the intro and URL separately so the link is not duplicated", () => {
-    assert.match(card, /text: buildQuoteLinkIntro\(businessName\),/);
+    assert.match(share, /text: buildQuoteLinkIntro\(businessName\),/);
     assert.doesNotMatch(buildQuoteLinkIntro("Green Construction"), /https?:\/\//);
   });
 });

@@ -75,6 +75,41 @@ export function SampleQuoteCtaLink({
   );
 }
 
+/**
+ * In-page links such as "See How It Works". Kept out of contractor_cta_click so
+ * trial CTA click counts only include clicks that head to signup.
+ */
+export function ContractorSectionCtaLink({
+  href,
+  ctaText,
+  ctaLocation,
+  className,
+  children,
+}: {
+  href: `#${string}`;
+  ctaText: string;
+  ctaLocation: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      className={className}
+      onClick={() => {
+        trackGa4Event(GA4_FUNNEL_EVENTS.contractor_section_cta_click, {
+          ...acquisitionParams(),
+          cta_text: ctaText,
+          cta_location: ctaLocation,
+          destination: href,
+        });
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 export function ContractorAcquisitionCtaLink({
   href = "/signup",
   ctaText,
