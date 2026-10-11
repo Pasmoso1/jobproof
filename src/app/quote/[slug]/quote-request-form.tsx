@@ -359,9 +359,14 @@ export function QuoteRequestForm({
 
           <div className="block sm:col-span-2">
             <span className="text-sm font-medium text-zinc-800">Project photos</span>
-            <p className="mt-1 text-sm text-zinc-600">
-              Upload photos or take pictures with your phone camera. Photos help the contractor
-              understand the job before calling or visiting.
+            <p className="mt-1 text-sm leading-6 text-zinc-600">
+              Please take a few clear photos of the area where the work is needed. Include a wide
+              shot of the entire area and close-ups of anything that needs repair, replacement or
+              attention.
+            </p>
+            <p className="mt-2 text-sm leading-6 text-zinc-600">
+              These photos help your contractor understand the job and prepare before contacting
+              you.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <button

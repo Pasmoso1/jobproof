@@ -201,12 +201,12 @@ describe("F. send quote link uses the contractor URL", () => {
     const message = buildQuoteLinkMessage({ businessName: "Acme Painting", quoteUrl: QUOTE_URL });
     assert.equal(
       message,
-      `Hi, thanks for contacting Acme Painting. Please use this link to tell us about the job and add any photos that may help:\n\n${QUOTE_URL}`
+      `Thanks for contacting Acme Painting!\n\nTo help us understand your project and prepare your quote, please tell us what you need and upload a few photos of the work area using the link below.\n\n${QUOTE_URL}`
     );
-    assert.ok(message.length <= 200);
+    assert.ok(message.length <= 260);
     assert.equal(
       buildQuoteLinkMessage({ businessName: "  ", quoteUrl: QUOTE_URL }),
-      `Hi, thanks for getting in touch. Please use this link to tell us about the job and add any photos that may help:\n\n${QUOTE_URL}`
+      `Thanks for getting in touch!\n\nTo help us understand your project and prepare your quote, please tell us what you need and upload a few photos of the work area using the link below.\n\n${QUOTE_URL}`
     );
     const href = buildSmsHref("+14165550123", message);
     assert.ok(href.startsWith("sms:+14165550123?body="));

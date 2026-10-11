@@ -274,7 +274,8 @@ describe("public URL", () => {
     const publicSource = src("src/lib/quote-requests/public.ts");
     assert.match(publicSource, /\.ilike\("quote_slug", normalized\)/);
     const pageSource = src("src/app/quote/[slug]/page.tsx");
-    assert.match(pageSource, /getContractorByQuoteSlug\(slug\)/);
+    assert.match(pageSource, /const loadContractor = cache\(getContractorByQuoteSlug\);/);
+    assert.match(pageSource, /await loadContractor\(slug\)/);
   });
 
   it("claims are conditional so existing slugs are never rewritten", () => {

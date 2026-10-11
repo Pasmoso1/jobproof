@@ -21,8 +21,8 @@ export const QUOTE_LINK_WEBSITE_GUIDANCE =
 /** Message text before the link, used on its own when a share target receives the URL separately. */
 export function buildQuoteLinkIntro(businessName?: string | null): string {
   const business = String(businessName ?? "").replace(/\s+/g, " ").trim();
-  const opener = business ? `Hi, thanks for contacting ${business}.` : "Hi, thanks for getting in touch.";
-  return `${opener} Please use this link to tell us about the job and add any photos that may help:`;
+  const opener = business ? `Thanks for contacting ${business}!` : "Thanks for getting in touch!";
+  return `${opener}\n\nTo help us understand your project and prepare your quote, please tell us what you need and upload a few photos of the work area using the link below.`;
 }
 
 /**

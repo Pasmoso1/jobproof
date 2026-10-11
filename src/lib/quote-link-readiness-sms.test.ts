@@ -69,7 +69,7 @@ describe("1. Android-compatible SMS URI and body", () => {
     const href = buildSmsHref("+14165550123", message);
     assert.equal(
       href,
-      "sms:+14165550123?body=Hi%2C%20thanks%20for%20contacting%20Green%20Construction.%20Please%20use%20this%20link%20to%20tell%20us%20about%20the%20job%20and%20add%20any%20photos%20that%20may%20help%3A%0A%0Ahttps%3A%2F%2Fwww.jobproof.ca%2Fquote%2Fgreen-construction-2"
+      "sms:+14165550123?body=Thanks%20for%20contacting%20Green%20Construction!%0A%0ATo%20help%20us%20understand%20your%20project%20and%20prepare%20your%20quote%2C%20please%20tell%20us%20what%20you%20need%20and%20upload%20a%20few%20photos%20of%20the%20work%20area%20using%20the%20link%20below.%0A%0Ahttps%3A%2F%2Fwww.jobproof.ca%2Fquote%2Fgreen-construction-2"
     );
     assert.doesNotMatch(href, /\?&body=/);
     assert.doesNotMatch(href, /\+(?!1416)/, "spaces must be %20, never +");
@@ -80,9 +80,12 @@ describe("1. Android-compatible SMS URI and body", () => {
     const message = buildQuoteLinkMessage({ businessName: "Green Construction", quoteUrl: QUOTE_URL });
     assert.equal(
       message,
-      "Hi, thanks for contacting Green Construction. Please use this link to tell us about the job and add any photos that may help:\n\nhttps://www.jobproof.ca/quote/green-construction-2"
+      "Thanks for contacting Green Construction!\n\nTo help us understand your project and prepare your quote, please tell us what you need and upload a few photos of the work area using the link below.\n\nhttps://www.jobproof.ca/quote/green-construction-2"
     );
-    assert.doesNotMatch(message.split("\n")[0]!, /\bAI\b|lead|funnel|JobProof|software/i);
+    assert.doesNotMatch(
+      message.slice(0, message.lastIndexOf("\n")),
+      /\bAI\b|lead|funnel|JobProof|software/i
+    );
     assert.equal(parseSmsHref(buildSmsHref("+14165550123", message)).body, message);
   });
 });
@@ -120,7 +123,9 @@ describe("4. URL on its own line", () => {
     const message = buildQuoteLinkMessage({ businessName: "Green Construction", quoteUrl: QUOTE_URL });
     const lines = message.split("\n");
     assert.deepEqual(lines, [
-      "Hi, thanks for contacting Green Construction. Please use this link to tell us about the job and add any photos that may help:",
+      "Thanks for contacting Green Construction!",
+      "",
+      "To help us understand your project and prepare your quote, please tell us what you need and upload a few photos of the work area using the link below.",
       "",
       QUOTE_URL,
     ]);
@@ -143,7 +148,7 @@ describe("5. business names with special characters", () => {
       const { body } = parseSmsHref(href);
       assert.equal(body, message);
       assert.equal(body.split("\n").at(-1), QUOTE_URL);
-      assert.equal(body.split("\n").length, 3, "business name cannot inject extra lines");
+      assert.equal(body.split("\n").length, 5, "business name cannot inject extra lines");
       assert.doesNotMatch(href.slice(href.indexOf("?") + 1), /&(?!$)/, "raw & would split the body");
     });
   }
@@ -152,7 +157,7 @@ describe("5. business names with special characters", () => {
     for (const missing of [null, undefined, "", "   ", "\n"]) {
       assert.equal(
         buildQuoteLinkIntro(missing),
-        "Hi, thanks for getting in touch. Please use this link to tell us about the job and add any photos that may help:"
+        "Thanks for getting in touch!\n\nTo help us understand your project and prepare your quote, please tell us what you need and upload a few photos of the work area using the link below."
       );
     }
   });

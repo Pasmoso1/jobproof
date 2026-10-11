@@ -1,8 +1,35 @@
+import { cache } from "react";
+import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContractorByQuoteSlug } from "@/lib/quote-requests/public";
+import { buildQuoteRequestPageMetadata } from "@/lib/quote-requests/link-preview";
+import { resolveAppUrl } from "@/lib/stripe";
 import { QuoteRequestForm } from "./quote-request-form";
 
 export const dynamic = "force-dynamic";
+
+const loadContractor = cache(getContractorByQuoteSlug);
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  return buildQuoteRequestPageMetadata(await loadContractor(slug), resolveAppUrl());
+}
+
+function PoweredByJobProof() {
+  return (
+    <p className="mt-6 text-center text-xs text-zinc-500">
+      Powered by{" "}
+      <Link href="/" className="font-medium text-zinc-700 hover:text-zinc-900">
+        JobProof
+      </Link>
+    </p>
+  );
+}
 
 export default async function PublicQuotePage({
   params,
@@ -10,7 +37,7 @@ export default async function PublicQuotePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const contractor = await getContractorByQuoteSlug(slug);
+  const contractor = await loadContractor(slug);
   if (!contractor) notFound();
 
   if (!contractor.quote_ready) {
@@ -44,11 +71,13 @@ export default async function PublicQuotePage({
                 className="mx-auto mb-4 h-16 w-auto max-w-[200px] object-contain"
               />
             ) : null}
-            <p className="text-sm font-medium text-zinc-900">{contractor.business_name}</p>
+            <p className="text-lg font-semibold text-zinc-900 break-words">
+              {contractor.business_name}
+            </p>
             {contractor.trade_label ? (
-              <p className="mt-1 text-sm text-zinc-600">{contractor.trade_label}</p>
+              <p className="mt-0.5 text-sm text-zinc-600">{contractor.trade_label}</p>
             ) : null}
-            <h1 className="mt-2 text-2xl font-bold text-zinc-900">Request a Quote</h1>
+            <h1 className="mt-3 text-2xl font-bold text-zinc-900">Request a Quote</h1>
             <p className="mt-2 text-sm text-zinc-600">
               Upload photos and answer a few questions.
             </p>
@@ -59,6 +88,7 @@ export default async function PublicQuotePage({
 
           <QuoteRequestForm slug={contractor.quote_slug} contractorPhone={contractor.phone} />
         </div>
+        <PoweredByJobProof />
       </div>
     </div>
   );

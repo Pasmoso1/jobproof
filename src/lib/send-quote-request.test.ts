@@ -284,10 +284,10 @@ describe("5. share context uses the contractor's quote-request URL", () => {
 
   it("SMS message uses that URL and falls back without a business name", () => {
     const named = buildQuoteLinkMessage({ businessName: "Green Construction", quoteUrl: QUOTE_URL });
-    assert.ok(named.startsWith("Hi, thanks for contacting Green Construction."));
+    assert.ok(named.startsWith("Thanks for contacting Green Construction!\n\n"));
     assert.ok(named.endsWith(`\n\n${QUOTE_URL}`));
     const unnamed = buildQuoteLinkMessage({ businessName: null, quoteUrl: QUOTE_URL });
-    assert.ok(unnamed.startsWith("Hi, thanks for getting in touch."));
+    assert.ok(unnamed.startsWith("Thanks for getting in touch!\n\n"));
     const href = buildSmsHref("+14165550123", named);
     assert.equal(decodeURIComponent(href.split("?body=")[1]!), named);
   });
@@ -321,7 +321,7 @@ describe("6. copy and native share use the quote URL", () => {
     assert.equal(await shareQuoteLink(QUOTE_URL, "Green Construction"), "shared");
     assert.equal(shared[0]?.url, QUOTE_URL);
     assert.equal(shared[0]?.title, "Request a quote");
-    assert.match(shared[0]?.text ?? "", /^Hi, thanks for contacting Green Construction\./);
+    assert.match(shared[0]?.text ?? "", /^Thanks for contacting Green Construction!/);
   });
 
   it("cancelling the share sheet does not fall back to copying", async () => {
