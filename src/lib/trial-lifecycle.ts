@@ -6,8 +6,6 @@ import {
   resolveEffectivePlanTier,
   type PlanEntitlementProfile,
 } from "@/lib/plan-entitlements";
-import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
-
 /** Calendar length of the JobProof-managed free trial. */
 export const JOBPROOF_TRIAL_DAYS = 14;
 
@@ -44,25 +42,15 @@ export function hasSelectedTrialPlan(
   return resolveTrialPlanTier(profile) != null;
 }
 
-/** Business profile + primary trade required before the trial clock starts. */
+/**
+ * Initial onboarding: business name + primary trade. Phone and address are collected later,
+ * when a formal document (contract, invoice, sent estimate) or subscription checkout needs them.
+ */
 export function isOnboardingCompleteForTrial(
-  profile: TrialLifecycleProfile | null | undefined,
-  accountEmail: string
+  profile: Pick<TrialLifecycleProfile, "business_name" | "quote_primary_trade"> | null | undefined
 ): boolean {
   if (!profile) return false;
-  if (
-    !isBusinessProfileCompleteForApp({
-      business_name: profile.business_name,
-      account_email: accountEmail,
-      phone: profile.phone,
-      address_line_1: profile.address_line_1,
-      city: profile.city,
-      province: profile.province,
-      postal_code: profile.postal_code,
-    })
-  ) {
-    return false;
-  }
+  if (!String(profile.business_name ?? "").trim()) return false;
   return Boolean(String(profile.quote_primary_trade ?? "").trim());
 }
 
@@ -70,6 +58,27 @@ export function hasJobProofTrialStarted(
   profile: TrialLifecycleProfile | null | undefined
 ): boolean {
   return Boolean(String(profile?.trial_started_at ?? "").trim());
+}
+
+/**
+ * Plan chosen but the managed trial has not been activated. `pending_trial` grants write
+ * access, so these accounts must stay on onboarding until the trial clock starts.
+ */
+export function needsTrialActivation(
+  profile:
+    | Pick<
+        TrialLifecycleProfile,
+        "subscription_status" | "trial_started_at" | "stripe_subscription_id" | "beta_tester"
+      >
+    | null
+    | undefined
+): boolean {
+  if (!profile || profile.beta_tester === true) return false;
+  if (String(profile.subscription_status ?? "").trim().toLowerCase() !== "pending_trial") {
+    return false;
+  }
+  if (hasJobProofTrialStarted(profile)) return false;
+  return !String(profile.stripe_subscription_id ?? "").trim();
 }
 
 export function computeTrialEndsAt(startedAt: Date = new Date()): Date {

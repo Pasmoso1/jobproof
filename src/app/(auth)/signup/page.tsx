@@ -405,15 +405,16 @@ export default function SignupPage() {
 
   if (postSubmitView === "new_user_check_email") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4">
+      <div className="flex min-h-screen flex-col items-center bg-zinc-50 px-4 py-6 sm:justify-center sm:py-12">
         <div className="w-full max-w-sm">
-          <Link href="/" className="mb-8 block text-center">
+          <Link href="/" className="mb-5 block text-center sm:mb-8">
             <JobProofLogo className="mx-auto h-10 w-auto" />
           </Link>
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
             <h1 className="text-xl font-semibold text-zinc-900">Check your email</h1>
             <p className="mt-3 text-sm text-zinc-600">
-              We&apos;ve sent a confirmation link to <strong>{email}</strong>.
+              We&apos;ve sent a confirmation link to{" "}
+              <strong className="break-all text-zinc-900">{email}</strong>.
             </p>
             <p className="mt-2 text-sm text-zinc-600">
               You must confirm your email before you can sign in. Click the link
@@ -430,24 +431,27 @@ export default function SignupPage() {
             )}
 
             {resendSuccess && (
-              <p className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+              <p
+                className="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700"
+                role="status"
+              >
                 We sent a new confirmation email. Please check your inbox and spam
                 folder.
               </p>
             )}
 
-            <div className="mt-6 space-y-3">
+            <div className="mt-5 space-y-3">
               <button
                 type="button"
                 onClick={handleResend}
                 disabled={resendLoading}
-                className="w-full rounded-lg border border-zinc-300 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-70"
+                className="min-h-12 w-full rounded-lg border border-zinc-300 px-4 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-70"
               >
                 {resendLoading ? "Sending..." : "Resend confirmation email"}
               </button>
               <Link
                 href="/login"
-                className="block w-full rounded-lg bg-[#2436BB] px-4 py-3 text-center text-sm font-medium text-white hover:bg-[#1c2a96]"
+                className="flex min-h-12 w-full items-center justify-center rounded-lg bg-[#2436BB] px-4 py-3 text-center text-sm font-medium text-white hover:bg-[#1c2a96]"
               >
                 Back to sign in
               </Link>

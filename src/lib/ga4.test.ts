@@ -46,7 +46,7 @@ function installBrowserMocks() {
     gtag,
     sessionStorage: storage,
     localStorage: storage,
-    location: { search: "", pathname: "/signup" },
+    location: { search: "", pathname: "/signup", hostname: "www.jobproof.ca" },
   };
   (globalThis as { document?: { cookie: string } }).document = { cookie: "" };
 
@@ -221,19 +221,34 @@ describe("signup funnel analytics wiring", () => {
     );
 
     const form = read("src/app/(app)/onboarding/business-profile/onboarding-business-form.tsx");
-    const save = form.indexOf("await updateProfileBusinessInfo(formData)");
-    const errorReturn = form.indexOf("if (result?.error) {", save);
+    const save = form.indexOf("await completeOnboardingBusinessSetup(formData)");
+    const errorReturn = form.indexOf("if (!result.success) {", save);
     const fire = form.indexOf('"onboarding_complete"', save);
-    const navigate = form.indexOf('router.push("/dashboard")', save);
+    const navigate = form.indexOf("router.push(result.redirectTo)", save);
     assert.ok(save > 0 && errorReturn > save && fire > errorReturn && navigate > fire);
+    assert.equal(form.match(/"onboarding_complete"/g)?.length, 1);
+  });
+
+  it("onboarding_plan_selected fires only after the plan is saved, with the tier only", () => {
+    const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+    const form = read("src/app/(app)/onboarding/plan/plan-selection-form.tsx");
+    const save = form.indexOf("await selectOnboardingPlan(planTier)");
+    const errorReturn = form.indexOf("if (!result.success) {", save);
+    const fire = form.indexOf("GA4_FUNNEL_EVENTS.onboarding_plan_selected", save);
+    const navigate = form.indexOf("router.push(result.redirectTo)", save);
+    assert.ok(save > 0 && errorReturn > save && fire > errorReturn && navigate > fire);
+    assert.match(form, /onboarding_plan_selected, \{ plan_tier: planTier \}\)/);
   });
 
   it("does not install a second GA measurement ID", () => {
     const layout = readFileSync(join(process.cwd(), "src/app/layout.tsx"), "utf8");
-    const matches = layout.match(/G-74H8WQ0KQ4/g) ?? [];
-    // config + script src only
-    assert.equal(matches.length, 2);
-    assert.doesNotMatch(layout, /gtag\/js\?id=G-(?!74H8WQ0KQ4)/);
+    // The tag is installed only through the hostname-gated bootstrap.
+    assert.doesNotMatch(layout, /G-[A-Z0-9]{4,}/);
+    assert.doesNotMatch(layout, /googletagmanager/);
+    assert.equal(layout.match(/<Script id="google-analytics"/g)?.length, 1);
+    assert.match(layout, /const ga4BootstrapScript = buildGa4BootstrapScript\(\);/);
+    const env = readFileSync(join(process.cwd(), "src/lib/ga4-environment.ts"), "utf8");
+    assert.equal(env.match(/G-[A-Z0-9]{4,}/g)?.length, 1);
     const funnelTrackers = readFileSync(
       join(process.cwd(), "src/components/contractor-funnel-trackers.tsx"),
       "utf8"
@@ -251,6 +266,7 @@ describe("signup funnel analytics wiring", () => {
         "contractor_section_cta_click",
         "email_verification_required",
         "onboarding_complete",
+        "onboarding_plan_selected",
         "onboarding_start",
         "sample_quote_cta_click",
         "sample_quote_view",

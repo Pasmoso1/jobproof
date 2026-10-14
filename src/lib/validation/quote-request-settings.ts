@@ -53,10 +53,8 @@ export function validateQuoteRequestSettings(input: {
     fieldErrors.businessName = "Business name is required.";
   }
 
+  // Optional here: shown on the public quote page when set; required later for formal documents.
   const businessPhone = input.businessPhone.trim();
-  if (!businessPhone) {
-    fieldErrors.businessPhone = "Business phone is required.";
-  }
 
   const logoUrlRaw = input.logoUrl.trim();
   let logoUrl: string | null = null;

@@ -4,7 +4,10 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
+import {
+  BUSINESS_DETAILS_REQUIRED_MESSAGE,
+  isBusinessProfileCompleteForApp,
+} from "@/lib/validation/business-profile";
 import {
   parsePositiveContractPrice,
   validateCustomerEmail,
@@ -667,7 +670,7 @@ export async function sendEstimate(
   ) {
     return {
       error:
-        "Please complete your business profile before sending. Go to Settings → Business.",
+        BUSINESS_DETAILS_REQUIRED_MESSAGE,
     };
   }
 

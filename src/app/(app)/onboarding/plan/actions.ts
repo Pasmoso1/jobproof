@@ -4,15 +4,17 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { parseBillingPlanTier } from "@/lib/billing-plan-display";
 import type { BillingPlanTier } from "@/lib/stripe";
-import { isBetaTesterProfile, needsPlanSelection } from "@/lib/beta-tester";
+import { isBetaTesterProfile } from "@/lib/beta-tester";
 import { saveSelectedTrialPlan } from "@/lib/start-managed-trial";
-import { markTrialStartedAnalyticsPending } from "@/lib/ga4-trial-started-server";
-import { isOnboardingCompleteForTrial } from "@/lib/trial-lifecycle";
+import { hasJobProofTrialStarted } from "@/lib/trial-lifecycle";
 
 export type SelectOnboardingPlanResult =
   | { success: true; redirectTo: string }
   | { success: false; error: string };
 
+const BUSINESS_SETUP_PATH = "/onboarding/business-profile";
+
+/** Saves the chosen plan; the trial itself starts after business setup. */
 export async function selectOnboardingPlan(
   planTier: BillingPlanTier
 ): Promise<SelectOnboardingPlanResult> {
@@ -30,51 +32,27 @@ export async function selectOnboardingPlan(
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, beta_tester, stripe_subscription_id, subscription_status, plan_tier, trial_plan_tier, trial_started_at, trial_ends_at, trial_email_welcome_sent_at, trial_email_started_sent_at, business_name, phone, address_line_1, city, province, postal_code, quote_primary_trade"
+      "id, beta_tester, stripe_subscription_id, subscription_status, plan_tier, trial_plan_tier, trial_started_at, trial_ends_at, trial_email_welcome_sent_at, trial_email_started_sent_at, business_name, quote_primary_trade"
     )
     .eq("user_id", user.id)
     .single();
 
   if (!profile?.id) {
-    return { success: false, error: "Profile not found." };
+    return { success: false, error: "Could not load your account. Please try again." };
   }
 
   if (isBetaTesterProfile(profile)) {
-    redirect("/dashboard");
-  }
-
-  if (!needsPlanSelection(profile) && profile.trial_started_at) {
-    redirect("/dashboard");
-  }
-
-  const result = await saveSelectedTrialPlan(
-    supabase,
-    profile,
-    tier,
-    user.email ?? ""
-  );
-  if (!result.ok) {
-    return { success: false, error: result.error };
-  }
-  if (result.trialStarted) {
-    await markTrialStartedAnalyticsPending(tier);
-  }
-
-  const { data: refreshed } = await supabase
-    .from("profiles")
-    .select(
-      "business_name, phone, address_line_1, city, province, postal_code, quote_primary_trade, trial_started_at, plan_tier, trial_plan_tier"
-    )
-    .eq("id", profile.id)
-    .single();
-
-  if (
-    refreshed &&
-    isOnboardingCompleteForTrial(refreshed, user.email ?? "") &&
-    refreshed.trial_started_at
-  ) {
     return { success: true, redirectTo: "/dashboard" };
   }
 
-  return { success: true, redirectTo: "/onboarding/business-profile" };
+  if (hasJobProofTrialStarted(profile) || String(profile.stripe_subscription_id ?? "").trim()) {
+    return { success: true, redirectTo: "/dashboard" };
+  }
+
+  const result = await saveSelectedTrialPlan(supabase, profile, tier, user.email ?? "");
+  if (!result.ok) {
+    return { success: false, error: result.error };
+  }
+
+  return { success: true, redirectTo: BUSINESS_SETUP_PATH };
 }

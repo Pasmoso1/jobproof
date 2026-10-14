@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
+import {
+  getMissingBusinessDetails,
+  isBusinessProfileCompleteForApp,
+} from "@/lib/validation/business-profile";
+import { BusinessDetailsNeededNotice } from "@/components/business-details-needed-notice";
 import {
   getJob,
   getJobUpdatesWithSignedAttachmentUrls,
@@ -159,12 +163,11 @@ export default async function JobDetailPage({
         </div>
       )}
       {businessIncomplete && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Complete your business profile to send contracts and invoices.{" "}
-          <Link href="/settings/business" className="font-medium underline hover:no-underline">
-            Add business details →
-          </Link>
-        </div>
+        <BusinessDetailsNeededNotice
+          missing={getMissingBusinessDetails(profile)}
+          returnTo={`/jobs/${jobId}`}
+          action="send contracts, change orders and invoices"
+        />
       )}
       <div>
         <Link

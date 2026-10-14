@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updateProfileBusinessInfo } from "@/app/(app)/actions";
-import { validateBusinessProfileFields } from "@/lib/validation/business-profile";
+import {
+  BUSINESS_NAME_MAX_LENGTH,
+  validateOnboardingBusinessName,
+} from "@/lib/validation/business-profile";
 import { normalizeAdditionalTrades } from "@/lib/quote-requests/trade";
 import { ContractorTradesServicesFields } from "@/components/contractor/contractor-trades-services-fields";
-import { ProvinceSelect } from "@/components/canada/province-select";
-import { provinceSelectValue } from "@/lib/canada/provinces";
-import { formatCanadianPhoneForDisplay } from "@/lib/canada/phone";
 import {
   GA4_FUNNEL_EVENTS,
   buildAcquisitionContext,
@@ -16,60 +15,50 @@ import {
 } from "@/lib/ga4";
 import { readFirstTouchClient } from "@/lib/attribution-first-touch";
 import { readPartnerRefClient } from "@/lib/partners/partner-ref-cookie";
+import { completeOnboardingBusinessSetup } from "./actions";
 
 type Profile = {
   id: string;
   business_name: string | null;
-  contractor_name: string | null;
-  phone: string | null;
-  address_line_1: string | null;
-  address_line_2: string | null;
-  city: string | null;
-  province: string | null;
-  postal_code: string | null;
-  business_contact_email?: string | null;
   quote_primary_trade?: string | null;
   quote_primary_trade_other?: string | null;
   quote_additional_trades?: string[] | null;
   contractor_extra_capabilities?: string | null;
 } | null;
 
+const INPUT_CLASS =
+  "mt-1 block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-base text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]";
+
 export function OnboardingBusinessForm({
   profile,
-  userEmail,
   confirmed,
+  redirectTo,
+  startsTrial = true,
   maxTotalTrades = 2,
 }: {
   profile: Profile;
-  userEmail: string;
   confirmed: boolean;
+  redirectTo: string;
+  /** False for accounts whose trial or subscription already exists (profile fix-up only). */
+  startsTrial?: boolean;
   maxTotalTrades?: number | null;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Not cleared on success: the form stays locked until the dashboard replaces this page.
+  const [saving, setSaving] = useState(false);
+  const [isNavigating, startTransition] = useTransition();
+  const inFlight = useRef(false);
+  const busy = saving || isNavigating;
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const [businessName, setBusinessName] = useState(profile?.business_name ?? "");
-  const [contractorName, setContractorName] = useState(profile?.contractor_name ?? "");
-  const [businessContactEmail, setBusinessContactEmail] = useState(
-    () => profile?.business_contact_email?.trim() || userEmail
-  );
-  const [phone, setPhone] = useState(() => formatCanadianPhoneForDisplay(profile?.phone));
-  const [addressLine1, setAddressLine1] = useState(profile?.address_line_1 ?? "");
-  const [addressLine2, setAddressLine2] = useState(profile?.address_line_2 ?? "");
-  const [city, setCity] = useState(profile?.city ?? "");
-  const [province, setProvince] = useState(profile?.province ?? "");
-  const [postalCode, setPostalCode] = useState(profile?.postal_code ?? "");
   const [primaryTrade, setPrimaryTrade] = useState(profile?.quote_primary_trade ?? "");
   const [primaryTradeOther, setPrimaryTradeOther] = useState(
     profile?.quote_primary_trade_other ?? ""
   );
   const [additionalTrades, setAdditionalTrades] = useState<string[]>(
     normalizeAdditionalTrades(profile?.quote_additional_trades)
-  );
-  const [contractorExtraCapabilities, setContractorExtraCapabilities] = useState(
-    profile?.contractor_extra_capabilities ?? ""
   );
 
   function clearFieldError(key: string) {
@@ -82,52 +71,45 @@ export function OnboardingBusinessForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy || inFlight.current) return;
     setError(null);
 
-    const errs = validateBusinessProfileFields({
-      business_name: businessName,
-      account_email: userEmail,
-      phone,
-      address_line_1: addressLine1,
-      city,
-      province,
-      postal_code: postalCode,
-    });
+    const errs: Record<string, string> = {};
+    const nameError = validateOnboardingBusinessName(businessName);
+    if (nameError) errs.business_name = nameError;
+    if (!primaryTrade.trim()) errs.primaryTrade = "Select a primary trade.";
+    else if (primaryTrade === "Other" && !primaryTradeOther.trim()) {
+      errs.primaryTradeOther = "Please specify your trade.";
+    }
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
       return;
     }
     setFieldErrors({});
-    setLoading(true);
+    inFlight.current = true;
+    setSaving(true);
 
     const formData = new FormData();
     formData.set("business_name", businessName.trim());
-    formData.set("contractor_name", contractorName.trim());
-    formData.set("business_contact_email", businessContactEmail.trim());
-    formData.set("phone", phone.trim());
-    formData.set("address_line_1", addressLine1.trim());
-    formData.set("address_line_2", addressLine2.trim());
-    formData.set("city", city.trim());
-    formData.set("province", province.trim());
-    formData.set("postal_code", postalCode.trim());
     formData.set("primaryTrade", primaryTrade.trim());
     formData.set("primaryTradeOther", primaryTradeOther.trim());
-    formData.set("primaryTradeRequired", "1");
-    for (const trade of additionalTrades) {
-      formData.append("additionalTrades", trade);
+    formData.set("redirect", redirectTo);
+
+    let result: Awaited<ReturnType<typeof completeOnboardingBusinessSetup>>;
+    try {
+      result = await completeOnboardingBusinessSetup(formData);
+    } catch {
+      result = {
+        success: false,
+        error: "Could not save your business details. Please check your connection and try again.",
+      };
     }
-    formData.set("contractor_extra_capabilities", contractorExtraCapabilities);
 
-    const result = await updateProfileBusinessInfo(formData);
-
-    setLoading(false);
-
-    if (result && "fieldErrors" in result && result.fieldErrors) {
-      setFieldErrors(result.fieldErrors);
-      return;
-    }
-    if (result?.error) {
-      setError(result.error);
+    if (!result.success) {
+      inFlight.current = false;
+      setSaving(false);
+      if (result.fieldErrors) setFieldErrors(result.fieldErrors);
+      if (result.error) setError(result.error);
       return;
     }
 
@@ -144,251 +126,107 @@ export function OnboardingBusinessForm({
       }
     );
 
-    router.push("/dashboard");
-    router.refresh();
+    startTransition(() => {
+      router.push(result.redirectTo);
+    });
   }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm"
+      noValidate
+      aria-busy={busy}
+      className="space-y-5 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6"
     >
-      <p className="text-sm text-zinc-600">
-        This information will appear on your contracts and invoices and is required.
-      </p>
-
       {confirmed && (
         <div
-          className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+          className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
           role="status"
         >
-          Your email has been confirmed. Your account is ready to use.
+          Your email has been confirmed.
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
           {error}
         </div>
       )}
 
       <div>
-        <label htmlFor="businessName" className="block text-sm font-medium text-zinc-700">
-          Business name <span className="text-red-500">*</span>
+        <label htmlFor="businessName" className="block text-sm font-medium text-zinc-800">
+          Business name
         </label>
         <input
           id="businessName"
+          name="business_name"
           type="text"
+          autoComplete="organization"
+          required
+          maxLength={BUSINESS_NAME_MAX_LENGTH}
           value={businessName}
           onChange={(e) => {
             setBusinessName(e.target.value);
             clearFieldError("business_name");
           }}
-          placeholder="Acme Construction Ltd."
-          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
+          placeholder="Acme Renovations"
+          className={INPUT_CLASS}
           aria-invalid={!!fieldErrors.business_name}
+          aria-describedby={fieldErrors.business_name ? "businessName-error" : undefined}
         />
         {fieldErrors.business_name && (
-          <p className="mt-1 text-sm text-red-600" role="alert">
+          <p id="businessName-error" className="mt-1 text-sm text-red-600" role="alert">
             {fieldErrors.business_name}
           </p>
         )}
       </div>
 
-      <div>
-        <label htmlFor="contractorName" className="block text-sm font-medium text-zinc-700">
-          Contractor name (optional)
-        </label>
-        <input
-          id="contractorName"
-          type="text"
-          value={contractorName}
-          onChange={(e) => setContractorName(e.target.value)}
-          placeholder="John Smith"
-          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-        />
-      </div>
+      <ContractorTradesServicesFields
+        primaryOnly
+        primaryTrade={primaryTrade}
+        primaryTradeOther={primaryTradeOther}
+        additionalTrades={additionalTrades}
+        contractorExtraCapabilities={profile?.contractor_extra_capabilities ?? ""}
+        onPrimaryTradeChange={(value) => {
+          setPrimaryTrade(value);
+          clearFieldError("primaryTrade");
+        }}
+        onPrimaryTradeOtherChange={(value) => {
+          setPrimaryTradeOther(value);
+          clearFieldError("primaryTradeOther");
+        }}
+        onAdditionalTradesChange={setAdditionalTrades}
+        onContractorExtraCapabilitiesChange={() => {}}
+        fieldErrors={fieldErrors}
+        primaryTradeRequired
+        maxTotalTrades={maxTotalTrades}
+        inputClassName={INPUT_CLASS}
+        selectClassName={INPUT_CLASS}
+      />
 
-      <div>
-        <label htmlFor="businessContactEmail" className="block text-sm font-medium text-zinc-700">
-          Business contact email
-        </label>
-        <input
-          id="businessContactEmail"
-          type="email"
-          value={businessContactEmail}
-          onChange={(e) => {
-            setBusinessContactEmail(e.target.value);
-            clearFieldError("business_contact_email");
-          }}
-          placeholder={userEmail || "you@example.com"}
-          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-          aria-invalid={!!fieldErrors.business_contact_email}
-        />
-        {fieldErrors.business_contact_email && (
-          <p className="mt-1 text-sm text-red-600" role="alert">
-            {fieldErrors.business_contact_email}
-          </p>
-        )}
-        <p className="mt-1 text-xs text-zinc-500">
-          Shown on invoices to customers. Defaults to your login email ({userEmail || "—"}).
-        </p>
-      </div>
-
-      <div>
-        <label htmlFor="phone" className="block text-sm font-medium text-zinc-700">
-          Phone <span className="text-red-500">*</span>
-        </label>
-        <input
-          id="phone"
-          type="tel"
-          value={phone}
-          onChange={(e) => {
-            setPhone(e.target.value);
-            clearFieldError("phone");
-          }}
-          placeholder="(555) 123-4567"
-          className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-          aria-invalid={!!fieldErrors.phone}
-        />
-        {fieldErrors.phone && (
-          <p className="mt-1 text-sm text-red-600" role="alert">
-            {fieldErrors.phone}
-          </p>
-        )}
-      </div>
-
-      <div className="space-y-4">
-        <div>
-          <label htmlFor="addressLine1" className="block text-sm font-medium text-zinc-700">
-            Address line 1 <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="addressLine1"
-            type="text"
-            value={addressLine1}
-            onChange={(e) => {
-              setAddressLine1(e.target.value);
-              clearFieldError("address_line_1");
-            }}
-            placeholder="123 Main St"
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-            aria-invalid={!!fieldErrors.address_line_1}
-          />
-          {fieldErrors.address_line_1 && (
-            <p className="mt-1 text-sm text-red-600" role="alert">
-              {fieldErrors.address_line_1}
-            </p>
-          )}
-        </div>
-        <div>
-          <label htmlFor="addressLine2" className="block text-sm font-medium text-zinc-700">
-            Address line 2
-          </label>
-          <input
-            id="addressLine2"
-            type="text"
-            value={addressLine2}
-            onChange={(e) => setAddressLine2(e.target.value)}
-            placeholder="Suite 100"
-            className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-          />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div>
-            <label htmlFor="city" className="block text-sm font-medium text-zinc-700">
-              City <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="city"
-              type="text"
-              value={city}
-              onChange={(e) => {
-                setCity(e.target.value);
-                clearFieldError("city");
-              }}
-              placeholder="City"
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-              aria-invalid={!!fieldErrors.city}
-            />
-            {fieldErrors.city && (
-              <p className="mt-1 text-sm text-red-600" role="alert">
-                {fieldErrors.city}
-              </p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="province" className="block text-sm font-medium text-zinc-700">
-              Province <span className="text-red-500">*</span>
-            </label>
-            <ProvinceSelect
-              id="province"
-              name="province"
-              required
-              value={provinceSelectValue(province)}
-              onChange={(v) => {
-                setProvince(v);
-                clearFieldError("province");
-              }}
-              aria-invalid={!!fieldErrors.province}
-            />
-            {fieldErrors.province && (
-              <p className="mt-1 text-sm text-red-600" role="alert">
-                {fieldErrors.province}
-              </p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="postalCode" className="block text-sm font-medium text-zinc-700">
-              Postal code <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="postalCode"
-              type="text"
-              value={postalCode}
-              onChange={(e) => {
-                setPostalCode(e.target.value);
-                clearFieldError("postal_code");
-              }}
-              placeholder="Postal code"
-              className="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-              aria-invalid={!!fieldErrors.postal_code}
-            />
-            {fieldErrors.postal_code && (
-              <p className="mt-1 text-sm text-red-600" role="alert">
-                {fieldErrors.postal_code}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="border-t border-zinc-200 pt-6">
-        <ContractorTradesServicesFields
-          primaryTrade={primaryTrade}
-          primaryTradeOther={primaryTradeOther}
-          additionalTrades={additionalTrades}
-          contractorExtraCapabilities={contractorExtraCapabilities}
-          onPrimaryTradeChange={setPrimaryTrade}
-          onPrimaryTradeOtherChange={setPrimaryTradeOther}
-          onAdditionalTradesChange={setAdditionalTrades}
-          onContractorExtraCapabilitiesChange={setContractorExtraCapabilities}
-          fieldErrors={fieldErrors}
-          primaryTradeRequired={true}
-          maxTotalTrades={maxTotalTrades}
-          inputClassName="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 placeholder-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-          selectClassName="mt-1 block w-full rounded-lg border border-zinc-300 px-4 py-2.5 text-zinc-900 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB]"
-        />
-      </div>
-
-      <div className="border-t border-zinc-200 pt-6">
+      <div className="pt-1">
         <button
           type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-[#2436BB] px-4 py-3 font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
+          disabled={busy}
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#2436BB] px-4 text-base font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2436BB] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {loading ? "Saving..." : "Save and start free trial"}
+          {busy ? (
+            <>
+              <span
+                className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+                aria-hidden="true"
+              />
+              <span>{startsTrial ? "Starting your trial…" : "Saving…"}</span>
+            </>
+          ) : startsTrial ? (
+            "Start my 14-day free trial"
+          ) : (
+            "Save and continue"
+          )}
         </button>
+        {startsTrial ? (
+          <p className="mt-2 text-center text-xs text-zinc-500">No credit card required.</p>
+        ) : null}
       </div>
     </form>
   );

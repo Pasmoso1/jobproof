@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BillingPlanTier } from "@/lib/stripe";
 import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
@@ -17,12 +18,13 @@ type ProfileRow = TrialLifecycleProfile & {
   trial_email_started_sent_at?: string | null;
 };
 
+/** Persists the chosen plan only; the trial starts after business setup (`maybeStartManagedTrial`). */
 export async function saveSelectedTrialPlan(
   supabase: SupabaseClient,
   profile: ProfileRow,
   planTier: BillingPlanTier,
   accountEmail: string
-): Promise<{ ok: true; trialStarted: boolean } | { ok: false; error: string }> {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   if (hasJobProofTrialStarted(profile)) {
     return {
       ok: false,
@@ -31,13 +33,22 @@ export async function saveSelectedTrialPlan(
   }
 
   const patch = buildPendingTrialPlanPatch(planTier);
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("profiles")
     .update(patch)
-    .eq("id", profile.id);
+    .eq("id", profile.id)
+    .is("trial_started_at", null)
+    .select("id");
 
   if (error) {
-    return { ok: false, error: error.message };
+    console.error("[saveSelectedTrialPlan]", error.message);
+    return { ok: false, error: "Could not save your plan. Please try again." };
+  }
+  if (!updated?.length) {
+    return {
+      ok: false,
+      error: "Your trial plan is locked while your free trial is active.",
+    };
   }
 
   trackProductEventSafe({
@@ -48,29 +59,26 @@ export async function saveSelectedTrialPlan(
   });
 
   if (!profile.trial_email_welcome_sent_at) {
-    await sendTrialWelcomeEmail({
-      profileId: profile.id,
-      userEmail: accountEmail,
-      planTier,
+    // Sent after the response so the plan step advances without waiting on email delivery.
+    after(async () => {
+      await sendTrialWelcomeEmail({
+        profileId: profile.id,
+        userEmail: accountEmail,
+        planTier,
+      });
+      await supabase
+        .from("profiles")
+        .update({ trial_email_welcome_sent_at: new Date().toISOString() })
+        .eq("id", profile.id);
     });
-    await supabase
-      .from("profiles")
-      .update({ trial_email_welcome_sent_at: new Date().toISOString() })
-      .eq("id", profile.id);
   }
 
-  const refreshed: ProfileRow = {
-    ...profile,
-    ...patch,
-  };
-
-  const started = await maybeStartManagedTrial(supabase, refreshed, accountEmail);
-  return { ok: true, trialStarted: started };
+  return { ok: true };
 }
 
 /**
  * Starts the 14-day trial when plan is selected and onboarding is complete.
- * Idempotent if the trial already started.
+ * Idempotent: only the request whose conditional update wins starts the trial.
  */
 export async function maybeStartManagedTrial(
   supabase: SupabaseClient,
@@ -83,19 +91,21 @@ export async function maybeStartManagedTrial(
 
   const planTier = resolveTrialPlanTier(profile);
   if (!planTier) return false;
-  if (!isOnboardingCompleteForTrial(profile, accountEmail)) return false;
+  if (!isOnboardingCompleteForTrial(profile)) return false;
 
   const patch = buildTrialStartProfilePatch(planTier);
-  const { error } = await supabase
+  const { data: started, error } = await supabase
     .from("profiles")
     .update(patch)
     .eq("id", profile.id)
-    .is("trial_started_at", null);
+    .is("trial_started_at", null)
+    .select("id");
 
   if (error) {
     console.error("[maybeStartManagedTrial]", error.message);
     return false;
   }
+  if (!started?.length) return false;
 
   trackProductEventSafe({
     profileId: profile.id,

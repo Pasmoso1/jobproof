@@ -170,7 +170,7 @@ describe("signup_verified consume + dedupe", () => {
       gtag: (...args: unknown[]) => gtagCalls.push(args),
       sessionStorage: storage,
       localStorage: storage,
-      location: { search: "", pathname: "/onboarding/plan" },
+      location: { search: "", pathname: "/onboarding/plan", hostname: "www.jobproof.ca" },
     };
     Object.defineProperty(globalThis, "document", {
       configurable: true,

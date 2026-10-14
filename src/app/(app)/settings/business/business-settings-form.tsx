@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { updateProfileBusinessInfo } from "@/app/(app)/actions";
 import { validateBusinessProfileFields } from "@/lib/validation/business-profile";
 import { ProvinceSelect } from "@/components/canada/province-select";
@@ -34,10 +35,14 @@ type Profile = {
 export function BusinessSettingsForm({
   profile,
   userEmail,
+  returnTo = null,
 }: {
   profile: Profile;
   userEmail: string;
+  /** Sanitized in-app path to resume after saving (deferred profile completion). */
+  returnTo?: string | null;
 }) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [stripeAddressWarning, setStripeAddressWarning] = useState<string | null>(null);
@@ -172,6 +177,9 @@ export function BusinessSettingsForm({
       result.stripeAddressSyncWarning
     ) {
       setStripeAddressWarning(result.stripeAddressSyncWarning);
+    } else if (returnTo) {
+      router.push(returnTo);
+      return;
     }
     if (
       result &&
@@ -189,7 +197,8 @@ export function BusinessSettingsForm({
       className="space-y-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm"
     >
       <p className="text-sm text-zinc-600">
-        This information will appear on your contracts and invoices and is required.
+        Your phone and address appear on contracts, quotes and invoices, so they&apos;re required
+        before you send those documents.
       </p>
 
       {error && (
@@ -657,10 +666,10 @@ export function BusinessSettingsForm({
           disabled={loading}
           className="rounded-lg bg-[#2436BB] px-6 py-3 font-medium text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {loading ? "Saving..." : "Save"}
+          {loading ? "Saving..." : returnTo ? "Save and continue" : "Save"}
         </button>
         <Link
-          href="/dashboard"
+          href={returnTo ?? "/dashboard"}
           className="rounded-lg border border-zinc-300 px-6 py-3 font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
         >
           Cancel

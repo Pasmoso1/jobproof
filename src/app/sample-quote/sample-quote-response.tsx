@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { ContractorAcquisitionCtaLink } from "@/components/contractor-funnel-trackers";
+
+const acceptedCtaClassName =
+  "inline-flex w-full items-center justify-center rounded-xl bg-[#2436BB] px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto";
 
 type DemoNotice = "question" | "changes" | "declined" | null;
 
@@ -39,10 +43,12 @@ export function SampleQuoteResponse({
   businessName,
   questionsOrChangesIntro,
   nextSteps,
+  fromDashboard = false,
 }: {
   businessName: string;
   questionsOrChangesIntro: string;
   nextSteps: string[];
+  fromDashboard?: boolean;
 }) {
   const [accepted, setAccepted] = useState(false);
   const [notice, setNotice] = useState<DemoNotice>(null);
@@ -101,14 +107,20 @@ export function SampleQuoteResponse({
           </div>
         ) : null}
         <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-          <ContractorAcquisitionCtaLink
-            href="/signup"
-            ctaText="Create Quotes Like This"
-            ctaLocation="sample_quote_accepted"
-            className="inline-flex w-full items-center justify-center rounded-xl bg-[#2436BB] px-6 py-3.5 text-base font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 sm:w-auto"
-          >
-            Create Quotes Like This
-          </ContractorAcquisitionCtaLink>
+          {fromDashboard ? (
+            <Link href="/dashboard" className={acceptedCtaClassName}>
+              Back to dashboard
+            </Link>
+          ) : (
+            <ContractorAcquisitionCtaLink
+              href="/signup"
+              ctaText="Create Quotes Like This"
+              ctaLocation="sample_quote_accepted"
+              className={acceptedCtaClassName}
+            >
+              Create Quotes Like This
+            </ContractorAcquisitionCtaLink>
+          )}
           <button
             type="button"
             onClick={() => setAccepted(false)}

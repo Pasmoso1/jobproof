@@ -45,9 +45,9 @@ JobProof gives you a full 14-day free trial on the plan you choose (Solo or Pro)
 The trial clock does **not** start when you create your account. It starts only after you:
 
 1. Select Solo or Pro
-2. Complete your business profile (including primary trade)
+2. Add your business name and primary trade
 
-Until then, JobProof will remind you to finish setup so you do not lose trial days while you are away.
+Until then, JobProof will remind you to finish setup so you do not lose trial days while you are away. You can add your phone number and address later — JobProof asks for them before you send contracts, quotes or invoices.
 
 ### What you get
 
@@ -72,20 +72,20 @@ Include:
 - Phone number
 - Service address (street, city, province, postal code)
 
-Accurate details help customers recognize your company and make follow-up easier. Completing this step is also required before your free trial begins.
+Accurate details help customers recognize your company and make follow-up easier. Your phone number and address are required before you send contracts, quotes or invoices, because they appear on those documents. Find them under Settings → Business.
 `.trim(),
   }),
   a({
     slug: "choose-your-trades",
     title: "Choose your trades",
-    summary: "Set your primary trade (and additional trades on Pro) so quote requests match your work.",
+    summary: "Set your primary trade (and additional trades) so quote requests ask customers the right questions.",
     estimatedMinutes: 3,
     updatedAt: "2026-07-11",
     keywords: ["trades", "primary trade", "solo", "pro", "limits"],
     body: `
 ## Choose your trades
 
-Your primary trade tells JobProof what kind of work you do. It helps organize quote requests and keeps your public quote page relevant.
+Your trade helps JobProof ask customers the right questions about their projects, so you receive more useful details before preparing a quote. Additional trades customize those quote-request questions for the other work you do.
 
 - **Solo** includes a limited number of trades.
 - **Pro** supports more trades for multi-service contractors.

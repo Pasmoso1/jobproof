@@ -270,16 +270,23 @@ describe("5. share context uses the contractor's quote-request URL", () => {
   };
 
   it("returns the public URL and business name when ready", () => {
-    assert.deepEqual(resolveQuoteRequestShareContext(profile, "a@b.ca", ORIGIN), {
+    assert.deepEqual(resolveQuoteRequestShareContext(profile, ORIGIN), {
       quoteUrl: QUOTE_URL,
       businessName: "Green Construction",
     });
   });
 
   it("returns null before the profile is ready or without a slug", () => {
-    assert.equal(resolveQuoteRequestShareContext({ ...profile, quote_slug: null }, "a@b.ca", ORIGIN), null);
-    assert.equal(resolveQuoteRequestShareContext({ ...profile, phone: "" }, "a@b.ca", ORIGIN), null);
-    assert.equal(resolveQuoteRequestShareContext(null, "a@b.ca", ORIGIN), null);
+    assert.equal(resolveQuoteRequestShareContext({ ...profile, quote_slug: null }, ORIGIN), null);
+    assert.equal(resolveQuoteRequestShareContext({ ...profile, quote_primary_trade: "" }, ORIGIN), null);
+    assert.equal(resolveQuoteRequestShareContext(null, ORIGIN), null);
+  });
+
+  it("is available right after two-field onboarding (no phone or address yet)", () => {
+    assert.deepEqual(
+      resolveQuoteRequestShareContext({ ...profile, phone: "", address_line_1: "" }, ORIGIN),
+      { quoteUrl: QUOTE_URL, businessName: "Green Construction" }
+    );
   });
 
   it("SMS message uses that URL and falls back without a business name", () => {
@@ -354,6 +361,7 @@ describe("7. analytics events carry no PII and stay out of Meta and the funnel",
     (globalThis as { window?: unknown }).window = {
       gtag: (...args: unknown[]) => void gtagCalls.push(args),
       fbq: (...args: unknown[]) => void fbqCalls.push(args),
+      location: { hostname: "www.jobproof.ca" },
     };
   });
 
@@ -458,7 +466,7 @@ describe("8. Send Quote Request placements", () => {
 
   it("is reachable from the mobile header, Quote Requests and settings", () => {
     const layout = src("src/app/(app)/layout.tsx");
-    assert.match(layout, /resolveQuoteRequestShareContext\(profile, user\.email \?\? "", resolveAppUrl\(\)\)/);
+    assert.match(layout, /resolveQuoteRequestShareContext\(profile, resolveAppUrl\(\)\)/);
     assert.match(layout, /quote_slug/);
     const quoteRequests = src("src/app/(app)/quote-requests/page.tsx");
     assert.match(quoteRequests, /<SendQuoteRequestButton[\s\S]*?sourceLocation="quote_requests"/);

@@ -26,8 +26,6 @@ function src(relativePath: string): string {
 
 const ORIGIN = "https://www.jobproof.ca";
 const QUOTE_URL = `${ORIGIN}/quote/green-construction-2`;
-const EMAIL = "owner@example.com";
-
 const COMPLETE_PROFILE: QuoteReadinessProfile = {
   business_name: "Green Construction",
   phone: "416-555-0123",
@@ -215,11 +213,18 @@ describe("7. no customer PII sent to JobProof", () => {
 
 describe("8. missing or incomplete business profile", () => {
   it("is not ready without a business name or primary trade", () => {
-    assert.equal(isQuoteSharingReady({ ...COMPLETE_PROFILE, business_name: "" }, EMAIL), false);
-    assert.equal(isQuoteSharingReady({ ...COMPLETE_PROFILE, quote_primary_trade: null }, EMAIL), false);
-    assert.equal(isQuoteSharingReady({ ...COMPLETE_PROFILE, phone: null }, EMAIL), false);
-    assert.equal(isQuoteSharingReady({ ...COMPLETE_PROFILE, postal_code: "" }, EMAIL), false);
-    assert.equal(isQuoteSharingReady(null, EMAIL), false);
+    assert.equal(isQuoteSharingReady({ ...COMPLETE_PROFILE, business_name: "" }), false);
+    assert.equal(isQuoteSharingReady({ ...COMPLETE_PROFILE, quote_primary_trade: null }), false);
+    assert.equal(isQuoteSharingReady(null), false);
+  });
+
+  it("phone and address are not required to share (collected before formal documents)", () => {
+    assert.equal(isQuoteSharingReady({ ...COMPLETE_PROFILE, phone: null }), true);
+    assert.equal(isQuoteSharingReady({ ...COMPLETE_PROFILE, postal_code: "" }), true);
+    assert.equal(
+      isPublicQuotePageReady({ business_name: "Green Construction", quote_primary_trade: "Roofing" }),
+      true
+    );
   });
 
   it("public quote page is not ready for incomplete profiles", () => {
@@ -231,7 +236,7 @@ describe("8. missing or incomplete business profile", () => {
 
 describe("9. completed business profile", () => {
   it("is ready once the onboarding rule is satisfied", () => {
-    assert.equal(isQuoteSharingReady(COMPLETE_PROFILE, EMAIL), true);
+    assert.equal(isQuoteSharingReady(COMPLETE_PROFILE), true);
     assert.equal(isPublicQuotePageReady(COMPLETE_PROFILE), true);
   });
 
@@ -247,8 +252,8 @@ describe("9. completed business profile", () => {
       { ...COMPLETE_PROFILE, address_line_1: "" },
     ];
     for (const p of variants) {
-      const onboarding = isOnboardingCompleteForTrial(p, EMAIL);
-      assert.equal(isQuoteSharingReady(p, EMAIL), onboarding);
+      const onboarding = isOnboardingCompleteForTrial(p);
+      assert.equal(isQuoteSharingReady(p), onboarding);
       assert.equal(isPublicQuotePageReady(p), onboarding);
     }
   });
@@ -279,7 +284,7 @@ describe("10. sharing controls hidden before required setup", () => {
 
   it("dashboard derives readiness from the onboarding rule and passes it to the card", () => {
     const dashboard = src("src/app/(app)/dashboard/page.tsx");
-    assert.match(dashboard, /const quoteSharingReady = isQuoteSharingReady\(profile, user\?\.email \?\? ""\)/);
+    assert.match(dashboard, /const quoteSharingReady = isQuoteSharingReady\(profile\)/);
     assert.match(dashboard, /profileReady=\{quoteSharingReady\}/);
     assert.match(dashboard, /ensureQuoteSlugForProfile\(supabase,/, "automatic link creation is kept");
   });

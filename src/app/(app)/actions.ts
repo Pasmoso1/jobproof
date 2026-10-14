@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import type { EmailLog, UpdateCategory } from "@/types/database";
 import {
+  BUSINESS_DETAILS_REQUIRED_MESSAGE,
   isBusinessProfileCompleteForApp,
   validateBusinessProfileFields,
 } from "@/lib/validation/business-profile";
@@ -1645,7 +1646,7 @@ export async function createOrUpdateContract(
     ) {
       return {
         error:
-          "Please complete your business profile before proceeding. Go to Settings → Business.",
+          BUSINESS_DETAILS_REQUIRED_MESSAGE,
       };
     }
     const scopeOfWork = structured?.scopeOfWork ?? (contractData.scope as string) ?? "";
@@ -1843,7 +1844,7 @@ export async function sendContractForSigning(
   ) {
     return {
       error:
-        "Please complete your business profile before proceeding. Go to Settings → Business.",
+        BUSINESS_DETAILS_REQUIRED_MESSAGE,
     };
   }
 
@@ -2739,7 +2740,7 @@ export async function sendChangeOrderForSigning(
   ) {
     return {
       error:
-        "Please complete your business profile before proceeding. Go to Settings → Business.",
+        BUSINESS_DETAILS_REQUIRED_MESSAGE,
     };
   }
 
@@ -3578,7 +3579,7 @@ export async function createInvoice(
   ) {
     return {
       error:
-        "Please complete your business profile before proceeding. Go to Settings → Business.",
+        BUSINESS_DETAILS_REQUIRED_MESSAGE,
     };
   }
 
@@ -3928,7 +3929,7 @@ export async function resendInvoice(
   ) {
     return {
       error:
-        "Please complete your business profile before proceeding. Go to Settings → Business.",
+        BUSINESS_DETAILS_REQUIRED_MESSAGE,
     };
   }
 
@@ -4748,7 +4749,7 @@ export async function sendInvoiceReminder(
     return {
       success: false,
       error:
-        "Please complete your business profile before proceeding. Go to Settings → Business.",
+        BUSINESS_DETAILS_REQUIRED_MESSAGE,
     };
   }
 

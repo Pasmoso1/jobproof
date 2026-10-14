@@ -8,14 +8,13 @@ export type QuoteRequestShareContext = {
 
 /**
  * What the Send Quote Request action needs, or null when the contractor can't share yet
- * (incomplete business profile or no quote slug). Uses the same readiness rule as the dashboard.
+ * (business name / primary trade missing, or no quote slug). Same readiness rule as the dashboard.
  */
 export function resolveQuoteRequestShareContext(
   profile: (QuoteReadinessProfile & { quote_slug?: string | null }) | null | undefined,
-  accountEmail: string,
   appOrigin: string
 ): QuoteRequestShareContext | null {
-  if (!profile || !isQuoteSharingReady(profile, accountEmail)) return null;
+  if (!profile || !isQuoteSharingReady(profile)) return null;
   const quoteUrl = buildPublicQuoteUrl(appOrigin, profile.quote_slug);
   if (!quoteUrl) return null;
   return {

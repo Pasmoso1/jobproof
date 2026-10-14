@@ -61,7 +61,7 @@ function installBrowserMocks(opts: { cookie?: string; search?: string } = {}) {
     fbq: (...args: unknown[]) => metaCalls.push(args),
     sessionStorage: storage,
     localStorage: storage,
-    location: { search: opts.search ?? "", pathname: "/signup" },
+    location: { search: opts.search ?? "", pathname: "/signup", hostname: "www.jobproof.ca" },
   };
   (globalThis as { document?: { cookie: string; referrer: string } }).document = {
     cookie: opts.cookie ?? "",
