@@ -9,11 +9,51 @@
  * /auth/callback (see emails/supabase-auth/confirm-signup.html). That OTP type is the
  * authoritative server signal — Device A cookies are NOT required.
  *
- * Values are always "1". No email, user id, tokens, or partner codes.
+ * Markers are a hint only: the app shell claims profiles.ga4_signup_verified_sent_at
+ * before firing, so the event is sent once per account even across devices/tabs, and
+ * a recent confirmation with no marker (scanner-consumed link, failed PKCE exchange,
+ * other device) is still reconciled on the next authenticated app visit.
+ *
+ * Values are "1" (email confirmation) or "instant" (signup returned a session).
+ * No email, user id, tokens, or partner codes.
  */
 
 export const GA4_EMAIL_VERIFY_PENDING_COOKIE = "jp_ga4_ev_pending";
 export const GA4_SIGNUP_VERIFIED_PENDING_COOKIE = "jp_ga4_sv_pending";
+export const GA4_SIGNUP_VERIFIED_INSTANT_VALUE = "instant";
+
+export const SIGNUP_VERIFIED_SENT_AT_COLUMN = "ga4_signup_verified_sent_at";
+
+/**
+ * Only confirmations this recent are reconciled server-side, so old accounts never
+ * emit a late signup_verified on an ordinary login.
+ */
+export const SIGNUP_VERIFIED_RECONCILE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type SignupVerifiedClaimResult =
+  | "claimed"
+  | "already_recorded"
+  | "not_eligible"
+  | "retry";
+
+export function isRecentEmailConfirmation(
+  emailConfirmedAt: string | null | undefined,
+  nowMs: number
+): boolean {
+  if (!emailConfirmedAt) return false;
+  const confirmedMs = Date.parse(emailConfirmedAt);
+  if (!Number.isFinite(confirmedMs)) return false;
+  return nowMs - confirmedMs <= SIGNUP_VERIFIED_RECONCILE_WINDOW_MS;
+}
+
+/** PostgREST errors when migration 070 has not been applied yet. */
+export function isMissingSignupVerifiedSentAtColumnError(
+  error: { code?: string | null; message?: string | null } | null | undefined
+): boolean {
+  if (!error) return false;
+  if (error.code === "42703" || error.code === "PGRST204") return true;
+  return String(error.message ?? "").includes(SIGNUP_VERIFIED_SENT_AT_COLUMN);
+}
 
 /** How long we wait for the confirmation email click (same browser). */
 export const GA4_EMAIL_VERIFY_PENDING_MAX_AGE_SEC = 7 * 24 * 60 * 60;
@@ -168,9 +208,26 @@ export function clearEmailVerificationPendingClient(): void {
   }
 }
 
+export type SignupVerifiedMarkerPath = "email_confirm" | "instant_session";
+
+export function readSignupVerifiedPendingClient(): SignupVerifiedMarkerPath | null {
+  const value = readDocumentCookie(GA4_SIGNUP_VERIFIED_PENDING_COOKIE);
+  if (value === "1") return "email_confirm";
+  if (value === GA4_SIGNUP_VERIFIED_INSTANT_VALUE) return "instant_session";
+  return null;
+}
+
 export function hasSignupVerifiedPendingClient(): boolean {
-  if (readDocumentCookie(GA4_SIGNUP_VERIFIED_PENDING_COOKIE) === "1") return true;
-  return false;
+  return readSignupVerifiedPendingClient() !== null;
+}
+
+/** Signup returned a session immediately (email confirmation disabled). */
+export function markSignupVerifiedInstantPendingClient(): void {
+  writeDocumentCookie(
+    GA4_SIGNUP_VERIFIED_PENDING_COOKIE,
+    GA4_SIGNUP_VERIFIED_INSTANT_VALUE,
+    GA4_SIGNUP_VERIFIED_PENDING_MAX_AGE_SEC
+  );
 }
 
 export function clearSignupVerifiedPendingClient(): void {

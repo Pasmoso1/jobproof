@@ -540,13 +540,33 @@ describe("trial_started analytics", () => {
     assert.doesNotMatch(startTrial, /markTrialStartedAnalyticsPending|jp_ga4_ts_pending/);
   });
 
-  it("app shell consumes the marker on every navigation", () => {
+  it("keeps the marker until gtag exists, then fires exactly once", async () => {
+    const { consumeTrialStartedPendingAndTrack } = await import("@/lib/signup-funnel-analytics");
+    const mocks = installBrowserMocks(`${GA4_TRIAL_STARTED_PENDING_COOKIE}=essential`);
+    clearGa4OnceFiredForTests();
+    const win = (globalThis as unknown as { window: { gtag?: unknown } }).window;
+    const gtag = win.gtag;
+    delete win.gtag;
+
+    assert.equal(consumeTrialStartedPendingAndTrack(), false);
+    assert.match(
+      (globalThis as unknown as { document: { cookie: string } }).document.cookie,
+      new RegExp(`${GA4_TRIAL_STARTED_PENDING_COOKIE}=essential`)
+    );
+
+    win.gtag = gtag;
+    assert.equal(consumeTrialStartedPendingAndTrack(), true);
+    assert.equal(consumeTrialStartedPendingAndTrack(), false);
+    assert.equal(mocks.gtagCalls.filter((c) => c[1] === "trial_started").length, 1);
+  });
+
+  it("app shell consumes the marker on every navigation once gtag is ready", () => {
     const layout = read("src/app/(app)/layout.tsx");
     assert.match(layout, /<TrialStartedPendingBridge \/>/);
     const bridge = read("src/components/contractor-onboarding-analytics.tsx");
     assert.match(
       bridge,
-      /export function TrialStartedPendingBridge\(\)[\s\S]*?consumeTrialStartedPendingAndTrack\(\);\s*\}, \[pathname\]\);/
+      /export function TrialStartedPendingBridge\(\)[\s\S]*?waitForGa4Ready\(\)\.then\(\(\) => consumeTrialStartedPendingAndTrack\(\)\);\s*\}, \[pathname\]\);/
     );
   });
 });

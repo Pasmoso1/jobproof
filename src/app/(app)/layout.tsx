@@ -16,6 +16,7 @@ import { getAppNavLinks } from "@/lib/app-nav";
 import { SendQuoteRequestButton } from "@/components/send-quote-request";
 import { resolveQuoteRequestShareContext } from "@/lib/quote-requests/share-context";
 import { resolveAppUrl } from "@/lib/stripe";
+import { isSignupVerifiedAnalyticsPending } from "@/lib/ga4-signup-verified-server";
 
 const headerSendQuoteRequestClassName =
   "inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-lg bg-[#2436BB] px-3 text-[13px] font-semibold text-white transition-colors hover:bg-[#1c2a96] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2436BB] focus-visible:ring-offset-2 min-[400px]:text-sm";
@@ -87,13 +88,18 @@ export default async function AppLayout({
     }
   }
 
+  const signupVerifiedAnalyticsPending = await isSignupVerifiedAnalyticsPending(
+    supabase,
+    user
+  );
+
   const navLinks = getAppNavLinks({ showPartnerPortal });
   const feedbackHref = getFeedbackMailtoHref();
   const quoteShare = resolveQuoteRequestShareContext(profile, user.email ?? "", resolveAppUrl());
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <SignupVerifiedPendingBridge />
+      <SignupVerifiedPendingBridge serverPending={signupVerifiedAnalyticsPending} />
       <TrialStartedPendingBridge />
       <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex min-h-14 max-w-6xl items-center justify-between gap-3 px-4 py-2 sm:px-6">

@@ -6,49 +6,46 @@ import {
   GA4_FUNNEL_EVENTS,
   buildAcquisitionContext,
   trackGa4EventOnce,
+  waitForGa4Ready,
 } from "@/lib/ga4";
 import { readFirstTouchClient } from "@/lib/attribution-first-touch";
 import { readPartnerRefClient } from "@/lib/partners/partner-ref-cookie";
 import {
-  consumeSignupVerifiedPendingAndTrack,
   consumeTrialStartedPendingAndTrack,
+  reconcileSignupVerifiedAnalytics,
 } from "@/lib/signup-funnel-analytics";
+import { claimSignupVerifiedAnalyticsAction } from "@/app/(app)/product-analytics-actions";
 
 /**
- * Consumes auth-callback signup_verified pending marker (preferred),
- * and still accepts legacy ?confirmed=true as a secondary signal.
- *
- * Preferred path: auth/callback sets jp_ga4_sv_pending → this fires once.
+ * Accepts legacy ?confirmed=true as a secondary signal. The server claim still
+ * decides, so this cannot double-count with SignupVerifiedPendingBridge.
  */
 export function SignupVerifiedTracker({ confirmed = false }: { confirmed?: boolean }) {
   useEffect(() => {
-    if (consumeSignupVerifiedPendingAndTrack()) return;
-    // Legacy fallback: destination still has confirmed=true (e.g. older emails).
-    if (!confirmed) return;
-    trackGa4EventOnce(
-      "signup_verified",
-      GA4_FUNNEL_EVENTS.signup_verified,
-      {
-        ...buildAcquisitionContext({
-          firstTouch: readFirstTouchClient(),
-          partnerReferralPresent: Boolean(readPartnerRefClient()),
-        }),
-        method: "email",
-        verification_path: "confirmed_query",
-      }
-    );
+    void reconcileSignupVerifiedAnalytics({
+      confirmedQuery: confirmed,
+      claim: claimSignupVerifiedAnalyticsAction,
+    });
   }, [confirmed]);
   return null;
 }
 
 /**
  * Mount once in the authenticated app shell so signup_verified fires even when
- * middleware strips ?confirmed=true (e.g. redirect to /onboarding/plan).
+ * middleware strips ?confirmed=true (e.g. redirect to /onboarding/plan), and so a
+ * recent confirmation without a browser marker (serverPending) is still recorded.
  */
-export function SignupVerifiedPendingBridge() {
+export function SignupVerifiedPendingBridge({
+  serverPending = false,
+}: {
+  serverPending?: boolean;
+}) {
   useEffect(() => {
-    consumeSignupVerifiedPendingAndTrack();
-  }, []);
+    void reconcileSignupVerifiedAnalytics({
+      serverPending,
+      claim: claimSignupVerifiedAnalyticsAction,
+    });
+  }, [serverPending]);
   return null;
 }
 
@@ -60,7 +57,7 @@ export function SignupVerifiedPendingBridge() {
 export function TrialStartedPendingBridge() {
   const pathname = usePathname();
   useEffect(() => {
-    consumeTrialStartedPendingAndTrack();
+    void waitForGa4Ready().then(() => consumeTrialStartedPendingAndTrack());
   }, [pathname]);
   return null;
 }

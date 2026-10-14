@@ -204,6 +204,30 @@ describe("signup funnel analytics wiring", () => {
     assert.doesNotMatch(settingsForm, /onboarding_complete|trackGa4Event/);
   });
 
+  it("onboarding_start mounts on both onboarding steps; onboarding_complete only after a successful save", () => {
+    const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+    assert.match(
+      read("src/app/(app)/onboarding/plan/page.tsx"),
+      /<OnboardingStartTracker step="plan" \/>/
+    );
+    assert.match(
+      read("src/app/(app)/onboarding/business-profile/page.tsx"),
+      /<OnboardingStartTracker step="business_profile" \/>/
+    );
+    const trackers = read("src/components/contractor-onboarding-analytics.tsx");
+    assert.match(
+      trackers,
+      /trackGa4EventOnce\(\s*"onboarding_start",\s*GA4_FUNNEL_EVENTS\.onboarding_start/
+    );
+
+    const form = read("src/app/(app)/onboarding/business-profile/onboarding-business-form.tsx");
+    const save = form.indexOf("await updateProfileBusinessInfo(formData)");
+    const errorReturn = form.indexOf("if (result?.error) {", save);
+    const fire = form.indexOf('"onboarding_complete"', save);
+    const navigate = form.indexOf('router.push("/dashboard")', save);
+    assert.ok(save > 0 && errorReturn > save && fire > errorReturn && navigate > fire);
+  });
+
   it("does not install a second GA measurement ID", () => {
     const layout = readFileSync(join(process.cwd(), "src/app/layout.tsx"), "utf8");
     const matches = layout.match(/G-74H8WQ0KQ4/g) ?? [];
@@ -326,7 +350,12 @@ describe("signup funnel success helpers", () => {
     trackSignupSuccess({ requiresEmailVerification: false });
     const names = gtagCalls.map((c) => c[1]);
     assert.ok(names.includes("sign_up"));
-    assert.ok(names.includes("signup_verified"));
     assert.equal(names.includes("email_verification_required"), false);
+    // Sent by the app shell after the server claim, not directly from the signup page.
+    assert.equal(names.includes("signup_verified"), false);
+    assert.match(
+      (globalThis as unknown as { document: { cookie: string } }).document.cookie,
+      /jp_ga4_sv_pending=instant/
+    );
   });
 });

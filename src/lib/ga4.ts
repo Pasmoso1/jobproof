@@ -247,6 +247,24 @@ export function getGtag(): ((...args: unknown[]) => void) | undefined {
 }
 
 /**
+ * Resolves true once the root-layout gtag stub exists. The stub is injected by an
+ * afterInteractive script, so a component mounted on first load can run before it.
+ */
+export async function waitForGa4Ready(
+  timeoutMs = 10_000,
+  intervalMs = 100
+): Promise<boolean> {
+  if (getGtag()) return true;
+  if (!isBrowser()) return false;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    if (getGtag()) return true;
+  }
+  return false;
+}
+
+/**
  * Fire a GA4 event via the existing gtag install.
  * No-ops safely when gtag/window is unavailable.
  */

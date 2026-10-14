@@ -1,6 +1,8 @@
 "use server";
 
 import { trackContractorMilestone } from "@/lib/contractor-milestones";
+import type { SignupVerifiedClaimResult } from "@/lib/ga4-signup-verified-marker";
+import { claimSignupVerifiedAnalytics } from "@/lib/ga4-signup-verified-server";
 import {
   PRODUCT_ANALYTICS_EVENTS,
   trackProductEventOnce,
@@ -35,6 +37,18 @@ export async function trackOnboardingStartedAction(
     source: source.trim() || "unknown",
   });
   return { ok: true };
+}
+
+export async function claimSignupVerifiedAnalyticsAction(): Promise<SignupVerifiedClaimResult> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return await claimSignupVerifiedAnalytics(supabase, user);
+  } catch {
+    return "retry";
+  }
 }
 
 export async function trackSampleJobViewedAction(): Promise<{ ok: true } | { ok: false }> {
