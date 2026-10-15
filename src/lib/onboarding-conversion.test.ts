@@ -16,9 +16,11 @@ for (const key of [
 }
 
 import {
+  formatTrialDaysRemainingLabel,
   isOnboardingCompleteForTrial,
   needsTrialActivation,
   resolveTrialPlanTier,
+  type TrialLifecycleProfile,
 } from "@/lib/trial-lifecycle";
 import { resolveContractorPostLoginPath } from "@/lib/auth/post-login-path";
 import {
@@ -38,6 +40,7 @@ import {
   shouldShowFirstTimeDashboard,
 } from "@/lib/dashboard-first-time";
 import {
+  BUSINESS_SETTINGS_FROM_DASHBOARD_PATH,
   FIRST_QUOTE_REQUEST_BODY,
   FIRST_QUOTE_REQUEST_TITLE,
   FIRST_TIME_DASHBOARD_HEADING,
@@ -45,9 +48,21 @@ import {
   FULL_DASHBOARD_TRANSITION_NOTE,
   FirstTimeDashboard,
   MORE_QUOTE_REQUESTS_TITLE,
+  PROFILE_CARD_BODY,
+  PROFILE_CARD_CTA,
+  PROFILE_CARD_TITLE,
+  QUOTE_REQUEST_WORKFLOW,
+  SAMPLE_JOB_CARD,
+  SAMPLE_QUOTE_CARD,
   formatReceivedQuoteRequests,
   quoteRequestCardTitle,
 } from "@/components/dashboard/first-time-dashboard";
+import {
+  ACTIVE_TRIAL_NO_CARD_NOTE,
+  TRIAL_ENDING_SOON_NOTE,
+  TrialStatusBanner,
+  formatActiveTrialStatus,
+} from "@/components/trial-status-banner";
 import {
   BusinessDetailsNeededNotice,
   buildBusinessDetailsHref,
@@ -502,10 +517,10 @@ describe("12–14. first-time dashboard transition", () => {
     assert.ok(html.includes(FIRST_QUOTE_REQUEST_TITLE));
     assert.ok(html.includes(FIRST_QUOTE_REQUEST_BODY.replace("'", "&#x27;")));
     assert.match(html, />Send Quote Request</);
-    assert.match(html, /href="\/sample-quote\?from=dashboard"[^>]*>[\s\S]*?View a sample quote/);
+    assert.match(html, /href="\/sample-quote\?from=dashboard"[^>]*>View sample quote/);
     assert.match(html, /Explore a sample job/);
     assert.match(html, /Complete your business profile/);
-    assert.match(html, /Add your business phone and business address before sending/);
+    assert.match(html, /Still needed: business phone and business address\./);
     assert.equal(FULL_DASHBOARD_PATH, "/dashboard?view=full");
     assert.match(html, /href="\/dashboard\?view=full"[^>]*>View full dashboard/);
     assert.ok(html.includes(FULL_DASHBOARD_TRANSITION_NOTE));
@@ -680,5 +695,188 @@ describe("19. quote-request sharing", () => {
     const view = src("src/components/dashboard/first-time-dashboard.tsx");
     assert.match(view, /<SendQuoteRequestButton[\s\S]*?sourceLocation="dashboard"/);
     assert.match(src("src/lib/validation/quote-request-settings.ts"), /Optional here/);
+  });
+});
+
+describe("20. first-time dashboard UX", () => {
+  const renderDashboard = (props: Partial<Parameters<typeof FirstTimeDashboard>[0]> = {}) =>
+    renderToStaticMarkup(
+      createElement(FirstTimeDashboard, {
+        quoteUrl: "https://jobproof.ca/quote/green-construction",
+        businessName: "Green Construction",
+        missingProfileDetails: ["Business phone", "Business address"],
+        ...props,
+      })
+    );
+
+  it("shows the four-step quote-request workflow inside the card, before the CTA", () => {
+    assert.deepEqual(
+      QUOTE_REQUEST_WORKFLOW.map((s) => s.label),
+      [
+        "Customer contacts you",
+        "Send your quote-request link",
+        "Customer provides details and photos",
+        "Review the job and prepare your quote",
+      ]
+    );
+    const html = renderDashboard();
+    const list = html.match(/<ol aria-label="How a quote request works"[\s\S]*?<\/ol>/)?.[0] ?? "";
+    assert.equal(list.match(/<li/g)?.length, 4);
+    const listText = list.replace(/<[^>]+>/g, "");
+    let last = -1;
+    for (const step of QUOTE_REQUEST_WORKFLOW) {
+      const at = listText.indexOf(step.label);
+      assert.ok(at > last, `${step.label} in order`);
+      last = at;
+    }
+    assert.ok(html.indexOf("</ol>") < html.indexOf(">Send Quote Request<"), "workflow sits above the CTA");
+    assert.doesNotMatch(html, /<img|<video|animate-/, "no images or animations");
+  });
+
+  it("never suggests JobProof supplies the customers", () => {
+    const html = renderDashboard();
+    assert.doesNotMatch(html, /\bleads?\b|we(&#x27;ll| will) (find|send) you/i);
+    assert.match(QUOTE_REQUEST_WORKFLOW[0].label, /Customer contacts you/);
+  });
+
+  it("keeps the Send Quote Request CTA full-width and tall on mobile", () => {
+    const html = renderDashboard();
+    const button = html.match(/<button[^>]*>Send Quote Request<\/button>/)?.[0] ?? "";
+    assert.match(button, /min-h-12/);
+    assert.match(button, /w-full/);
+    assert.match(button, /sm:w-auto/);
+  });
+
+  it("sample quote and sample job are descriptive action cards on the existing routes", () => {
+    assert.deepEqual(
+      { ...SAMPLE_QUOTE_CARD },
+      {
+        title: "See a professional quote",
+        body: "Preview the type of quote you can send to customers.",
+        cta: "View sample quote",
+        href: "/sample-quote?from=dashboard",
+      }
+    );
+    assert.equal(SAMPLE_JOB_CARD.title, "Explore a sample job");
+    assert.equal(
+      SAMPLE_JOB_CARD.body,
+      "See how JobProof organizes project details, photos, approvals, and records."
+    );
+    assert.equal(SAMPLE_JOB_CARD.cta, "Explore sample job");
+    const html = renderDashboard();
+    assert.match(html, /<h3[^>]*>See a professional quote<\/h3>/);
+    assert.match(html, /<h3[^>]*>Explore a sample job<\/h3>/);
+    assert.match(
+      html,
+      /<button type="button" aria-expanded="false" aria-controls="first-time-sample-job"[^>]*>Explore sample job/
+    );
+    assert.match(html, /class="grid gap-3 sm:grid-cols-2"/, "stacked on mobile, side by side from sm");
+    const view = src("src/components/dashboard/first-time-dashboard.tsx");
+    assert.match(view, /<ProtectedJobSampleCard id="first-time-sample-job" \/>/);
+    assert.match(view, /trackSampleJobViewedAction\(\)/, "sample job analytics unchanged");
+    assert.doesNotMatch(view, /\.insert\(|createClient/, "no records are created");
+  });
+
+  it("the profile card explains the trial is active and details are only needed for documents", () => {
+    assert.equal(PROFILE_CARD_TITLE, "Complete your business profile");
+    assert.equal(
+      PROFILE_CARD_BODY,
+      "Add your business contact details so your quotes, contracts, and invoices are ready to send."
+    );
+    const html = renderDashboard();
+    assert.match(html, /Still needed: business phone and business address\. No rush — your trial is already active\./);
+    assert.match(
+      html,
+      new RegExp(`href="${BUSINESS_SETTINGS_FROM_DASHBOARD_PATH.replace(/[?]/g, "\\?")}"[^>]*>${PROFILE_CARD_CTA}`)
+    );
+    assert.doesNotMatch(html, /required to use|before you can use/i);
+  });
+
+  it("orders the page for mobile: welcome, card, workflow, CTA, samples, profile, full dashboard", () => {
+    const html = renderDashboard();
+    const order = [
+      FIRST_TIME_DASHBOARD_HEADING,
+      FIRST_QUOTE_REQUEST_TITLE,
+      "How a quote request works",
+      ">Send Quote Request<",
+      SAMPLE_QUOTE_CARD.title,
+      SAMPLE_JOB_CARD.title,
+      PROFILE_CARD_TITLE,
+      "View full dashboard",
+    ].map((needle) => html.indexOf(needle));
+    assert.ok(order.every((at) => at >= 0), "every section renders");
+    assert.deepEqual([...order].sort((a, b) => a - b), order);
+  });
+
+  it("all card actions cover the full card and stay within a 360px screen", () => {
+    const view = src("src/components/dashboard/first-time-dashboard.tsx");
+    assert.match(view, /after:absolute after:inset-0/);
+    assert.doesNotMatch(view, /\b(min-)?w-\[(3[6-9]\d|[4-9]\d\d)px\]|whitespace-nowrap/);
+  });
+});
+
+describe("21. trial status banner", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const trialProfile = (startedDaysAgo: number, extra: Partial<TrialLifecycleProfile> = {}) => {
+    const started = Date.now() - startedDaysAgo * DAY - 60_000;
+    return {
+      subscription_status: "trial",
+      trial_plan_tier: "essential",
+      plan_tier: "essential",
+      business_name: "Green Construction",
+      quote_primary_trade: "Roofing",
+      trial_started_at: new Date(started).toISOString(),
+      trial_ends_at: new Date(started + 14 * DAY).toISOString(),
+      ...extra,
+    } satisfies TrialLifecycleProfile;
+  };
+  const render = (profile: TrialLifecycleProfile) =>
+    renderToStaticMarkup(createElement(TrialStatusBanner, { profile }));
+
+  it("counts down from the real trial dates instead of a fixed 14", () => {
+    assert.match(render(trialProfile(0)), /Your free trial is active — 14 days remaining\./);
+    assert.match(render(trialProfile(4)), /Your free trial is active — 10 days remaining\./);
+    assert.match(render(trialProfile(9)), /Your free trial is active — 5 days remaining\./);
+    assert.equal(formatActiveTrialStatus(1), "Your free trial is active — 1 day remaining.");
+    assert.doesNotMatch(src("src/components/trial-status-banner.tsx"), /\b14\b/);
+  });
+
+  it("says no credit card is required only while the card-free trial is active", () => {
+    const active = render(trialProfile(2));
+    assert.ok(active.includes(ACTIVE_TRIAL_NO_CARD_NOTE));
+    assert.match(active, /emerald/, "calm colour while active");
+    assert.doesNotMatch(active, /amber|red-/);
+
+    const paid = render(
+      trialProfile(2, { subscription_status: "active", stripe_subscription_id: "sub_123" })
+    );
+    assert.equal(paid, "", "linked subscriptions show no trial banner");
+    const expired = render(trialProfile(20));
+    assert.doesNotMatch(expired, /no credit card/);
+    assert.match(expired, /Your free trial has ended/);
+    const ending = render(trialProfile(12));
+    assert.doesNotMatch(ending, /no credit card/);
+  });
+
+  it("keeps the amber subscribe prompt for the final days", () => {
+    const ending = render(trialProfile(11));
+    assert.match(ending, /Your free trial is active — 3 days remaining\./);
+    assert.ok(ending.includes(TRIAL_ENDING_SOON_NOTE));
+    assert.match(ending, /amber/);
+    assert.match(ending, /href="\/settings\/billing"[^>]*>Subscribe Now/);
+    assert.match(render(trialProfile(13)), /1 day remaining\./);
+  });
+
+  it("leaves pending setup, expiry and the billing page label unchanged", () => {
+    const pending = render({
+      subscription_status: "pending_trial",
+      trial_plan_tier: "essential",
+      business_name: "",
+      quote_primary_trade: "",
+    });
+    assert.match(pending, /Continue setup/);
+    assert.match(render(trialProfile(20)), /Subscribe Now/);
+    assert.equal(formatTrialDaysRemainingLabel(10), "10 days remaining");
+    assert.equal(formatTrialDaysRemainingLabel(1), "Last day of your trial");
   });
 });
