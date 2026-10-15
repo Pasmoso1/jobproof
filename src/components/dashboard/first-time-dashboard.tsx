@@ -6,6 +6,7 @@ import {
   SEND_QUOTE_REQUEST_LABEL,
   SendQuoteRequestButton,
   primaryButtonClassName,
+  secondaryButtonClassName,
 } from "@/components/send-quote-request";
 import { ProtectedJobSampleCard } from "@/components/onboarding/protected-job-sample-card";
 import { LandingIcon, type LandingIconName } from "@/components/landing/landing-icon";
@@ -15,6 +16,11 @@ import {
 } from "@/app/(app)/product-analytics-actions";
 import { QUOTE_REQUEST_SETTINGS_PATH } from "@/lib/quote-link-share";
 import { FULL_DASHBOARD_PATH } from "@/lib/dashboard-first-time";
+import {
+  WELCOME_DASHBOARD_EVENTS,
+  trackWelcomeDashboardEvent,
+} from "@/lib/welcome-dashboard-analytics";
+import { buildQuoteFormPreviewUrl } from "@/lib/quote-requests/preview-mode";
 
 export const FIRST_TIME_DASHBOARD_HEADING = "Welcome to JobProof!";
 export const FIRST_TIME_DASHBOARD_INTRO =
@@ -60,6 +66,10 @@ export const BUSINESS_SETTINGS_FROM_DASHBOARD_PATH = "/settings/business?returnT
 
 export const FULL_DASHBOARD_TRANSITION_NOTE =
   "Your full dashboard opens automatically once you create your first job or invoice.";
+
+export const TRY_IT_YOURSELF_LABEL = "Try it yourself";
+export const TRY_IT_YOURSELF_HINT =
+  "See what your customers experience when requesting a quote.";
 
 export function formatReceivedQuoteRequests(count: number): string {
   return count === 1
@@ -161,6 +171,7 @@ export function FirstTimeDashboard({
 
   function openSampleJob() {
     if (!showSampleJob) {
+      trackWelcomeDashboardEvent(WELCOME_DASHBOARD_EVENTS.sample_job_clicked);
       void trackOnboardingStartedAction("dashboard_first_time_sample_job").catch(() => undefined);
       void trackSampleJobViewedAction().catch(() => undefined);
     }
@@ -172,6 +183,20 @@ export function FirstTimeDashboard({
       });
     });
   }
+
+  function trackSampleQuoteClick() {
+    trackWelcomeDashboardEvent(WELCOME_DASHBOARD_EVENTS.sample_quote_clicked);
+  }
+
+  function trackTryYourselfClick() {
+    trackWelcomeDashboardEvent(WELCOME_DASHBOARD_EVENTS.try_yourself_clicked);
+  }
+
+  function trackProfileDetailsClick() {
+    trackWelcomeDashboardEvent(WELCOME_DASHBOARD_EVENTS.profile_details_clicked);
+  }
+
+  const previewUrl = quoteUrl ? buildQuoteFormPreviewUrl(quoteUrl) : null;
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -198,12 +223,12 @@ export function FirstTimeDashboard({
           {FIRST_QUOTE_REQUEST_BODY}
         </p>
         <QuoteRequestWorkflow />
-        <div className="mt-4">
+        <div className="mt-4 space-y-2.5">
           {quoteUrl ? (
             <SendQuoteRequestButton
               quoteUrl={quoteUrl}
               businessName={businessName}
-              sourceLocation="dashboard"
+              sourceLocation="welcome_dashboard"
               className={`${primaryButtonClassName} w-full text-base sm:w-auto sm:min-w-56`}
             >
               {SEND_QUOTE_REQUEST_LABEL}
@@ -216,6 +241,20 @@ export function FirstTimeDashboard({
               Set up your quote link
             </Link>
           )}
+          {previewUrl ? (
+            <div>
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={trackTryYourselfClick}
+                className={`${secondaryButtonClassName} w-full sm:w-auto`}
+              >
+                {TRY_IT_YOURSELF_LABEL}
+              </a>
+              <p className="mt-1.5 text-xs text-zinc-500">{TRY_IT_YOURSELF_HINT}</p>
+            </div>
+          ) : null}
         </div>
         {quoteRequestCount > 0 ? (
           <Link
@@ -242,7 +281,11 @@ export function FirstTimeDashboard({
             <div className="min-w-0">
               <h3 className="text-base font-semibold text-zinc-900">{SAMPLE_QUOTE_CARD.title}</h3>
               <p className="mt-0.5 text-sm text-zinc-600">{SAMPLE_QUOTE_CARD.body}</p>
-              <Link href={SAMPLE_QUOTE_CARD.href} className={stretchedCtaClassName}>
+              <Link
+                href={SAMPLE_QUOTE_CARD.href}
+                onClick={trackSampleQuoteClick}
+                className={stretchedCtaClassName}
+              >
                 {SAMPLE_QUOTE_CARD.cta}
                 <span aria-hidden="true">→</span>
               </Link>
@@ -290,7 +333,11 @@ export function FirstTimeDashboard({
             <p className="mt-1 text-xs text-zinc-500">
               {formatMissingProfileDetails(missingProfileDetails)}
             </p>
-            <Link href={BUSINESS_SETTINGS_FROM_DASHBOARD_PATH} className={stretchedCtaClassName}>
+            <Link
+              href={BUSINESS_SETTINGS_FROM_DASHBOARD_PATH}
+              onClick={trackProfileDetailsClick}
+              className={stretchedCtaClassName}
+            >
               {PROFILE_CARD_CTA}
               <span aria-hidden="true">→</span>
             </Link>

@@ -379,6 +379,7 @@ describe("7. analytics events carry no PII and stay out of Meta and the funnel",
     ]);
     assert.deepEqual([...QUOTE_REQUEST_SHARE_SOURCES], [
       "dashboard",
+      "welcome_dashboard",
       "quote_requests",
       "mobile_global_action",
       "settings",
@@ -393,7 +394,7 @@ describe("7. analytics events carry no PII and stay out of Meta and the funnel",
       }
     }
     assert.equal(fbqCalls.length, 0);
-    assert.equal(gtagCalls.length, 25);
+    assert.equal(gtagCalls.length, 30);
     for (const [kind, , params] of gtagCalls) {
       assert.equal(kind, "event");
       const keys = Object.keys(params as Record<string, unknown>);

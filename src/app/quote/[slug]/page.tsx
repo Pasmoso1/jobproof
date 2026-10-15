@@ -4,6 +4,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContractorByQuoteSlug } from "@/lib/quote-requests/public";
 import { buildQuoteRequestPageMetadata } from "@/lib/quote-requests/link-preview";
+import {
+  isQuoteFormPreviewMode,
+  QUOTE_FORM_PREVIEW_BANNER,
+} from "@/lib/quote-requests/preview-mode";
 import { resolveAppUrl } from "@/lib/stripe";
 import { QuoteRequestForm } from "./quote-request-form";
 
@@ -33,12 +37,15 @@ function PoweredByJobProof() {
 
 export default async function PublicQuotePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, sp] = await Promise.all([params, searchParams]);
   const contractor = await loadContractor(slug);
   if (!contractor) notFound();
+  const previewMode = isQuoteFormPreviewMode(sp);
 
   if (!contractor.quote_ready) {
     return (
@@ -61,6 +68,15 @@ export default async function PublicQuotePage({
   return (
     <div className="min-h-screen bg-zinc-50 py-8 sm:py-12">
       <div className="mx-auto max-w-xl px-4">
+        {previewMode ? (
+          <div
+            role="status"
+            className="mb-4 rounded-lg border border-[#2436BB]/25 bg-[#2436BB]/5 px-4 py-3 text-sm text-zinc-800"
+          >
+            <p className="font-semibold text-zinc-900">Contractor preview</p>
+            <p className="mt-1 text-zinc-700">{QUOTE_FORM_PREVIEW_BANNER}</p>
+          </div>
+        ) : null}
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="mb-6 text-center">
             {contractor.quote_logo_url ? (
@@ -86,7 +102,11 @@ export default async function PublicQuotePage({
             </p>
           </div>
 
-          <QuoteRequestForm slug={contractor.quote_slug} contractorPhone={contractor.phone} />
+          <QuoteRequestForm
+            slug={contractor.quote_slug}
+            contractorPhone={contractor.phone}
+            previewMode={previewMode}
+          />
         </div>
         <PoweredByJobProof />
       </div>

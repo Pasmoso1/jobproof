@@ -54,9 +54,23 @@ import {
   QUOTE_REQUEST_WORKFLOW,
   SAMPLE_JOB_CARD,
   SAMPLE_QUOTE_CARD,
+  TRY_IT_YOURSELF_HINT,
+  TRY_IT_YOURSELF_LABEL,
   formatReceivedQuoteRequests,
   quoteRequestCardTitle,
 } from "@/components/dashboard/first-time-dashboard";
+import {
+  buildQuoteFormPreviewUrl,
+  isQuoteFormPreviewMode,
+  QUOTE_FORM_PREVIEW_BANNER,
+  QUOTE_FORM_PREVIEW_SUBMIT_LABEL,
+} from "@/lib/quote-requests/preview-mode";
+import {
+  WELCOME_DASHBOARD_EVENTS,
+  WELCOME_DASHBOARD_SOURCE,
+  trackWelcomeDashboardEvent,
+} from "@/lib/welcome-dashboard-analytics";
+import { QuoteRequestForm } from "@/app/quote/[slug]/quote-request-form";
 import {
   ACTIVE_TRIAL_NO_CARD_NOTE,
   TRIAL_ENDING_SOON_NOTE,
@@ -662,7 +676,10 @@ describe("18. compact mobile onboarding", () => {
     const signup = src("src/app/(auth)/signup/page.tsx");
     const checkEmail = signup.slice(signup.indexOf('postSubmitView === "new_user_check_email"'));
     assert.match(checkEmail, /items-center bg-zinc-50 px-4 py-6 sm:justify-center/);
-    assert.match(checkEmail, /className="break-all text-zinc-900">\{email\}/);
+    assert.match(checkEmail, /<EmailAddress value=\{email\} \/>/);
+    assert.match(checkEmail, /Don&apos;t see the email\? Check your junk or spam folder\./);
+    assert.match(checkEmail, /Resend confirmation email/);
+    assert.match(checkEmail, /Back to sign in/);
   });
 
   it("trade copy explains question tailoring, not lead matching", () => {
@@ -693,7 +710,7 @@ describe("19. quote-request sharing", () => {
 
   it("first-time dashboard reuses the existing Send Quote Request flow", () => {
     const view = src("src/components/dashboard/first-time-dashboard.tsx");
-    assert.match(view, /<SendQuoteRequestButton[\s\S]*?sourceLocation="dashboard"/);
+    assert.match(view, /<SendQuoteRequestButton[\s\S]*?sourceLocation="welcome_dashboard"/);
     assert.match(src("src/lib/validation/quote-request-settings.ts"), /Optional here/);
   });
 });
@@ -792,13 +809,14 @@ describe("20. first-time dashboard UX", () => {
     assert.doesNotMatch(html, /required to use|before you can use/i);
   });
 
-  it("orders the page for mobile: welcome, card, workflow, CTA, samples, profile, full dashboard", () => {
+  it("orders the page for mobile: welcome, card, workflow, CTA, try-it, samples, profile, full dashboard", () => {
     const html = renderDashboard();
     const order = [
       FIRST_TIME_DASHBOARD_HEADING,
       FIRST_QUOTE_REQUEST_TITLE,
       "How a quote request works",
       ">Send Quote Request<",
+      TRY_IT_YOURSELF_LABEL,
       SAMPLE_QUOTE_CARD.title,
       SAMPLE_JOB_CARD.title,
       PROFILE_CARD_TITLE,
@@ -806,6 +824,31 @@ describe("20. first-time dashboard UX", () => {
     ].map((needle) => html.indexOf(needle));
     assert.ok(order.every((at) => at >= 0), "every section renders");
     assert.deepEqual([...order].sort((a, b) => a - b), order);
+  });
+
+  it("offers a secondary Try it yourself preview that never competes with Send Quote Request", () => {
+    const html = renderDashboard();
+    const previewHref = buildQuoteFormPreviewUrl("https://jobproof.ca/quote/green-construction");
+    assert.match(
+      html,
+      new RegExp(
+        `href="${previewHref.replace(/[.?]/g, "\\$&")}"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*>${TRY_IT_YOURSELF_LABEL}`
+      )
+    );
+    assert.ok(html.includes(TRY_IT_YOURSELF_HINT));
+    const primary = html.match(/<button[^>]*>Send Quote Request<\/button>/)?.[0] ?? "";
+    const secondary = html.match(new RegExp(`<a[^>]*>${TRY_IT_YOURSELF_LABEL}</a>`))?.[0] ?? "";
+    assert.match(primary, /bg-\[#2436BB\]/);
+    assert.match(secondary, /border border-zinc-300 bg-white/);
+    assert.ok(html.indexOf(">Send Quote Request<") < html.indexOf(TRY_IT_YOURSELF_LABEL));
+    const missingLink = renderToStaticMarkup(
+      createElement(FirstTimeDashboard, {
+        quoteUrl: null,
+        businessName: null,
+        missingProfileDetails: [],
+      })
+    );
+    assert.doesNotMatch(missingLink, /Try it yourself/);
   });
 
   it("all card actions cover the full card and stay within a 360px screen", () => {
@@ -878,5 +921,81 @@ describe("21. trial status banner", () => {
     assert.match(render(trialProfile(20)), /Subscribe Now/);
     assert.equal(formatTrialDaysRemainingLabel(10), "10 days remaining");
     assert.equal(formatTrialDaysRemainingLabel(1), "Last day of your trial");
+  });
+});
+
+describe("22. quote-form preview mode", () => {
+  it("builds and detects the preview query without inventing a demo pipeline", () => {
+    assert.equal(
+      buildQuoteFormPreviewUrl("https://jobproof.ca/quote/green-construction"),
+      "https://jobproof.ca/quote/green-construction?preview=1"
+    );
+    assert.equal(isQuoteFormPreviewMode({ preview: "1" }), true);
+    assert.equal(isQuoteFormPreviewMode({ preview: "true" }), false);
+    assert.equal(isQuoteFormPreviewMode({}), false);
+  });
+
+  it("renders a labeled preview that cannot submit a live request", () => {
+    const html = renderToStaticMarkup(
+      createElement(QuoteRequestForm, {
+        slug: "green-construction",
+        contractorPhone: "416-555-0100",
+        previewMode: true,
+      })
+    );
+    assert.ok(html.includes(QUOTE_FORM_PREVIEW_SUBMIT_LABEL.replace("'", "&#x27;")));
+    assert.doesNotMatch(html, />Submit quote request</);
+    assert.match(html, /Photo uploads are disabled in preview/);
+    const page = src("src/app/quote/[slug]/page.tsx");
+    assert.match(page, /QUOTE_FORM_PREVIEW_BANNER/);
+    assert.match(page, /previewMode=\{previewMode\}/);
+    const form = src("src/app/quote/[slug]/quote-request-form.tsx");
+    const previewGuard = form.search(
+      /if \(previewMode\) \{\s*setError\(QUOTE_FORM_PREVIEW_SUBMIT_LABEL\);\s*return;/
+    );
+    const liveSubmit = form.indexOf("await submitPublicQuoteRequest(slug,");
+    assert.ok(previewGuard >= 0, "preview mode returns before any server submit");
+    assert.ok(liveSubmit > previewGuard, "live submit stays after the preview guard");
+    assert.ok(QUOTE_FORM_PREVIEW_BANNER.includes("never sends a live quote request"));
+  });
+});
+
+describe("23. welcome dashboard engagement analytics", () => {
+  it("reuses Send Quote Request share events with a welcome_dashboard source", () => {
+    const view = src("src/components/dashboard/first-time-dashboard.tsx");
+    assert.match(view, /sourceLocation="welcome_dashboard"/);
+    assert.match(src("src/components/dashboard/get-more-work-card.tsx"), /sourceLocation="dashboard"/);
+  });
+
+  it("fires dedicated welcome events without PII or acquisition-funnel renames", () => {
+    assert.equal(WELCOME_DASHBOARD_SOURCE, "welcome_dashboard");
+    assert.deepEqual(Object.values(WELCOME_DASHBOARD_EVENTS).sort(), [
+      "welcome_profile_details_clicked",
+      "welcome_sample_job_clicked",
+      "welcome_sample_quote_clicked",
+      "welcome_try_yourself_clicked",
+    ]);
+    for (const name of Object.values(WELCOME_DASHBOARD_EVENTS)) {
+      assert.equal(name in GA4_FUNNEL_EVENTS, false, `${name} stays outside the funnel`);
+    }
+    const view = src("src/components/dashboard/first-time-dashboard.tsx");
+    assert.match(view, /trackWelcomeDashboardEvent\(WELCOME_DASHBOARD_EVENTS\.try_yourself_clicked\)/);
+    assert.match(view, /trackWelcomeDashboardEvent\(WELCOME_DASHBOARD_EVENTS\.sample_quote_clicked\)/);
+    assert.match(view, /trackWelcomeDashboardEvent\(WELCOME_DASHBOARD_EVENTS\.sample_job_clicked\)/);
+    assert.match(view, /trackWelcomeDashboardEvent\(WELCOME_DASHBOARD_EVENTS\.profile_details_clicked\)/);
+    assert.equal(typeof trackWelcomeDashboardEvent, "function");
+  });
+
+  it("trial_started still fires only after maybeStartManagedTrial wins the conditional update", () => {
+    const business = src("src/app/(app)/onboarding/business-profile/actions.ts");
+    assert.match(
+      business,
+      /const trialStarted = await maybeStartManagedTrial\([\s\S]*?\);\s*if \(trialStarted\) \{\s*await markTrialStartedAnalyticsPending/
+    );
+    const start = src("src/lib/start-managed-trial.ts");
+    assert.match(start, /\.is\("trial_started_at", null\)/);
+    assert.match(start, /if \(hasJobProofTrialStarted\(profile\)\) return false;/);
+    assert.match(src("src/lib/signup-funnel-analytics.ts"), /trackGa4EventOnce\("trial_started"/);
+    assert.doesNotMatch(src("src/app/(auth)/signup/page.tsx"), /trial_started|maybeStartManagedTrial/);
   });
 });

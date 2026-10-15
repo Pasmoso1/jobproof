@@ -18,6 +18,7 @@ export type QuoteRequestShareEventName =
 
 export const QUOTE_REQUEST_SHARE_SOURCES = [
   "dashboard",
+  "welcome_dashboard",
   "quote_requests",
   "mobile_global_action",
   "settings",

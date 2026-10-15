@@ -38,6 +38,22 @@ function logSignupDebug(label: string, payload: Record<string, unknown>) {
   }
 }
 
+/** Keep the local-part and domain on separate lines so long emails stay readable. */
+function EmailAddress({ value }: { value: string }) {
+  const at = value.lastIndexOf("@");
+  if (at <= 0) {
+    return <span className="block break-all">{value}</span>;
+  }
+  const local = value.slice(0, at);
+  const domain = value.slice(at + 1);
+  return (
+    <span className="block">
+      <span className="block break-all">{local}</span>
+      <span className="block break-all">@{domain}</span>
+    </span>
+  );
+}
+
 function isEmailAlreadyRegisteredError(message: string): boolean {
   const m = message.toLowerCase();
   return (
@@ -413,17 +429,22 @@ export default function SignupPage() {
           <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
             <h1 className="text-xl font-semibold text-zinc-900">Check your email</h1>
             <p className="mt-3 text-sm text-zinc-600">
-              We&apos;ve sent a confirmation link to{" "}
-              <strong className="break-all text-zinc-900">{email}</strong>.
+              We&apos;ve sent a confirmation link to:
             </p>
-            <p className="mt-2 text-sm text-zinc-600">
+            <p className="mt-2 overflow-hidden rounded-lg bg-zinc-50 px-3 py-2.5 text-sm font-medium text-zinc-900">
+              <EmailAddress value={email} />
+            </p>
+            <p className="mt-3 text-sm text-zinc-600">
               You must confirm your email before you can sign in. Click the link
               in the email to activate your account.
+            </p>
+            <p className="mt-2 text-sm text-zinc-500">
+              Don&apos;t see the email? Check your junk or spam folder.
             </p>
 
             {error && (
               <p
-                className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+                className="mt-4 break-words rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
                 role="alert"
               >
                 {error}
@@ -473,8 +494,9 @@ export default function SignupPage() {
             Start your 14-day free trial
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-            Create your JobProof account and start turning more inquiries into
-            paying jobs.
+            Create your free account, confirm your email, choose Solo or Pro, and
+            add a few business details to start your trial — no credit card
+            required.
           </p>
           <ul
             aria-label="Free trial details"
@@ -633,7 +655,7 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full rounded-lg bg-[#2436BB] px-4 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-[#1c2a96] focus:outline-none focus:ring-2 focus:ring-[#2436BB] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {loading ? "Creating account..." : "Start My Free Trial"}
+              {loading ? "Creating account..." : "Create My Free Account"}
             </button>
           </form>
 

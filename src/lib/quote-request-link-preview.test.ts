@@ -82,7 +82,10 @@ describe("1–2. Project photos helper text, photos stay optional", () => {
     assert.match(form, />\s*Add photos or take pictures\s*</);
     assert.match(form, />\s*Take a photo\s*</);
     assert.match(form, /capture="environment"/);
-    assert.match(form, /Optional\. Up to \{MAX_QUOTE_REQUEST_PHOTOS\} photos, \{maxPhotoMb\} MB each\./);
+    assert.match(
+      form,
+      /Optional\. Up to \$\{MAX_QUOTE_REQUEST_PHOTOS\} photos, \$\{maxPhotoMb\} MB each\./
+    );
     assert.equal(MAX_QUOTE_REQUEST_PHOTOS, 10);
     assert.equal(MAX_QUOTE_REQUEST_PHOTO_BYTES, 10 * 1024 * 1024);
   });
@@ -389,7 +392,10 @@ describe("12. quote page wiring and branding", () => {
   });
 
   it("still renders the existing form with the slug and contractor phone", () => {
-    assert.match(page, /<QuoteRequestForm slug=\{contractor\.quote_slug\} contractorPhone=\{contractor\.phone\} \/>/);
+    assert.match(
+      page,
+      /<QuoteRequestForm\s+slug=\{contractor\.quote_slug\}\s+contractorPhone=\{contractor\.phone\}\s+previewMode=\{previewMode\}\s*\/>/
+    );
     assert.match(page, /if \(!contractor\) notFound\(\);/);
   });
 });

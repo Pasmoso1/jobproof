@@ -91,9 +91,9 @@ describe("signup page positioning", () => {
     assert.match(signupHtml, /<h1[^>]*>Start your 14-day free trial<\/h1>/);
     assert.match(
       signupHtml,
-      /Create your JobProof account and start turning more inquiries into paying jobs\./
+      /Create your free account, confirm your email, choose Solo or Pro, and add a few business details to start your trial/
     );
-    assert.doesNotMatch(signupHtml, />Create account</);
+    assert.doesNotMatch(signupHtml, />Start My Free Trial</);
     assert.doesNotMatch(signupHtml, /Sign up to start protecting your jobs/);
   });
 
@@ -114,13 +114,13 @@ describe("signup page positioning", () => {
     assert.ok(signupHtml.indexOf("Free trial details") < signupHtml.indexOf("<form"));
   });
 
-  it("labels the submit button Start My Free Trial without changing its behaviour", () => {
+  it("labels the submit button Create My Free Account without changing its behaviour", () => {
     const submit = /<button type="submit"[^>]*>([\s\S]*?)<\/button>/.exec(formHtml);
     assert.ok(submit);
-    assert.equal(submit[1].trim(), "Start My Free Trial");
+    assert.equal(submit[1].trim(), "Create My Free Account");
     assert.match(submit[0], /bg-\[#2436BB\]/);
     assert.match(signupSource, /<form onSubmit=\{handleSubmit\}/);
-    assert.match(signupSource, /loading \? "Creating account\.\.\." : "Start My Free Trial"/);
+    assert.match(signupSource, /loading \? "Creating account\.\.\." : "Create My Free Account"/);
   });
 
   it("keeps the sign-in link for existing users", () => {

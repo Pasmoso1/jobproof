@@ -16,6 +16,7 @@ import {
   deleteQuotePhotoUpload,
   submitPublicQuoteRequest,
 } from "./actions";
+import { QUOTE_FORM_PREVIEW_SUBMIT_LABEL } from "@/lib/quote-requests/preview-mode";
 
 const FIELD_INPUT_CLASS =
   "mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-base text-zinc-900 placeholder:text-zinc-400 focus:border-[#2436BB] focus:outline-none focus:ring-1 focus:ring-[#2436BB] sm:text-sm";
@@ -54,9 +55,12 @@ function newUploadSessionId(): string {
 export function QuoteRequestForm({
   slug,
   contractorPhone,
+  previewMode = false,
 }: {
   slug: string;
   contractorPhone: string;
+  /** Contractor exploring their own form — never creates a live request. */
+  previewMode?: boolean;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -87,6 +91,9 @@ export function QuoteRequestForm({
 
   const uploadOne = useCallback(
     async (id: string, file: File) => {
+      // Defense in depth: preview never requests signed upload URLs or storage writes.
+      if (previewMode) return;
+
       const metaCheck = validateQuotePhotoMeta({
         mimeType: file.type,
         byteSize: file.size,
@@ -138,11 +145,13 @@ export function QuoteRequestForm({
         });
       }
     },
-    [slug, updatePhoto, uploadSessionId]
+    [previewMode, slug, updatePhoto, uploadSessionId]
   );
 
   const addFiles = useCallback(
     (incoming: FileList | File[]) => {
+      if (previewMode) return;
+
       const available = MAX_QUOTE_REQUEST_PHOTOS - photosRef.current.length;
       if (available <= 0) return;
 
@@ -161,7 +170,7 @@ export function QuoteRequestForm({
         void uploadOne(item.id, item.file);
       }
     },
-    [syncPhotosRef, uploadOne]
+    [previewMode, syncPhotosRef, uploadOne]
   );
 
   function onUploadPhotosChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -195,6 +204,12 @@ export function QuoteRequestForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+
+    // Preview must never reach submitPublicQuoteRequest — including Enter-key submits.
+    if (previewMode) {
+      setError(QUOTE_FORM_PREVIEW_SUBMIT_LABEL);
+      return;
+    }
 
     const form = formRef.current ?? e.currentTarget;
     if (!form.reportValidity()) {
@@ -260,28 +275,32 @@ export function QuoteRequestForm({
 
   return (
     <>
-      <input
-        ref={uploadInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={onUploadPhotosChange}
-        className="hidden"
-        tabIndex={-1}
-        aria-hidden
-      />
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={onCameraPhotoChange}
-        className="hidden"
-        tabIndex={-1}
-        aria-hidden
-      />
+      {previewMode ? null : (
+        <>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={onUploadPhotosChange}
+            className="hidden"
+            tabIndex={-1}
+            aria-hidden
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={onCameraPhotoChange}
+            className="hidden"
+            tabIndex={-1}
+            aria-hidden
+          />
+        </>
+      )}
 
-      <form ref={formRef} onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
+      <form ref={formRef} onSubmit={(e) => void handleSubmit(e)} className="space-y-5" noValidate={previewMode}>
         {error ? (
           <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             {error}
@@ -371,7 +390,7 @@ export function QuoteRequestForm({
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={atPhotoLimit}
+                disabled={previewMode || atPhotoLimit}
                 onClick={() => uploadInputRef.current?.click()}
                 className={PHOTO_BUTTON_CLASS}
               >
@@ -379,7 +398,7 @@ export function QuoteRequestForm({
               </button>
               <button
                 type="button"
-                disabled={atPhotoLimit}
+                disabled={previewMode || atPhotoLimit}
                 onClick={() => cameraInputRef.current?.click()}
                 className={PHOTO_BUTTON_CLASS}
               >
@@ -387,8 +406,11 @@ export function QuoteRequestForm({
               </button>
             </div>
             <p className="mt-2 text-xs text-zinc-500">
-              Optional. Up to {MAX_QUOTE_REQUEST_PHOTOS} photos, {maxPhotoMb} MB each.
-              {photos.length > 0 ? ` ${photos.length} selected.` : ""}
+              {previewMode
+                ? "Photo uploads are disabled in preview so nothing is stored."
+                : `Optional. Up to ${MAX_QUOTE_REQUEST_PHOTOS} photos, ${maxPhotoMb} MB each.${
+                    photos.length > 0 ? ` ${photos.length} selected.` : ""
+                  }`}
             </p>
             {uploadProgressLabel ? (
               <p className="mt-2 text-sm font-medium text-[#2436BB]">{uploadProgressLabel}</p>
@@ -475,13 +497,22 @@ export function QuoteRequestForm({
           ) : null}
         </div>
 
-        <button
-          type="submit"
-          disabled={loading || hasUploading}
-          className="w-full rounded-lg bg-[#2436BB] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c2a96] disabled:opacity-60"
-        >
-          {loading ? "Submitting…" : hasUploading ? "Waiting for photos…" : "Submit quote request"}
-        </button>
+        {previewMode ? (
+          <p
+            role="status"
+            className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-center text-sm font-medium text-zinc-700"
+          >
+            {QUOTE_FORM_PREVIEW_SUBMIT_LABEL}
+          </p>
+        ) : (
+          <button
+            type="submit"
+            disabled={loading || hasUploading}
+            className="w-full rounded-lg bg-[#2436BB] px-4 py-3 text-sm font-semibold text-white hover:bg-[#1c2a96] disabled:opacity-60"
+          >
+            {loading ? "Submitting…" : hasUploading ? "Waiting for photos…" : "Submit quote request"}
+          </button>
+        )}
       </form>
     </>
   );
