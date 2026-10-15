@@ -3,6 +3,8 @@
  * Uses the existing root-layout gtag install — does not load a second tag.
  */
 
+import { isGa4AllowedInBrowser } from "@/lib/ga4-environment";
+
 export const GA4_FUNNEL_EVENTS = {
   contractor_landing_view: "contractor_landing_view",
   contractor_cta_click: "contractor_cta_click",
@@ -15,6 +17,7 @@ export const GA4_FUNNEL_EVENTS = {
   email_verification_required: "email_verification_required",
   signup_verified: "signup_verified",
   onboarding_start: "onboarding_start",
+  onboarding_plan_selected: "onboarding_plan_selected",
   onboarding_complete: "onboarding_complete",
   sample_quote_view: "sample_quote_view",
   sample_quote_cta_click: "sample_quote_cta_click",
@@ -241,8 +244,9 @@ export function buildAcquisitionContext(input?: {
   return context;
 }
 
+/** Undefined off approved hostnames, so every helper below no-ops there. */
 export function getGtag(): ((...args: unknown[]) => void) | undefined {
-  if (!isBrowser()) return undefined;
+  if (!isBrowser() || !isGa4AllowedInBrowser()) return undefined;
   return typeof window.gtag === "function" ? window.gtag : undefined;
 }
 
@@ -255,7 +259,7 @@ export async function waitForGa4Ready(
   intervalMs = 100
 ): Promise<boolean> {
   if (getGtag()) return true;
-  if (!isBrowser()) return false;
+  if (!isBrowser() || !isGa4AllowedInBrowser()) return false;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, intervalMs));

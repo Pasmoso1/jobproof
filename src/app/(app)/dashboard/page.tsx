@@ -1,7 +1,21 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
+import {
+  getMissingBusinessDetails,
+  isBusinessProfileCompleteForApp,
+  MISSING_BUSINESS_DETAIL_LABELS,
+} from "@/lib/validation/business-profile";
+import { BusinessDetailsNeededNotice } from "@/components/business-details-needed-notice";
+import { FirstTimeDashboard } from "@/components/dashboard/first-time-dashboard";
+import {
+  ACTIVE_ACCOUNT_COUNTS,
+  FULL_DASHBOARD_VIEW,
+  GETTING_STARTED_DASHBOARD_PATH,
+  loadDashboardActivityCounts,
+  shouldOfferBackToGettingStarted,
+  shouldShowFirstTimeDashboard,
+} from "@/lib/dashboard-first-time";
 import {
   getProfile,
   getActiveJobsCount,
@@ -125,6 +139,14 @@ export default async function DashboardPage({
   ]);
 
   const hasNoJobs = jobs.length === 0;
+  const dashboardView = firstSearchParam(sp.view);
+  const activityCounts =
+    profile?.id && hasNoJobs && !receivables.hasAnyInvoice
+      ? await loadDashboardActivityCounts(supabase, String(profile.id))
+      : ACTIVE_ACCOUNT_COUNTS;
+  const showFirstTimeDashboard = shouldShowFirstTimeDashboard(activityCounts, dashboardView);
+  const offerBackToGettingStarted = shouldOfferBackToGettingStarted(activityCounts, dashboardView);
+  const missingBusinessDetails = getMissingBusinessDetails(profile);
   const quoteSlug =
     profile?.id && !profile.quote_slug
       ? quoteSlugFromEnsureResult(
@@ -136,7 +158,7 @@ export default async function DashboardPage({
         )
       : (profile?.quote_slug ?? null);
   const quoteUrl = buildPublicQuoteUrl(resolveAppUrl(), quoteSlug);
-  const quoteSharingReady = isQuoteSharingReady(profile, user?.email ?? "");
+  const quoteSharingReady = isQuoteSharingReady(profile);
   const showOnboardingProgress =
     !hasNoJobs && profile?.id && !isOnboardingProgressComplete(onboardingProgress);
 
@@ -148,33 +170,8 @@ export default async function DashboardPage({
     });
   }
 
-  return (
-    <div className="space-y-6">
-      <Suspense fallback={null}>
-        <DashboardAlerts />
-      </Suspense>
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">
-          Dashboard
-        </h1>
-        <p className="mt-1 text-zinc-600">
-          Welcome back. Here&apos;s an overview of your jobs.
-        </p>
-      </div>
-
-      {profile?.id ? (
-        <QuoteRequestDashboardAlerts contractorId={String(profile.id)} />
-      ) : null}
-
-      {/* Business profile banner */}
-      {!businessProfileComplete && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Complete your business profile to send contracts and invoices.{" "}
-          <Link href="/settings/business" className="font-medium underline hover:no-underline">
-            Add business details →
-          </Link>
-        </div>
-      )}
+  const billingNotices = (
+    <>
       {profile?.subscription_status === "past_due" && profile.grace_period_ends_at && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Billing is past due. Grace period ends{" "}
@@ -203,6 +200,62 @@ export default async function DashboardPage({
           {access.freeBetaHelperCopy}
         </div>
       ) : null}
+    </>
+  );
+
+  if (showFirstTimeDashboard) {
+    return (
+      <div className="space-y-5">
+        <Suspense fallback={null}>
+          <DashboardAlerts />
+        </Suspense>
+        {billingNotices}
+        <FirstTimeDashboard
+          quoteUrl={quoteSharingReady ? quoteUrl : null}
+          businessName={profile?.business_name ? String(profile.business_name) : null}
+          missingProfileDetails={missingBusinessDetails.map(
+            (detail) => MISSING_BUSINESS_DETAIL_LABELS[detail]
+          )}
+          quoteRequestCount={activityCounts.quoteRequestCount ?? 0}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Suspense fallback={null}>
+        <DashboardAlerts />
+      </Suspense>
+      <div>
+        <h1 className="text-2xl font-bold text-zinc-900 sm:text-3xl">
+          Dashboard
+        </h1>
+        <p className="mt-1 text-zinc-600">
+          Welcome back. Here&apos;s an overview of your jobs.
+        </p>
+        {offerBackToGettingStarted ? (
+          <Link
+            href={GETTING_STARTED_DASHBOARD_PATH}
+            className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-[#2436BB] underline-offset-2 hover:underline"
+          >
+            ← Back to getting started
+          </Link>
+        ) : null}
+      </div>
+
+      {profile?.id ? (
+        <QuoteRequestDashboardAlerts contractorId={String(profile.id)} />
+      ) : null}
+
+      {!businessProfileComplete && (
+        <BusinessDetailsNeededNotice
+          missing={missingBusinessDetails}
+          returnTo="/dashboard"
+          action="send contracts, quotes and invoices"
+        />
+      )}
+      {billingNotices}
 
       <GetMoreWorkCard
         quoteUrl={quoteUrl}
@@ -239,7 +292,9 @@ export default async function DashboardPage({
         </div>
       )}
 
-      <MoneyOverviewSection data={receivables} />
+      {receivables.hasAnyInvoice || dashboardView === FULL_DASHBOARD_VIEW ? (
+        <MoneyOverviewSection data={receivables} />
+      ) : null}
 
       {estimatesAwaiting > 0 && (
         <div className="rounded-lg border border-indigo-200 bg-indigo-50/90 px-4 py-3 text-sm text-indigo-950">

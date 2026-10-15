@@ -5,7 +5,12 @@ import Script from "next/script";
 import { FirstTouchAttributionCapture } from "@/components/first-touch-attribution-capture";
 import { PartnerRefCapture } from "@/components/partner-ref-capture";
 import MetaPageViewTracker from "@/components/MetaPageViewTracker";
+import { buildGa4BootstrapScript } from "@/lib/ga4-environment";
+import { buildMetaPixelBootstrapScript } from "@/lib/meta-pixel-environment";
 import "./globals.css";
+
+const ga4BootstrapScript = buildGa4BootstrapScript();
+const metaPixelBootstrapScript = buildMetaPixelBootstrapScript();
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,50 +38,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <noscript>
-          {/* Meta Pixel noscript fallback requires a plain img tag */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            height="1"
-            width="1"
-            style={{ display: "none" }}
-            src="https://www.facebook.com/tr?id=26827091406927437&ev=PageView&noscript=1"
-            alt=""
-          />
-        </noscript>
-        <Script id="meta-pixel" strategy="afterInteractive">
-          {`
-!function(f,b,e,v,n,t,s)
-{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-if(!f._fbq)f._fbq=n;
-n.push=n;
-n.loaded=!0;
-n.version='2.0';
-n.queue=[];
-t=b.createElement(e);
-t.async=!0;
-t.src=v;
-s=b.getElementsByTagName(e)[0];
-s.parentNode.insertBefore(t,s)
-}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
-
-fbq('init', '26827091406927437');
-fbq('track', 'PageView');
-`}
-        </Script>
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-74H8WQ0KQ4"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-74H8WQ0KQ4');
-          `}
-        </Script>
+        {metaPixelBootstrapScript ? (
+          <Script id="meta-pixel" strategy="afterInteractive">
+            {metaPixelBootstrapScript}
+          </Script>
+        ) : null}
+        {ga4BootstrapScript ? (
+          <Script id="google-analytics" strategy="afterInteractive">
+            {ga4BootstrapScript}
+          </Script>
+        ) : null}
         <Suspense fallback={null}>
           <MetaPageViewTracker />
           <FirstTouchAttributionCapture />

@@ -1,9 +1,9 @@
 import { isOnboardingCompleteForTrial } from "@/lib/trial-lifecycle";
-import { validateBusinessProfileFields } from "@/lib/validation/business-profile";
 
 /**
  * Quote-request readiness reuses the onboarding-completion rule the middleware enforces
- * (`isOnboardingCompleteForTrial`: complete business profile + primary trade).
+ * (`isOnboardingCompleteForTrial`: business name + primary trade). Phone and address are
+ * optional here — the public quote pages omit contact details the contractor hasn't added.
  */
 
 export type QuoteReadinessProfile = {
@@ -17,29 +17,13 @@ export type QuoteReadinessProfile = {
 };
 
 /** Signed-in contractor: may they share their quote-request link with customers? */
-export function isQuoteSharingReady(
-  profile: QuoteReadinessProfile | null | undefined,
-  accountEmail: string
-): boolean {
+export function isQuoteSharingReady(profile: QuoteReadinessProfile | null | undefined): boolean {
   if (!profile) return false;
-  return isOnboardingCompleteForTrial(profile, accountEmail);
+  return isOnboardingCompleteForTrial(profile);
 }
 
-/**
- * Public /quote/[slug] route. There is no session (and profiles store no account email), so this
- * applies the business-profile and primary-trade requirements of the same rule.
- */
+/** Public /quote/[slug] route: same rule as sharing (no session is available here). */
 export function isPublicQuotePageReady(profile: QuoteReadinessProfile | null | undefined): boolean {
   if (!profile) return false;
-  const errors = validateBusinessProfileFields({
-    business_name: profile.business_name ?? "",
-    phone: profile.phone ?? "",
-    address_line_1: profile.address_line_1 ?? "",
-    city: profile.city ?? "",
-    province: profile.province ?? "",
-    postal_code: profile.postal_code ?? "",
-  });
-  delete errors.account_email;
-  if (Object.keys(errors).length > 0) return false;
-  return Boolean(String(profile.quote_primary_trade ?? "").trim());
+  return isOnboardingCompleteForTrial(profile);
 }

@@ -116,7 +116,7 @@ async function loadQuoteShareContext() {
     )
     .eq("user_id", user.id)
     .maybeSingle();
-  return resolveQuoteRequestShareContext(profile, user.email ?? "", resolveAppUrl());
+  return resolveQuoteRequestShareContext(profile, resolveAppUrl());
 }
 
 export default async function QuoteRequestsPage() {

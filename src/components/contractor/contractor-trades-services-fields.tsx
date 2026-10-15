@@ -37,7 +37,12 @@ type ContractorTradesServicesFieldsProps = {
   selectClassName?: string;
   /** Max primary + additional trades; null = unlimited (Pro). */
   maxTotalTrades?: number | null;
+  /** Initial onboarding: primary trade only; additional trades live in settings. */
+  primaryOnly?: boolean;
 };
+
+export const PRIMARY_TRADE_HELP_TEXT =
+  "Your trade helps JobProof ask customers the right questions about their projects, so you receive more useful details before preparing a quote.";
 
 export function ContractorTradesServicesFields({
   primaryTrade,
@@ -53,6 +58,7 @@ export function ContractorTradesServicesFields({
   inputClassName = FIELD_INPUT_CLASS,
   selectClassName = FIELD_SELECT_CLASS,
   maxTotalTrades = null,
+  primaryOnly = false,
 }: ContractorTradesServicesFieldsProps) {
   const additionalOptions = QUOTE_ADDITIONAL_TRADE_OPTIONS.filter(
     (trade) => trade !== primaryTrade
@@ -84,32 +90,34 @@ export function ContractorTradesServicesFields({
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-sm font-semibold text-zinc-900">Trades &amp; Services</h2>
-        <p className="mt-1 text-xs text-zinc-500">
-          Your trades and services help JobProof match quote requests to the work you actually
-          perform.
-        </p>
-        {isSoloLimited ? (
-          <p className="mt-2 text-xs font-medium text-zinc-700">
-            {maxTotalTrades} trades included
-            {totalSelected > 0 ? ` · ${totalSelected} selected` : ""}
-          </p>
-        ) : null}
-      </div>
+      {primaryOnly ? null : (
+        <div>
+          <h2 className="text-sm font-semibold text-zinc-900">Trades &amp; Services</h2>
+          <p className="mt-1 text-xs text-zinc-500">{PRIMARY_TRADE_HELP_TEXT}</p>
+          {isSoloLimited ? (
+            <p className="mt-2 text-xs font-medium text-zinc-700">
+              {maxTotalTrades} trades included
+              {totalSelected > 0 ? ` · ${totalSelected} selected` : ""}
+            </p>
+          ) : null}
+        </div>
+      )}
 
-      <label className="block">
-        <span className="text-sm font-medium text-zinc-800">
+      <div>
+        <label htmlFor="primary-trade" className="block text-sm font-medium text-zinc-800">
           Primary trade
           {primaryTradeRequired ? null : (
             <span className="font-normal text-zinc-500"> (optional)</span>
           )}
-        </span>
+        </label>
         <select
+          id="primary-trade"
           name="primaryTrade"
           value={primaryTrade}
           onChange={(e) => onPrimaryChange(e.target.value)}
           required={primaryTradeRequired}
+          aria-invalid={fieldErrors.primaryTrade ? true : undefined}
+          aria-describedby={primaryOnly ? "primary-trade-help" : undefined}
           className={selectClassName}
         >
           <option value="" className="text-zinc-900">
@@ -121,10 +129,17 @@ export function ContractorTradesServicesFields({
             </option>
           ))}
         </select>
-        {fieldErrors.primaryTrade ? (
-          <p className="mt-1 text-xs text-red-600">{fieldErrors.primaryTrade}</p>
+        {primaryOnly ? (
+          <p id="primary-trade-help" className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+            {PRIMARY_TRADE_HELP_TEXT}
+          </p>
         ) : null}
-      </label>
+        {fieldErrors.primaryTrade ? (
+          <p className="mt-1 text-xs text-red-600" role="alert">
+            {fieldErrors.primaryTrade}
+          </p>
+        ) : null}
+      </div>
 
       {primaryTrade === "Other" ? (
         <label className="block">
@@ -139,19 +154,23 @@ export function ContractorTradesServicesFields({
             className={inputClassName}
           />
           {fieldErrors.primaryTradeOther ? (
-            <p className="mt-1 text-xs text-red-600">{fieldErrors.primaryTradeOther}</p>
+            <p className="mt-1 text-xs text-red-600" role="alert">
+              {fieldErrors.primaryTradeOther}
+            </p>
           ) : null}
         </label>
       ) : null}
 
+      {primaryOnly ? null : (
+        <>
       <fieldset className="block">
         <legend className="text-sm font-medium text-zinc-800">
           Additional trades{" "}
           <span className="font-normal text-zinc-500">(optional)</span>
         </legend>
         <p className="mt-1 text-xs text-zinc-500">
-          Select every other trade you regularly perform. Shown only to JobProof for matching — not
-          on your public quote page.
+          Select other trades you regularly perform. JobProof uses them to tailor the questions
+          customers answer in your quote requests. Not shown on your public quote page.
         </p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {additionalOptions.map((trade) => {
@@ -194,6 +213,8 @@ export function ContractorTradesServicesFields({
         fieldError={fieldErrors.contractorExtraCapabilities}
         inputClassName={inputClassName}
       />
+        </>
+      )}
     </div>
   );
 }

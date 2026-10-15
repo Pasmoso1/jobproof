@@ -5,7 +5,7 @@ export const SUPPORT_FAQS: SupportFaq[] = [
     id: "how-does-free-trial-work",
     question: "How does the free trial work?",
     answer:
-      "JobProof includes a 14-day free trial on Solo or Pro. The trial starts after you choose a plan and complete your business profile (including primary trade)—not when you first create your account. No credit card is required to begin.",
+      "JobProof includes a 14-day free trial on Solo or Pro. The trial starts after you choose a plan and add your business name and primary trade—not when you first create your account. No credit card is required to begin.",
     keywords: ["trial", "free trial", "14 days", "onboarding"],
   },
   {

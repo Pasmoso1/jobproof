@@ -1,6 +1,7 @@
 import { JobProofLogo } from "@/components/jobproof-logo";
 import { QuoteRequestsNavLink } from "@/components/quote-requests-nav-link";
 import { TrialStatusBanner } from "@/components/trial-status-banner";
+import { HideOnOnboarding } from "@/components/hide-on-onboarding";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getNewQuoteRequestCount } from "@/lib/quote-requests/response-alerts";
@@ -95,7 +96,7 @@ export default async function AppLayout({
 
   const navLinks = getAppNavLinks({ showPartnerPortal });
   const feedbackHref = getFeedbackMailtoHref();
-  const quoteShare = resolveQuoteRequestShareContext(profile, user.email ?? "", resolveAppUrl());
+  const quoteShare = resolveQuoteRequestShareContext(profile, resolveAppUrl());
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -150,9 +151,11 @@ export default async function AppLayout({
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {profile ? (
-          <div className="mb-4">
-            <TrialStatusBanner profile={profile} accountEmail={user.email ?? ""} />
-          </div>
+          <HideOnOnboarding>
+            <div className="mb-4 empty:hidden">
+              <TrialStatusBanner profile={profile} />
+            </div>
+          </HideOnOnboarding>
         ) : null}
         {children}
       </main>

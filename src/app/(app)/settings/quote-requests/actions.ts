@@ -101,7 +101,7 @@ export async function updateQuoteRequestSettings(
     .update({
       quote_slug: quoteSlug,
       business_name: businessName,
-      phone: businessPhone,
+      phone: businessPhone || null,
       quote_logo_url: logoUrl,
       quote_pricing_profile: pricingProfile,
       quote_primary_trade: primaryTrade,

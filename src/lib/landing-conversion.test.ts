@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Home, { metadata as homeMetadata } from "@/app/page";
-import SampleQuotePage, { metadata as sampleMetadata } from "@/app/sample-quote/page";
+import { metadata as sampleMetadata } from "@/app/sample-quote/page";
+import { SampleQuoteView } from "@/app/sample-quote/sample-quote-view";
 import {
   ContractorAcquisitionCtaLink,
   ContractorSectionCtaLink,
@@ -30,7 +31,7 @@ import {
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
 const homeHtml = renderToStaticMarkup(createElement(Home));
-const sampleHtml = renderToStaticMarkup(createElement(SampleQuotePage));
+const sampleHtml = renderToStaticMarkup(createElement(SampleQuoteView));
 
 type Anchor = { href: string; className: string; text: string; index: number };
 
@@ -75,7 +76,7 @@ function installBrowserMocks(cookie = "") {
     fbq: (...args: unknown[]) => metaCalls.push(args),
     sessionStorage: storage,
     localStorage: storage,
-    location: { search: "", pathname: "/" },
+    location: { search: "", pathname: "/", hostname: "www.jobproof.ca" },
   };
   (globalThis as { document?: { cookie: string } }).document = { cookie };
   return { gtagCalls, metaCalls };
@@ -282,7 +283,7 @@ describe("mobile layout guards", () => {
     for (const file of [
       "src/app/page.tsx",
       "src/components/landing/product-previews.tsx",
-      "src/app/sample-quote/page.tsx",
+      "src/app/sample-quote/sample-quote-view.tsx",
       "src/app/sample-quote/sample-quote-response.tsx",
     ]) {
       for (const match of read(file).matchAll(/\b(?:min-)?w-\[(\d+)px\]/g)) {
@@ -366,7 +367,7 @@ describe("sample quote", () => {
 
   it("cannot create records: no server actions, network calls or posting forms", () => {
     const sources = [
-      read("src/app/sample-quote/page.tsx"),
+      read("src/app/sample-quote/sample-quote-view.tsx"),
       read("src/app/sample-quote/sample-quote-response.tsx"),
       read("src/lib/sample-quote.ts"),
     ].join("\n");
@@ -382,7 +383,7 @@ describe("sample quote", () => {
     assert.equal(forms.length, 2);
     for (const form of forms) assert.match(form, /onSubmit=/);
     assert.match(response, /event\.preventDefault\(\)/);
-    assert.doesNotMatch(read("src/app/sample-quote/page.tsx"), /\/estimate\/sample\/pdf|hasPdf=\{true\}/);
+    assert.doesNotMatch(read("src/app/sample-quote/sample-quote-view.tsx"), /\/estimate\/sample\/pdf|hasPdf=\{true\}/);
   });
 });
 
@@ -471,7 +472,7 @@ describe("conversion funnel analytics", () => {
   it("landing and sample pages never fire signup or trial conversions", () => {
     const sources = [
       read("src/app/page.tsx"),
-      read("src/app/sample-quote/page.tsx"),
+      read("src/app/sample-quote/sample-quote-view.tsx"),
       read("src/app/sample-quote/sample-quote-response.tsx"),
       read("src/components/contractor-funnel-trackers.tsx"),
       read("src/components/landing/product-previews.tsx"),
@@ -485,7 +486,7 @@ describe("conversion funnel analytics", () => {
   it("sample_quote_view fires once per tab session", async () => {
     const trackers = read("src/components/contractor-funnel-trackers.tsx");
     assert.match(trackers, /trackGa4EventOnce\(\s*"sample_quote_view",\s*GA4_FUNNEL_EVENTS\.sample_quote_view/);
-    assert.match(read("src/app/sample-quote/page.tsx"), /<SampleQuoteViewTracker \/>/);
+    assert.match(read("src/app/sample-quote/sample-quote-view.tsx"), /<SampleQuoteViewTracker \/>/);
   });
 });
 
@@ -531,11 +532,14 @@ describe("trial_started analytics", () => {
       appActions,
       /const trialStarted = await maybeStartManagedTrial\([\s\S]*?\);\s*if \(trialStarted\) \{[\s\S]*?markTrialStartedAnalyticsPending/
     );
-    const planActions = read("src/app/(app)/onboarding/plan/actions.ts");
+    const onboardingActions = read("src/app/(app)/onboarding/business-profile/actions.ts");
     assert.match(
-      planActions,
-      /if \(result\.trialStarted\) \{\s*await markTrialStartedAnalyticsPending\(tier\);/
+      onboardingActions,
+      /const trialStarted = await maybeStartManagedTrial\([\s\S]*?\);\s*if \(trialStarted\) \{\s*await markTrialStartedAnalyticsPending\(/
     );
+    // Choosing a plan never starts the trial, so it never sets the marker.
+    const planActions = read("src/app/(app)/onboarding/plan/actions.ts");
+    assert.doesNotMatch(planActions, /markTrialStartedAnalyticsPending|maybeStartManagedTrial/);
     const startTrial = read("src/lib/start-managed-trial.ts");
     assert.doesNotMatch(startTrial, /markTrialStartedAnalyticsPending|jp_ga4_ts_pending/);
   });

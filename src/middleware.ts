@@ -3,9 +3,12 @@ import {
   updateSession,
   type ProfileOnboardingFields,
 } from "@/lib/supabase/middleware";
-import { isBusinessProfileCompleteForApp } from "@/lib/validation/business-profile";
 import { BETA_PLAN_ONBOARDING_PATH, needsPlanSelection } from "@/lib/beta-tester";
-import { isOnboardingCompleteForTrial, needsTrialExpiredIntro } from "@/lib/trial-lifecycle";
+import {
+  isOnboardingCompleteForTrial,
+  needsTrialActivation,
+  needsTrialExpiredIntro,
+} from "@/lib/trial-lifecycle";
 import { resolveAuthenticatedAuthPathRedirect } from "@/lib/auth/safe-redirect";
 import { resolveContractorPostLoginPath } from "@/lib/auth/post-login-path";
 
@@ -63,28 +66,10 @@ function requiresOnboarding(pathname: string): boolean {
   );
 }
 
-function isProfileIncomplete(
-  profile: ProfileOnboardingFields,
-  accountEmail: string
-): boolean {
+/** Business name + primary trade missing, or a chosen plan whose trial was never activated. */
+function needsBusinessSetup(profile: ProfileOnboardingFields): boolean {
   if (!profile) return true;
-  return !isOnboardingCompleteForTrial(profile, accountEmail);
-}
-
-function isBusinessIncomplete(
-  profile: ProfileOnboardingFields,
-  accountEmail: string
-): boolean {
-  if (!profile) return true;
-  return !isBusinessProfileCompleteForApp({
-    business_name: profile.business_name,
-    account_email: accountEmail,
-    phone: profile.phone,
-    address_line_1: profile.address_line_1,
-    city: profile.city,
-    province: profile.province,
-    postal_code: profile.postal_code,
-  });
+  return !isOnboardingCompleteForTrial(profile) || needsTrialActivation(profile);
 }
 
 export async function middleware(request: NextRequest) {
@@ -112,10 +97,7 @@ export async function middleware(request: NextRequest) {
       request.nextUrl.searchParams.get("redirect");
     const destination = resolveAuthenticatedAuthPathRedirect({
       next,
-      contractorFallbackPath: resolveContractorPostLoginPath(
-        profile,
-        user.email ?? ""
-      ),
+      contractorFallbackPath: resolveContractorPostLoginPath(profile),
     });
     return Response.redirect(new URL(destination, request.nextUrl.origin));
   }
@@ -131,7 +113,7 @@ export async function middleware(request: NextRequest) {
       }
       return Response.redirect(url);
     }
-    if (isProfileIncomplete(profile, user.email ?? "")) {
+    if (needsBusinessSetup(profile)) {
       const url = request.nextUrl.clone();
       url.pathname = BUSINESS_ONBOARDING_PATH;
       url.searchParams.set("redirect", pathname);
@@ -142,20 +124,19 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Plan page: if plan already selected, send to business onboarding or dashboard.
+  // Plan page stays available to change plan until the trial starts; afterwards it is locked.
   if (
     user &&
     (pathname === BETA_PLAN_ONBOARDING_PATH || pathname.startsWith(`${BETA_PLAN_ONBOARDING_PATH}/`)) &&
-    !needsPlanSelection(profile)
+    !needsPlanSelection(profile) &&
+    !needsTrialActivation(profile)
   ) {
     const url = request.nextUrl.clone();
-    url.pathname = isBusinessIncomplete(profile, user.email ?? "")
+    url.pathname = needsBusinessSetup(profile)
       ? BUSINESS_ONBOARDING_PATH
-      : isProfileIncomplete(profile, user.email ?? "")
-        ? BUSINESS_ONBOARDING_PATH
-        : needsTrialExpiredIntro(profile)
-          ? TRIAL_ENDED_PATH
-          : "/dashboard";
+      : needsTrialExpiredIntro(profile)
+        ? TRIAL_ENDED_PATH
+        : "/dashboard";
     return Response.redirect(url);
   }
 

@@ -49,7 +49,7 @@ function installBrowserMocks() {
     gtag: (...args: unknown[]) => gtagCalls.push(args),
     sessionStorage: storage,
     localStorage: storage,
-    location: { search: "", pathname: "/settings/billing" },
+    location: { search: "", pathname: "/settings/billing", hostname: "www.jobproof.ca" },
   };
   (globalThis as { document?: { cookie: string } }).document = { cookie: "" };
   return { gtagCalls };

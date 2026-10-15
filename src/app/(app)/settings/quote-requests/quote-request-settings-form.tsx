@@ -207,15 +207,21 @@ export function QuoteRequestSettingsForm({
       </label>
 
       <label className="block">
-        <span className="text-sm font-medium text-zinc-800">Business phone</span>
+        <span className="text-sm font-medium text-zinc-800">
+          Business phone <span className="font-normal text-zinc-500">(optional)</span>
+        </span>
         <input
           name="businessPhone"
           value={businessPhone}
           onChange={(e) => setBusinessPhone(e.target.value)}
-          required
           type="tel"
+          autoComplete="tel"
           className={FIELD_INPUT_CLASS}
         />
+        <p className="mt-1 text-xs text-zinc-500">
+          Shown on your quote page so customers can call you. Required before sending contracts
+          or invoices.
+        </p>
         {fieldErrors.businessPhone ? (
           <p className="mt-1 text-xs text-red-600">{fieldErrors.businessPhone}</p>
         ) : null}

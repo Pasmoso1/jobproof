@@ -60,7 +60,65 @@ export function validateBusinessProfileFields(
   return errors;
 }
 
-/** True when all required business fields + auth email satisfy validation (onboarding gate, middleware). */
+export const BUSINESS_NAME_MAX_LENGTH = 120;
+
+/** Formal documents (contracts, change orders, invoices, sent estimates) need full details. */
+export const BUSINESS_DETAILS_REQUIRED_MESSAGE =
+  "Add your business phone and address before sending. They appear on the documents your customers receive. Go to Settings → Business.";
+
+/** Initial onboarding only asks for the business name (plus primary trade, validated separately). */
+export function validateOnboardingBusinessName(name: string | null | undefined): string | null {
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) return "Business name is required.";
+  if (trimmed.length > BUSINESS_NAME_MAX_LENGTH) {
+    return `Business name must be ${BUSINESS_NAME_MAX_LENGTH} characters or fewer.`;
+  }
+  return null;
+}
+
+export type MissingBusinessDetail = "business_name" | "phone" | "address";
+
+export const MISSING_BUSINESS_DETAIL_LABELS: Record<MissingBusinessDetail, string> = {
+  business_name: "Business name",
+  phone: "Business phone",
+  address: "Business address",
+};
+
+/**
+ * Details still needed before formal customer documents (contracts, change orders, invoices,
+ * sent estimates) can be issued. Empty when the profile is complete.
+ */
+export function getMissingBusinessDetails(
+  profile:
+    | {
+        business_name?: string | null;
+        phone?: string | null;
+        address_line_1?: string | null;
+        city?: string | null;
+        province?: string | null;
+        postal_code?: string | null;
+      }
+    | null
+    | undefined
+): MissingBusinessDetail[] {
+  const errors = validateBusinessProfileFields({
+    business_name: profile?.business_name ?? "",
+    phone: profile?.phone ?? "",
+    address_line_1: profile?.address_line_1 ?? "",
+    city: profile?.city ?? "",
+    province: profile?.province ?? "",
+    postal_code: profile?.postal_code ?? "",
+  });
+  const missing: MissingBusinessDetail[] = [];
+  if (errors.business_name) missing.push("business_name");
+  if (errors.phone) missing.push("phone");
+  if (errors.address_line_1 || errors.city || errors.province || errors.postal_code) {
+    missing.push("address");
+  }
+  return missing;
+}
+
+/** True when all required business fields + auth email satisfy validation (formal documents). */
 export function isBusinessProfileCompleteForApp(input: {
   business_name: string | null | undefined;
   account_email: string;

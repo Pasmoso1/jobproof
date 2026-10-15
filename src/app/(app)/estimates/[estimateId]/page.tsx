@@ -12,6 +12,8 @@ import {
   SendEstimateButton,
 } from "@/app/(app)/estimates/estimate-send-buttons";
 import { defaultTaxRateForNewFinancials } from "@/lib/tax/canada";
+import { getMissingBusinessDetails } from "@/lib/validation/business-profile";
+import { BusinessDetailsNeededNotice } from "@/components/business-details-needed-notice";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +60,7 @@ export default async function EstimateDetailPage({
       : null;
 
   const isDraft = estimate.status === "draft";
+  const missingBusinessDetails = getMissingBusinessDetails(profile);
   const canResend = ["sent", "viewed"].includes(estimate.status) || estimate.displayStatus === "expired";
   const showConvert =
     estimate.displayStatus === "accepted" && !estimate.job_id;
@@ -192,9 +195,17 @@ export default async function EstimateDetailPage({
           <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-lg font-semibold text-zinc-900">Send to customer</h2>
             <p className="mt-1 text-sm text-zinc-600">
-              When you send, JobProof emails your customer a secure link. Complete your business
-              profile in Settings if you have not already.
+              When you send, JobProof emails your customer a secure link.
             </p>
+            {missingBusinessDetails.length > 0 ? (
+              <div className="mt-4">
+                <BusinessDetailsNeededNotice
+                  missing={missingBusinessDetails}
+                  returnTo={`/estimates/${estimate.id}`}
+                  action="send this estimate"
+                />
+              </div>
+            ) : null}
             <div className="mt-4">
               <SendEstimateButton estimateId={estimate.id} />
             </div>

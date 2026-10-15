@@ -14,20 +14,18 @@ import {
 
 export function TrialStatusBanner({
   profile,
-  accountEmail,
 }: {
   profile: TrialLifecycleProfile | null | undefined;
-  accountEmail: string;
 }) {
   if (!profile || profile.beta_tester === true) return null;
   if (hasLinkedPaidSubscription(profile)) return null;
 
-  if (!hasSelectedTrialPlan(profile) || !isOnboardingCompleteForTrial(profile, accountEmail)) {
+  if (!hasSelectedTrialPlan(profile) || !isOnboardingCompleteForTrial(profile)) {
     return (
       <div className="rounded-lg border border-[#2436BB]/25 bg-[#2436BB]/5 px-4 py-3 text-sm text-zinc-800">
         <p className="font-medium text-zinc-900">{PENDING_TRIAL_SETUP_MESSAGE}</p>
         <p className="mt-1 text-zinc-600">
-          Finish your business profile and primary trade so your free trial can begin.
+          Add your business name and primary trade so your free trial can begin.
         </p>
         <Link
           href="/onboarding/business-profile"

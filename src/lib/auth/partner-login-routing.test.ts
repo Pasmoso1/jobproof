@@ -117,10 +117,7 @@ describe("Partner vs contractor post-login routing", () => {
   });
 
   it("incomplete contractor profile does not override explicit Partner destination", () => {
-    const contractorFallback = resolveContractorPostLoginPath(
-      INCOMPLETE_PROFILE,
-      "contractor@example.com"
-    );
+    const contractorFallback = resolveContractorPostLoginPath(INCOMPLETE_PROFILE);
     assert.equal(contractorFallback, "/onboarding/business-profile");
     assert.equal(
       resolveAuthenticatedAuthPathRedirect({
@@ -140,16 +137,13 @@ describe("Partner vs contractor post-login routing", () => {
 
   it("normal JobProof login still sends incomplete profiles to contractor onboarding", () => {
     assert.equal(
-      resolveContractorPostLoginPath(INCOMPLETE_PROFILE, "a@b.com"),
+      resolveContractorPostLoginPath(INCOMPLETE_PROFILE),
       "/onboarding/business-profile"
     );
     assert.equal(
       resolveAuthenticatedAuthPathRedirect({
         next: null,
-        contractorFallbackPath: resolveContractorPostLoginPath(
-          INCOMPLETE_PROFILE,
-          "a@b.com"
-        ),
+        contractorFallbackPath: resolveContractorPostLoginPath(INCOMPLETE_PROFILE),
       }),
       "/onboarding/business-profile"
     );
@@ -157,16 +151,13 @@ describe("Partner vs contractor post-login routing", () => {
 
   it("completed contractor account continues to dashboard on normal login", () => {
     assert.equal(
-      resolveContractorPostLoginPath(COMPLETE_PROFILE, "a@b.com"),
+      resolveContractorPostLoginPath(COMPLETE_PROFILE),
       "/dashboard"
     );
     assert.equal(
       resolveAuthenticatedAuthPathRedirect({
         next: null,
-        contractorFallbackPath: resolveContractorPostLoginPath(
-          COMPLETE_PROFILE,
-          "a@b.com"
-        ),
+        contractorFallbackPath: resolveContractorPostLoginPath(COMPLETE_PROFILE),
       }),
       "/dashboard"
     );
