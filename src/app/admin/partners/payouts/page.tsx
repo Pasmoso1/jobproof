@@ -16,7 +16,7 @@ import {
 } from "./payout-dashboard-client";
 
 export default async function AdminPartnerPayoutsPage() {
-  const auth = await requireAdminUserOrRedirectLogin();
+  const auth = await requireAdminUserOrRedirectLogin("/admin/partners/payouts");
   if (!auth.ok) return <AdminNotAuthorized userEmail={auth.userEmail ?? ""} />;
 
   const admin = createServiceRoleClient();

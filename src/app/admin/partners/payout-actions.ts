@@ -2,8 +2,14 @@
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
-import { requireAdminUser } from "@/lib/admin-auth";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { requireAdminService } from "@/lib/admin-service";
+import {
+  ADMIN_AUDIT_ACTIONS,
+  auditWarning,
+  buildAuditIdempotencyKey,
+  recordAdminAudit,
+  type RecordAdminAuditResult,
+} from "@/lib/admin-audit-log";
 import {
   buildBatchPayoutIdempotencyKey,
   sumRewardAmounts,
@@ -13,13 +19,6 @@ import { verifyAndRouteQualifiedReferral } from "@/lib/partners/payout-verificat
 import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
 import { sendPartnerReferralLifecycleEmail } from "@/lib/partners/emails";
 
-async function requireAdminService() {
-  const auth = await requireAdminUser();
-  if (!auth.ok) return { ok: false as const, error: "Unauthorized" };
-  const admin = createServiceRoleClient();
-  if (!admin) return { ok: false as const, error: "Service role unavailable" };
-  return { ok: true as const, admin, email: auth.userEmail };
-}
 
 function revalidatePayoutPaths(partnerId?: string) {
   revalidatePath("/admin/partners/payouts");
@@ -48,6 +47,27 @@ export async function adminRecordPartnerBatchPayout(input: {
 
   if (listErr) return { ok: false as const, error: listErr.message };
   if (!readyReferrals?.length) {
+    // A retry after a successful (or lost-response) payout finds nothing left to pay. If the
+    // same idempotency key already produced a payout for this partner, report that payout
+    // instead of a misleading "nothing ready" error. Read-only: no side effects repeated.
+    const replayKey = input.idempotencyKey?.trim();
+    if (replayKey) {
+      const { data: prior } = await ctx.admin
+        .from("partner_payouts")
+        .select("id, amount, referral_count")
+        .eq("idempotency_key", replayKey)
+        .eq("partner_id", input.partnerId)
+        .maybeSingle();
+      if (prior) {
+        return {
+          ok: true as const,
+          payoutId: String(prior.id),
+          amount: Number(prior.amount),
+          referralCount: Number(prior.referral_count ?? 0),
+          idempotent: true,
+        };
+      }
+    }
     return { ok: false as const, error: "No rewards ready for payment" };
   }
 
@@ -87,8 +107,50 @@ export async function adminRecordPartnerBatchPayout(input: {
     return { ok: false as const, error: result?.error ?? "Payout failed" };
   }
 
+  const payoutId = String(result.payout_id);
+
+  // Replay of an already-recorded payout (same idempotency key): report the ORIGINAL payout and
+  // do not repeat side effects. Previously this path re-sent the "reward paid" email and
+  // analytics using the CURRENT ready set, which could describe referrals that were not in the
+  // replayed payout.
+  if (result.idempotent) {
+    const { data: original } = await ctx.admin
+      .from("partner_payouts")
+      .select("amount, referral_count")
+      .eq("id", payoutId)
+      .maybeSingle();
+    revalidatePayoutPaths(input.partnerId);
+    return {
+      ok: true as const,
+      payoutId,
+      amount: Number(original?.amount ?? 0),
+      referralCount: Number(original?.referral_count ?? 0),
+      idempotent: true,
+    };
+  }
+
   const amount = Number(result.amount ?? expectedTotal);
   const referralCount = Number(result.referral_count ?? readyReferrals.length);
+
+  // Keyed by payout id so a retry never writes a second record. The payout row itself already
+  // stores created_by (the admin) and is written atomically by the RPC; this audit row is a
+  // separate request (see admin-audit-log.ts), so a failure is surfaced via `auditWarning`.
+  const audit = await recordAdminAudit(ctx.admin, {
+    adminEmail: ctx.email,
+    action: ADMIN_AUDIT_ACTIONS.partnerBatchPayoutRecorded,
+    targetType: "partner_payout",
+    targetId: payoutId,
+    metadata: {
+      partner_id: input.partnerId,
+      amount_cad: amount,
+      referral_count: referralCount,
+      has_payment_reference: Boolean(input.paymentReference?.trim()),
+    },
+    idempotencyKey: buildAuditIdempotencyKey(
+      ADMIN_AUDIT_ACTIONS.partnerBatchPayoutRecorded,
+      payoutId
+    ),
+  });
 
   for (const referral of readyReferrals) {
     trackProductEventSafe({
@@ -125,13 +187,13 @@ export async function adminRecordPartnerBatchPayout(input: {
   revalidatePayoutPaths(input.partnerId);
   return {
     ok: true as const,
-    payoutId: String(result.payout_id),
+    payoutId,
     amount,
     referralCount,
-    idempotent: Boolean(result.idempotent),
+    idempotent: false,
+    ...auditWarning(audit),
   };
 }
-
 export async function adminReleaseReferralForPayment(referralId: string) {
   const ctx = await requireAdminService();
   if (!ctx.ok) return ctx;
@@ -164,8 +226,20 @@ export async function adminReleaseReferralForPayment(referralId: string) {
     };
   }
 
+  const releaseAudit = await recordAdminAudit(ctx.admin, {
+    adminEmail: ctx.email,
+    action: ADMIN_AUDIT_ACTIONS.referralReleasedForPayment,
+    targetType: "partner_referral",
+    targetId: referralId,
+    metadata: { from_status: String(row.reward_status), to_status: "approved" },
+    idempotencyKey: buildAuditIdempotencyKey(
+      ADMIN_AUDIT_ACTIONS.referralReleasedForPayment,
+      referralId
+    ),
+  });
+
   revalidatePayoutPaths();
-  return { ok: true as const, status: "approved" as const };
+  return { ok: true as const, status: "approved" as const, ...auditWarning(releaseAudit) };
 }
 
 export async function adminForceReleaseReferralForPayment(referralId: string) {
@@ -186,7 +260,7 @@ export async function adminForceReleaseReferralForPayment(referralId: string) {
     return { ok: false as const, error: "Reward is not eligible for release" };
   }
 
-  await ctx.admin
+  const { data: released, error: releaseError } = await ctx.admin
     .from("partner_referrals")
     .update({
       reward_status: "approved",
@@ -194,10 +268,33 @@ export async function adminForceReleaseReferralForPayment(referralId: string) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", referralId)
-    .in("reward_status", ["qualified", "needs_review"]);
+    .in("reward_status", ["qualified", "needs_review"])
+    .select("id");
+  if (releaseError) return { ok: false as const, error: releaseError.message };
+
+  // Audit only when a row actually changed, so a double-click / retry is not logged twice.
+  let forceAudit: RecordAdminAuditResult | null = null;
+  if (released && released.length > 0) {
+    forceAudit = await recordAdminAudit(ctx.admin, {
+      adminEmail: ctx.email,
+      action: ADMIN_AUDIT_ACTIONS.referralForceReleased,
+      targetType: "partner_referral",
+      targetId: referralId,
+      metadata: {
+        from_status: String(row.reward_status),
+        to_status: "approved",
+        verification_bypassed: true,
+      },
+      idempotencyKey: buildAuditIdempotencyKey(
+        ADMIN_AUDIT_ACTIONS.referralForceReleased,
+        referralId,
+        String(row.reward_status)
+      ),
+    });
+  }
 
   revalidatePayoutPaths();
-  return { ok: true as const };
+  return { ok: true as const, ...auditWarning(forceAudit) };
 }
 
 export async function adminInvalidateReferralReward(
@@ -242,19 +339,53 @@ export async function adminInvalidateReferralReward(
 
   if (error) return { ok: false as const, error: error.message };
 
+  const invalidateAudit = await recordAdminAudit(ctx.admin, {
+    adminEmail: ctx.email,
+    action: ADMIN_AUDIT_ACTIONS.referralInvalidated,
+    targetType: "partner_referral",
+    targetId: referralId,
+    // The free-text reason is stored on the referral (invalidated_reason), not copied here.
+    metadata: { from_status: String(row.reward_status), to_status: outcome },
+    idempotencyKey: buildAuditIdempotencyKey(
+      ADMIN_AUDIT_ACTIONS.referralInvalidated,
+      referralId
+    ),
+  });
+
   revalidatePayoutPaths();
-  return { ok: true as const, status: outcome };
+  return { ok: true as const, status: outcome, ...auditWarning(invalidateAudit) };
 }
 
 export async function adminReverifyReferral(referralId: string) {
   const ctx = await requireAdminService();
   if (!ctx.ok) return ctx;
 
+  const { data: before } = await ctx.admin
+    .from("partner_referrals")
+    .select("reward_status")
+    .eq("id", referralId)
+    .maybeSingle();
+
   const result = await verifyAndRouteQualifiedReferral(ctx.admin, referralId);
   if (!result.ok) return { ok: false as const, error: result.error ?? "Failed" };
 
+  // Only log when verification actually moved the referral to a different status.
+  let reverifyAudit: RecordAdminAuditResult | null = null;
+  if (before && String(before.reward_status) !== String(result.status)) {
+    reverifyAudit = await recordAdminAudit(ctx.admin, {
+      adminEmail: ctx.email,
+      action: ADMIN_AUDIT_ACTIONS.referralReverified,
+      targetType: "partner_referral",
+      targetId: referralId,
+      metadata: {
+        from_status: String(before.reward_status),
+        to_status: String(result.status),
+      },
+    });
+  }
+
   revalidatePayoutPaths();
-  return { ok: true as const, status: result.status };
+  return { ok: true as const, status: result.status, ...auditWarning(reverifyAudit) };
 }
 
 export async function adminGenerateBatchPayoutIdempotencyKey(partnerId: string) {

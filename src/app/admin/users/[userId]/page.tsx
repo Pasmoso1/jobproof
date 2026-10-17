@@ -101,7 +101,7 @@ export default async function AdminUserDetailPage({
 }) {
   const { userId } = await params;
 
-  const auth = await requireAdminUserOrRedirectLogin();
+  const auth = await requireAdminUserOrRedirectLogin(`/admin/users/${encodeURIComponent(userId)}`);
   if (!auth.ok) {
     return <AdminNotAuthorized userEmail={auth.userEmail ?? ""} />;
   }

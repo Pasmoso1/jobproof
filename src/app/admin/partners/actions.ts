@@ -1,8 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdminUser } from "@/lib/admin-auth";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { requireAdminService } from "@/lib/admin-service";
+import {
+  ADMIN_AUDIT_ACTIONS,
+  auditWarning,
+  buildAuditIdempotencyKey,
+  recordAdminAudit,
+  type RecordAdminAuditResult,
+} from "@/lib/admin-audit-log";
+import { recordSingleReferralPayout } from "@/lib/partners/single-referral-payout";
+import {
+  createRecoveryEmailSender,
+  deliverPartnerPasswordReset,
+  findAuthUserByEmail,
+} from "@/lib/admin/partner-password-reset";
 import {
   countFoundingPartners,
   createPartnerFromApplication,
@@ -22,14 +34,6 @@ import {
 } from "@/lib/partners/emails";
 import { PRODUCT_ANALYTICS_EVENTS, trackProductEventSafe } from "@/lib/product-analytics";
 import { resolveAppUrl } from "@/lib/stripe";
-
-async function requireAdminService() {
-  const auth = await requireAdminUser();
-  if (!auth.ok) return { ok: false as const, error: "Unauthorized" };
-  const admin = createServiceRoleClient();
-  if (!admin) return { ok: false as const, error: "Service role unavailable" };
-  return { ok: true as const, admin, email: auth.userEmail };
-}
 
 export async function adminSetApplicationUnderReview(applicationId: string) {
   const ctx = await requireAdminService();
@@ -56,6 +60,17 @@ export async function adminSetApplicationUnderReview(applicationId: string) {
   if (error) {
     return { ok: false as const, error: error.message };
   }
+  await recordAdminAudit(ctx.admin, {
+    adminEmail: ctx.email,
+    action: ADMIN_AUDIT_ACTIONS.partnerApplicationUnderReview,
+    targetType: "partner_application",
+    targetId: applicationId,
+    metadata: { from_status: "submitted", to_status: "under_review" },
+    idempotencyKey: buildAuditIdempotencyKey(
+      ADMIN_AUDIT_ACTIONS.partnerApplicationUnderReview,
+      applicationId
+    ),
+  });
   revalidatePath("/admin/partners");
   return { ok: true as const, status: "under_review" as const };
 }
@@ -114,6 +129,24 @@ export async function adminApprovePartnerApplication(
         reviewedBy: ctx.email,
       }
     );
+
+    // Record the approval as soon as the partner exists, before the (fallible) email send.
+    await recordAdminAudit(ctx.admin, {
+      adminEmail: ctx.email,
+      action: ADMIN_AUDIT_ACTIONS.partnerApplicationApproved,
+      targetType: "partner_application",
+      targetId: applicationId,
+      metadata: {
+        partner_id: created.partnerId,
+        partner_level: created.level,
+        partner_type: app.partner_type,
+        level_overridden: Boolean(levelOverride),
+      },
+      idempotencyKey: buildAuditIdempotencyKey(
+        ADMIN_AUDIT_ACTIONS.partnerApplicationApproved,
+        applicationId
+      ),
+    });
 
     const referralUrl = buildPartnerReferralUrl(resolveAppUrl(), created.referralCode);
     await sendPartnerApprovedEmail({
@@ -188,7 +221,7 @@ export async function adminDeclinePartnerApplication(
   }
 
   const reviewedAt = new Date().toISOString();
-  await ctx.admin
+  const { error: declineError } = await ctx.admin
     .from("partner_applications")
     .update({
       status: "declined",
@@ -196,7 +229,23 @@ export async function adminDeclinePartnerApplication(
       reviewed_at: reviewedAt,
       reviewed_by: ctx.email,
     })
-    .eq("id", applicationId);
+    .eq("id", applicationId)
+    .in("status", ["submitted", "under_review"]);
+  if (declineError) {
+    return { ok: false as const, error: declineError.message };
+  }
+
+  await recordAdminAudit(ctx.admin, {
+    adminEmail: ctx.email,
+    action: ADMIN_AUDIT_ACTIONS.partnerApplicationDeclined,
+    targetType: "partner_application",
+    targetId: applicationId,
+    metadata: { from_status: String(app.status), to_status: "declined" },
+    idempotencyKey: buildAuditIdempotencyKey(
+      ADMIN_AUDIT_ACTIONS.partnerApplicationDeclined,
+      applicationId
+    ),
+  });
 
   await sendPartnerDeclinedEmail({
     to: app.email,
@@ -220,26 +269,51 @@ export async function adminDeclinePartnerApplication(
   };
 }
 
+/** Shared suspend/reactivate: audits only when the status actually changed (retry-safe). */
+async function setPartnerStatus(
+  ctx: Extract<Awaited<ReturnType<typeof requireAdminService>>, { ok: true }>,
+  partnerId: string,
+  nextStatus: "suspended" | "active"
+) {
+  const { data: existing } = await ctx.admin
+    .from("partners")
+    .select("id, status")
+    .eq("id", partnerId)
+    .maybeSingle();
+  if (!existing) return { ok: false as const, error: "Partner not found" };
+
+  const { error } = await ctx.admin
+    .from("partners")
+    .update({ status: nextStatus, updated_at: new Date().toISOString() })
+    .eq("id", partnerId);
+  if (error) return { ok: false as const, error: error.message };
+
+  if (existing.status !== nextStatus) {
+    await recordAdminAudit(ctx.admin, {
+      adminEmail: ctx.email,
+      action:
+        nextStatus === "suspended"
+          ? ADMIN_AUDIT_ACTIONS.partnerSuspended
+          : ADMIN_AUDIT_ACTIONS.partnerReactivated,
+      targetType: "partner",
+      targetId: partnerId,
+      metadata: { from_status: String(existing.status ?? ""), to_status: nextStatus },
+    });
+  }
+  revalidatePath("/admin/partners");
+  return { ok: true as const };
+}
+
 export async function adminSuspendPartner(partnerId: string) {
   const ctx = await requireAdminService();
   if (!ctx.ok) return ctx;
-  await ctx.admin
-    .from("partners")
-    .update({ status: "suspended", updated_at: new Date().toISOString() })
-    .eq("id", partnerId);
-  revalidatePath("/admin/partners");
-  return { ok: true as const };
+  return setPartnerStatus(ctx, partnerId, "suspended");
 }
 
 export async function adminReactivatePartner(partnerId: string) {
   const ctx = await requireAdminService();
   if (!ctx.ok) return ctx;
-  await ctx.admin
-    .from("partners")
-    .update({ status: "active", updated_at: new Date().toISOString() })
-    .eq("id", partnerId);
-  revalidatePath("/admin/partners");
-  return { ok: true as const };
+  return setPartnerStatus(ctx, partnerId, "active");
 }
 
 export async function adminChangePartnerType(
@@ -251,10 +325,31 @@ export async function adminChangePartnerType(
   if (!isCanonicalPartnerType(partnerType)) {
     return { ok: false as const, error: "Select Creator, Marketing, or Organization." };
   }
-  await ctx.admin
+  const { data: existingType } = await ctx.admin
+    .from("partners")
+    .select("id, partner_type")
+    .eq("id", partnerId)
+    .maybeSingle();
+  if (!existingType) return { ok: false as const, error: "Partner not found" };
+
+  const { error: typeError } = await ctx.admin
     .from("partners")
     .update({ partner_type: partnerType, updated_at: new Date().toISOString() })
     .eq("id", partnerId);
+  if (typeError) return { ok: false as const, error: typeError.message };
+
+  if (existingType.partner_type !== partnerType) {
+    await recordAdminAudit(ctx.admin, {
+      adminEmail: ctx.email,
+      action: ADMIN_AUDIT_ACTIONS.partnerTypeChanged,
+      targetType: "partner",
+      targetId: partnerId,
+      metadata: {
+        from_type: String(existingType.partner_type ?? ""),
+        to_type: partnerType,
+      },
+    });
+  }
   revalidatePath("/admin/partners");
   return { ok: true as const };
 }
@@ -267,6 +362,7 @@ export async function adminChangePartnerLevel(partnerId: string, level: PartnerL
     .select("partner_level, partner_type")
     .eq("id", partnerId)
     .maybeSingle();
+  if (!existing) return { ok: false as const, error: "Partner not found" };
   if (isOrganizationPartnerType(existing?.partner_type)) {
     return {
       ok: false as const,
@@ -284,10 +380,24 @@ export async function adminChangePartnerLevel(partnerId: string, level: PartnerL
       }
     }
   }
-  await ctx.admin
+  const { error: levelError } = await ctx.admin
     .from("partners")
     .update({ partner_level: level, updated_at: new Date().toISOString() })
     .eq("id", partnerId);
+  if (levelError) return { ok: false as const, error: levelError.message };
+
+  if (existing?.partner_level !== level) {
+    await recordAdminAudit(ctx.admin, {
+      adminEmail: ctx.email,
+      action: ADMIN_AUDIT_ACTIONS.partnerLevelChanged,
+      targetType: "partner",
+      targetId: partnerId,
+      metadata: {
+        from_level: String(existing?.partner_level ?? ""),
+        to_level: level,
+      },
+    });
+  }
   revalidatePath("/admin/partners");
   return { ok: true as const };
 }
@@ -298,12 +408,35 @@ export async function adminAdjustReferralReward(referralId: string, amountCad: n
   if (!Number.isFinite(amountCad) || amountCad < 0) {
     return { ok: false as const, error: "Invalid amount" };
   }
-  await ctx.admin
+  const { data: existingReward } = await ctx.admin
+    .from("partner_referrals")
+    .select("id, reward_amount, reward_status")
+    .eq("id", referralId)
+    .maybeSingle();
+  if (!existingReward) return { ok: false as const, error: "Referral not found" };
+
+  const { error: adjustError } = await ctx.admin
     .from("partner_referrals")
     .update({ reward_amount: amountCad, updated_at: new Date().toISOString() })
     .eq("id", referralId);
+  if (adjustError) return { ok: false as const, error: adjustError.message };
+
+  let adjustAudit: RecordAdminAuditResult | null = null;
+  if (Number(existingReward.reward_amount) !== amountCad) {
+    adjustAudit = await recordAdminAudit(ctx.admin, {
+      adminEmail: ctx.email,
+      action: ADMIN_AUDIT_ACTIONS.referralRewardAdjusted,
+      targetType: "partner_referral",
+      targetId: referralId,
+      metadata: {
+        from_amount_cad: Number(existingReward.reward_amount),
+        to_amount_cad: amountCad,
+        reward_status: String(existingReward.reward_status ?? ""),
+      },
+    });
+  }
   revalidatePath("/admin/partners");
-  return { ok: true as const };
+  return { ok: true as const, ...auditWarning(adjustAudit) };
 }
 
 export async function adminApproveReferralReward(referralId: string) {
@@ -322,10 +455,28 @@ export async function adminApproveReferralReward(referralId: string) {
     return { ok: false as const, error: "Reward must be pending or qualified" };
   }
 
-  await ctx.admin
+  const { error: approveError } = await ctx.admin
     .from("partner_referrals")
     .update({ reward_status: "approved", updated_at: new Date().toISOString() })
-    .eq("id", referralId);
+    .eq("id", referralId)
+    .in("reward_status", ["pending", "qualified"]);
+  if (approveError) return { ok: false as const, error: approveError.message };
+
+  const approveAudit = await recordAdminAudit(ctx.admin, {
+    adminEmail: ctx.email,
+    action: ADMIN_AUDIT_ACTIONS.referralRewardApproved,
+    targetType: "partner_referral",
+    targetId: referralId,
+    metadata: {
+      from_status: String(row.reward_status),
+      to_status: "approved",
+      amount_cad: Number(row.reward_amount),
+    },
+    idempotencyKey: buildAuditIdempotencyKey(
+      ADMIN_AUDIT_ACTIONS.referralRewardApproved,
+      referralId
+    ),
+  });
 
   const partners = row.partners as
     | { contact_name?: string; email?: string }
@@ -343,7 +494,7 @@ export async function adminApproveReferralReward(referralId: string) {
   }
 
   revalidatePath("/admin/partners");
-  return { ok: true as const };
+  return { ok: true as const, ...auditWarning(approveAudit) };
 }
 
 export async function adminMarkReferralPaid(
@@ -353,73 +504,56 @@ export async function adminMarkReferralPaid(
   const ctx = await requireAdminService();
   if (!ctx.ok) return ctx;
 
-  const { data: row } = await ctx.admin
-    .from("partner_referrals")
-    .select(
-      "id, partner_id, reward_status, reward_amount, contractor_profile_id, contractor_business_name, partners(contact_name, email)"
-    )
-    .eq("id", referralId)
-    .maybeSingle();
-  if (!row) return { ok: false as const, error: "Not found" };
-  if (row.reward_status === "paid") return { ok: false as const, error: "Already paid" };
+  // Idempotent, conditionally-linked, self-compensating (see single-referral-payout.ts).
+  const paid = await recordSingleReferralPayout(ctx.admin, {
+    referralId,
+    paymentMethod: input.paymentMethod,
+    paymentReference: input.paymentReference,
+    notes: input.notes,
+    createdBy: ctx.email,
+  });
+  if (!paid.ok) return { ok: false as const, error: paid.error };
 
-  const amount = Number(row.reward_amount);
-  const paidAt = new Date().toISOString();
-  const { data: payout, error: payoutErr } = await ctx.admin
-    .from("partner_payouts")
-    .insert({
-      partner_id: row.partner_id,
-      amount,
-      payment_method: input.paymentMethod?.trim() || "e-transfer",
-      payment_reference: input.paymentReference?.trim() || null,
-      notes: input.notes?.trim() || null,
-      paid_at: paidAt,
-    })
-    .select("id")
-    .single();
-
-  if (payoutErr || !payout) {
-    return { ok: false as const, error: payoutErr?.message ?? "Payout insert failed" };
-  }
-
-  await ctx.admin
-    .from("partner_referrals")
-    .update({
-      reward_status: "paid",
-      reward_paid_at: new Date().toISOString(),
-      payout_id: payout.id,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", referralId);
-
-  trackProductEventSafe({
-    profileId: String(row.contractor_profile_id),
-    eventName: PRODUCT_ANALYTICS_EVENTS.partner_reward_paid,
-    source: "admin_partners",
-    metadata: { partner_id: String(row.partner_id), amount },
+  const audit = await recordAdminAudit(ctx.admin, {
+    adminEmail: ctx.email,
+    action: ADMIN_AUDIT_ACTIONS.referralMarkedPaid,
+    targetType: "partner_referral",
+    targetId: referralId,
+    metadata: {
+      payout_id: paid.payoutId,
+      partner_id: paid.partnerId,
+      amount_cad: paid.amount,
+      has_payment_reference: Boolean(input.paymentReference?.trim()),
+      resumed_after_interruption: paid.resumed,
+    },
+    idempotencyKey: buildAuditIdempotencyKey(
+      ADMIN_AUDIT_ACTIONS.referralMarkedPaid,
+      referralId
+    ),
   });
 
-  const partners = row.partners as
-    | { contact_name?: string; email?: string }
-    | { contact_name?: string; email?: string }[]
-    | null;
-  const p = Array.isArray(partners) ? partners[0] : partners;
-  if (p?.email) {
+  trackProductEventSafe({
+    profileId: paid.contractorProfileId,
+    eventName: PRODUCT_ANALYTICS_EVENTS.partner_reward_paid,
+    source: "admin_partners",
+    metadata: { partner_id: paid.partnerId, amount: paid.amount },
+  });
+
+  if (paid.partner?.email) {
     void sendPartnerReferralLifecycleEmail({
-      to: p.email,
-      contactName: p.contact_name ?? "Partner",
+      to: paid.partner.email,
+      contactName: paid.partner.contact_name ?? "Partner",
       kind: "reward_paid",
-      businessName: row.contractor_business_name,
-      amountCad: amount,
-      paymentDate: paidAt,
+      businessName: paid.contractorBusinessName,
+      amountCad: paid.amount,
+      paymentDate: paid.paidAt,
       paymentReference: input.paymentReference?.trim() || null,
     });
   }
 
   revalidatePath("/admin/partners");
-  return { ok: true as const };
+  return { ok: true as const, ...auditWarning(audit) };
 }
-
 export async function adminResendPartnerVerificationEmail(applicationId: string) {
   const ctx = await requireAdminService();
   if (!ctx.ok) return ctx;
@@ -452,31 +586,82 @@ export async function adminResendPartnerVerificationEmail(applicationId: string)
     };
   }
 
+  await recordAdminAudit(ctx.admin, {
+    adminEmail: ctx.email,
+    action: ADMIN_AUDIT_ACTIONS.partnerVerificationEmailResent,
+    targetType: "partner_application",
+    targetId: applicationId,
+  });
+
   revalidatePath("/admin/partners");
   return { ok: true as const };
 }
 
+/**
+ * Sends the partner a real password-reset email through Supabase Auth.
+ *
+ * History: this used `auth.admin.generateLink({ type: "recovery" })`, which only RETURNS a
+ * link and sends nothing; the link was discarded and the action still reported success.
+ * Now delivery goes through `resetPasswordForEmail` (see `partner-password-reset.ts`), the
+ * same mechanism as the public "Forgot password" page, and success is reported only when
+ * that request succeeds. No recovery token or reset URL is ever read, logged or returned.
+ */
 export async function adminSendPartnerPasswordResetEmail(applicationId: string) {
   const ctx = await requireAdminService();
   if (!ctx.ok) return ctx;
 
   const { data: app } = await ctx.admin
     .from("partner_applications")
-    .select("id, email")
+    .select("id, email, auth_user_id")
     .eq("id", applicationId)
     .maybeSingle();
   if (!app) return { ok: false as const, error: "Application not found" };
 
-  const email = String(app.email).trim().toLowerCase();
-  const redirectTo = `${resolveAppUrl()}/auth/callback?next=${encodeURIComponent("/update-password")}`;
-  const { error } = await ctx.admin.auth.admin.generateLink({
-    type: "recovery",
-    email,
-    options: { redirectTo },
-  });
-  if (error) {
-    return { ok: false as const, error: error.message };
+  // Resolve the Auth account first so we never claim an email was sent to an address
+  // that has no account behind it (Supabase answers 200 for unknown emails).
+  let authEmail: string | null = null;
+  if (app.auth_user_id) {
+    const { data, error } = await ctx.admin.auth.admin.getUserById(String(app.auth_user_id));
+    authEmail = !error && data?.user?.email ? data.user.email : null;
+  } else {
+    const found = await findAuthUserByEmail(
+      (page, perPage) => ctx.admin.auth.admin.listUsers({ page, perPage }),
+      String(app.email)
+    );
+    authEmail = found?.email ?? null;
   }
+  if (!authEmail) {
+    return {
+      ok: false as const,
+      error:
+        "No sign-in account exists for this partner yet, so there is no password to reset. Ask them to sign up or finish account setup first.",
+    };
+  }
+
+  const send = createRecoveryEmailSender();
+  if (!send) {
+    return {
+      ok: false as const,
+      error: "Email delivery is not configured on this deployment, so no email was sent.",
+    };
+  }
+
+  const result = await deliverPartnerPasswordReset({
+    email: authEmail,
+    appUrl: resolveAppUrl(),
+    send,
+  });
+  if (!result.ok) {
+    console.error("[admin-partners] password reset delivery failed", { applicationId });
+    return { ok: false as const, error: result.error };
+  }
+
+  await recordAdminAudit(ctx.admin, {
+    adminEmail: ctx.email,
+    action: ADMIN_AUDIT_ACTIONS.partnerPasswordResetEmailSent,
+    targetType: "partner_application",
+    targetId: applicationId,
+  });
 
   revalidatePath("/admin/partners");
   return { ok: true as const };

@@ -53,7 +53,7 @@ describe("admin Sign out chrome", () => {
       assert.match(source, /requireAdminUserOrRedirectLogin/);
     }
     const auth = read("src/lib/admin-auth.ts");
-    assert.match(auth, /redirect\(ADMIN_LOGIN_PATH\)/);
+    assert.match(auth, /redirect\(nextPath \? buildAdminLoginPath\(nextPath\) : ADMIN_LOGIN_PATH\)/);
     assert.match(auth, /isAdminEmail/);
   });
 

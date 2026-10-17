@@ -38,6 +38,18 @@ export function isPartnerProgramDestination(pathWithQuery: string): boolean {
   );
 }
 
+/**
+ * True for the admin area (`/admin` or `/admin/...`, optionally with a query string).
+ * Requires a safe relative path; `/administrator`, `//admin`, `/admin/../x` and
+ * absolute URLs are all rejected.
+ */
+export function isAdminPath(pathWithQuery: string | null | undefined): boolean {
+  const value = typeof pathWithQuery === "string" ? pathWithQuery.trim() : "";
+  if (!value || !isSafeRelativeRedirect(value)) return false;
+  const path = value.split("?")[0] ?? "";
+  return path === "/admin" || path.startsWith("/admin/");
+}
+
 /** Resolve a login `next` param to a safe internal path, or a fallback. */
 export function resolveSafeLoginRedirect(
   next: string | null | undefined,
@@ -58,6 +70,11 @@ export function resolveAuthenticatedAuthPathRedirect(input: {
 }): string {
   const next = typeof input.next === "string" ? input.next.trim() : "";
   if (next && isPartnerProgramDestination(next)) {
+    return next;
+  }
+  // Admin deep links are safe to honour here: every /admin page and action still
+  // enforces ADMIN_EMAILS server-side, so a non-admin simply sees "access required".
+  if (next && isAdminPath(next)) {
     return next;
   }
   return input.contractorFallbackPath;

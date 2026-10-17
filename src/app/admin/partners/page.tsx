@@ -13,7 +13,7 @@ import {
 import { AdminPartnersClient } from "./admin-partners-client";
 
 export default async function AdminPartnersPage() {
-  const auth = await requireAdminUserOrRedirectLogin();
+  const auth = await requireAdminUserOrRedirectLogin("/admin/partners");
   if (!auth.ok) return <AdminNotAuthorized userEmail={auth.userEmail ?? ""} />;
 
   const admin = createServiceRoleClient();

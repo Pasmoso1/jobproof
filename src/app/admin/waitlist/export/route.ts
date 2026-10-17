@@ -16,7 +16,11 @@ function firstStringFromUrl(searchParams: URLSearchParams, key: string): string 
 export async function GET(req: Request) {
   const auth = await requireAdminUser();
   if (!auth.ok) {
-    return new NextResponse("Unauthorized", { status: 401 });
+    // 401 = no session; 403 = signed in but not on the ADMIN_EMAILS allowlist.
+    return new NextResponse(auth.reason === "unauthenticated" ? "Unauthorized" : "Forbidden", {
+      status: auth.reason === "unauthenticated" ? 401 : 403,
+      headers: { "Cache-Control": "private, no-store" },
+    });
   }
 
   const urlBase = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || process.env.SUPABASE_URL?.trim();

@@ -28,7 +28,7 @@ async function countEvents(
 }
 
 export default async function AdminAnalyticsPage() {
-  const auth = await requireAdminUserOrRedirectLogin();
+  const auth = await requireAdminUserOrRedirectLogin("/admin/analytics");
   if (!auth.ok) {
     return <AdminNotAuthorized userEmail={auth.userEmail ?? ""} />;
   }

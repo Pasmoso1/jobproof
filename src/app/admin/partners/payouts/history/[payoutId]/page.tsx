@@ -13,7 +13,7 @@ export default async function AdminPayoutHistoryDetailPage({
   params: Promise<{ payoutId: string }>;
 }) {
   const { payoutId } = await params;
-  const auth = await requireAdminUserOrRedirectLogin();
+  const auth = await requireAdminUserOrRedirectLogin(`/admin/partners/payouts/history/${encodeURIComponent(payoutId)}`);
   if (!auth.ok) return <AdminNotAuthorized userEmail={auth.userEmail ?? ""} />;
 
   const admin = createServiceRoleClient();

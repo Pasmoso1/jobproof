@@ -58,12 +58,17 @@ export function PayoutDashboardClient({
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [auditWarning, setAuditWarning] = useState<string | null>(null);
   const [invalidateId, setInvalidateId] = useState<string | null>(null);
   const [invalidateReason, setInvalidateReason] = useState("");
 
-  function run(fn: () => Promise<{ ok: boolean; error?: string }>, success?: string) {
+  function run(
+    fn: () => Promise<{ ok: boolean; error?: string; auditWarning?: string }>,
+    success?: string
+  ) {
     setMessage(null);
     setError(null);
+    setAuditWarning(null);
     startTransition(async () => {
       const result = await fn();
       if (!result.ok) {
@@ -71,6 +76,7 @@ export function PayoutDashboardClient({
         return;
       }
       setMessage(success ?? "Updated");
+      if (result.auditWarning) setAuditWarning(result.auditWarning);
       router.refresh();
     });
   }
@@ -88,6 +94,14 @@ export function PayoutDashboardClient({
           {error ?? message}
         </div>
       )}
+      {auditWarning ? (
+        <div
+          role="alert"
+          className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          {auditWarning}
+        </div>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-zinc-900">Ready for payment</h2>

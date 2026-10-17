@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient as createAuthedClient } from "@/lib/supabase/server";
-import { ADMIN_LOGIN_PATH } from "@/lib/admin-constants";
+import { ADMIN_LOGIN_PATH, buildAdminLoginPath } from "@/lib/admin-constants";
 
 export { ADMIN_LOGIN_PATH } from "@/lib/admin-constants";
 
@@ -36,13 +36,17 @@ export async function requireAdminUser(): Promise<
   return { ok: true, userEmail: user.email ?? "" };
 }
 
-export async function requireAdminUserOrRedirectLogin(): Promise<
+/**
+ * Page-level guard. Unauthenticated visitors are sent to login and returned to `nextPath`
+ * (a safe /admin/... path; anything else falls back to /admin).
+ */
+export async function requireAdminUserOrRedirectLogin(nextPath?: string): Promise<
   | { ok: true; userEmail: string }
   | { ok: false; reason: "not_authorized"; userEmail: string | null }
 > {
   const res = await requireAdminUser();
   if (!res.ok && res.reason === "unauthenticated") {
-    redirect(ADMIN_LOGIN_PATH);
+    redirect(nextPath ? buildAdminLoginPath(nextPath) : ADMIN_LOGIN_PATH);
   }
   if (!res.ok) {
     return { ok: false, reason: "not_authorized", userEmail: res.userEmail };

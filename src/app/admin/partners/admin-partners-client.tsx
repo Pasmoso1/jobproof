@@ -96,6 +96,7 @@ export function AdminPartnersClient({
   const [applications, setApplications] = useState(initialApplications);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [auditWarning, setAuditWarning] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
@@ -134,6 +135,7 @@ export function AdminPartnersClient({
     fn: () => Promise<{
       ok: boolean;
       error?: string;
+      auditWarning?: string;
       partnerId?: string;
       status?: string;
       decline_reason?: string;
@@ -150,6 +152,7 @@ export function AdminPartnersClient({
   ) {
     setMessage(null);
     setError(null);
+    setAuditWarning(null);
     startTransition(async () => {
       const result = await fn();
       if (!result.ok) {
@@ -158,6 +161,7 @@ export function AdminPartnersClient({
       }
       onSuccess?.(result);
       setMessage(adminActionSuccessMessage(actionKey));
+      if (result.auditWarning) setAuditWarning(result.auditWarning);
       router.refresh();
     });
   }
@@ -179,6 +183,14 @@ export function AdminPartnersClient({
         >
           {error}
         </p>
+      ) : null}
+      {auditWarning ? (
+        <div
+          role="alert"
+          className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          {auditWarning}
+        </div>
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">

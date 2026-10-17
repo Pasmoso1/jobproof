@@ -52,6 +52,7 @@ export function PartnerPayoutDetailClient({
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [auditWarning, setAuditWarning] = useState<string | null>(null);
 
   const canPay =
     referrals.length > 0 && hasPartnerPaymentEmail(paymentEmail) && totalAmountCad > 0;
@@ -66,6 +67,7 @@ export function PartnerPayoutDetailClient({
   async function openConfirm() {
     setError(null);
     setMessage(null);
+    setAuditWarning(null);
     const keyResult = await adminGenerateBatchPayoutIdempotencyKey(partnerId);
     if (keyResult.ok) {
       setIdempotencyKey(`${keyResult.key}:${keyResult.clientNonce}`);
@@ -96,6 +98,11 @@ export function PartnerPayoutDetailClient({
           : `Recorded $${result.amount.toFixed(0)} CAD payment for ${result.referralCount} referrals.`
       );
       router.refresh();
+      if (result.auditWarning) {
+        // Stay on this page so the administrator actually sees the warning.
+        setAuditWarning(`${result.auditWarning} Payout ID: ${result.payoutId}.`);
+        return;
+      }
       router.push("/admin/partners/payouts");
     });
   }
@@ -111,6 +118,14 @@ export function PartnerPayoutDetailClient({
           }`}
         >
           {error ?? message}
+        </div>
+      )}
+      {auditWarning && (
+        <div
+          role="alert"
+          className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          {auditWarning}
         </div>
       )}
 

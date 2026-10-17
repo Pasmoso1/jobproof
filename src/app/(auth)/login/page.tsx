@@ -10,7 +10,7 @@ import {
   resendSignupConfirmation,
   signInWithUsernameOrEmail,
 } from "@/lib/auth/credential-actions";
-import { resolveSafeLoginRedirect } from "@/lib/auth/safe-redirect";
+import { isAdminPath, resolveSafeLoginRedirect } from "@/lib/auth/safe-redirect";
 
 function readLoginFlashFromLocation(): {
   authError: boolean;
@@ -44,7 +44,8 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("next") ?? searchParams.get("redirect");
   const redirectTo = resolveSafeLoginRedirect(redirectParam, "/dashboard");
-  const isAdminLogin = redirectParam === "/admin";
+  // Any safe /admin deep link (e.g. /admin/users/<id>) uses the admin sign-in experience.
+  const isAdminLogin = isAdminPath(redirectParam);
   const [authError, setAuthError] = useState(() => readLoginFlashFromLocation().authError);
   const [resetLinkError, setResetLinkError] = useState(
     () => readLoginFlashFromLocation().resetLinkError

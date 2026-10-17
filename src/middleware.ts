@@ -9,7 +9,14 @@ import {
   needsTrialActivation,
   needsTrialExpiredIntro,
 } from "@/lib/trial-lifecycle";
-import { resolveAuthenticatedAuthPathRedirect } from "@/lib/auth/safe-redirect";
+import {
+  isAdminPath,
+  resolveAuthenticatedAuthPathRedirect,
+} from "@/lib/auth/safe-redirect";
+import {
+  ADMIN_RESPONSE_HEADERS,
+  resolveAdminMiddlewareRedirect,
+} from "@/lib/admin/middleware-guard";
 import { resolveContractorPostLoginPath } from "@/lib/auth/post-login-path";
 
 const PROTECTED_PATHS = [
@@ -76,6 +83,22 @@ export async function middleware(request: NextRequest) {
   const { response, user, profile } = await updateSession(request);
 
   const { pathname } = request.nextUrl;
+
+  // Admin area: anonymous visitors go to login with the deep link preserved. Who counts
+  // as an admin (ADMIN_EMAILS) is enforced server-side on every page/action/route.
+  const adminLoginRedirect = resolveAdminMiddlewareRedirect({
+    pathname,
+    search: request.nextUrl.search,
+    hasSession: Boolean(user),
+  });
+  if (adminLoginRedirect) {
+    return Response.redirect(new URL(adminLoginRedirect, request.nextUrl.origin));
+  }
+  if (isAdminPath(pathname)) {
+    for (const [name, value] of Object.entries(ADMIN_RESPONSE_HEADERS)) {
+      response.headers.set(name, value);
+    }
+  }
 
   if (isProtected(pathname) && !isOnboardingPath(pathname) && !user) {
     const url = request.nextUrl.clone();

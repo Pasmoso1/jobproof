@@ -3,6 +3,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { requireAdminUserOrRedirectLogin } from "@/lib/admin-auth";
 import { AdminNotAuthorized } from "@/app/admin/NotAuthorized";
 import { buildStripeReadinessReport } from "@/lib/stripe-readiness";
+import { JOBPROOF_TRIAL_DAYS } from "@/lib/trial-lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
 }
 
 export default async function AdminStripeReadinessPage() {
-  const auth = await requireAdminUserOrRedirectLogin();
+  const auth = await requireAdminUserOrRedirectLogin("/admin/stripe-readiness");
   if (!auth.ok) {
     return <AdminNotAuthorized userEmail={auth.userEmail ?? ""} />;
   }
@@ -241,8 +242,9 @@ export default async function AdminStripeReadinessPage() {
           <h2 className="text-base font-semibold text-zinc-900">New signup vs legacy beta</h2>
           <ul className="mt-3 list-inside list-disc space-y-2 text-sm text-zinc-700">
             <li>
-              <strong className="font-medium text-zinc-900">New signups:</strong> plan selection starts Stripe
-              Checkout (live keys in production). Payment method required; 7-day trial before billing.
+              <strong className="font-medium text-zinc-900">New signups:</strong> choosing a plan starts the
+              JobProof-managed {JOBPROOF_TRIAL_DAYS}-day free trial (no card required). Stripe Checkout (live
+              keys in production) is used when the contractor subscribes; no Stripe trial period is added.
             </li>
             <li>
               <strong className="font-medium text-zinc-900">Legacy beta testers:</strong>{" "}

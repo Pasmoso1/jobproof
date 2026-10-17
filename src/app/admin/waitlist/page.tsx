@@ -30,7 +30,7 @@ export default async function AdminWaitlistPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const auth = await requireAdminUserOrRedirectLogin();
+  const auth = await requireAdminUserOrRedirectLogin("/admin/waitlist");
   if (!auth.ok) {
     return <AdminNotAuthorized userEmail={auth.userEmail ?? ""} />;
   }
